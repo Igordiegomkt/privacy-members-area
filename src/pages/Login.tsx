@@ -90,6 +90,7 @@ export const Login: React.FC = () => {
           };
 
           const { data, error: supabaseError } = await (supabase
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
             .from('first_access') as any)
             .insert([payload])
             .select('id')

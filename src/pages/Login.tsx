@@ -8,7 +8,6 @@ import {
   saveUTMsToLocalStorage 
 } from '../utils/utmParser';
 import { TrackingScripts } from '../components/TrackingScripts';
-import { FirstAccessRecord } from '../types';
 
 export const Login: React.FC = () => {
   const [name, setName] = useState('');
@@ -72,7 +71,7 @@ export const Login: React.FC = () => {
       let accessId = '';
       if (supabase) {
         try {
-          const payload: FirstAccessRecord = {
+          const payload = {
             name: name.trim(),
             is_adult: isAdult,
             ip_address: ipAddress,
@@ -90,9 +89,9 @@ export const Login: React.FC = () => {
             operating_system: deviceInfo.operating_system,
           };
 
-          const { data, error: supabaseError } = await supabase
-            .from<FirstAccessRecord>('first_access')
-            .insert(payload)
+          const { data, error: supabaseError } = await (supabase
+            .from('first_access') as any)
+            .insert([payload])
             .select('id')
             .maybeSingle();
 
@@ -112,8 +111,8 @@ export const Login: React.FC = () => {
             // Para outros erros, mostrar mensagem mas permitir continuar
             console.warn('Erro ao registrar no Supabase, mas permitindo acesso continuar');
           }
-          } else {
-            accessId = data?.id || '';
+          } else if (data) {
+            accessId = (data as { id: string })?.id || '';
             console.log('Acesso registrado com sucesso:', accessId);
           }
         } catch (supabaseErr) {

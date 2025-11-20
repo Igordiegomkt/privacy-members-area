@@ -17,9 +17,9 @@ export const Login: React.FC = () => {
     const userName = localStorage.getItem('userName');
     
       if (isAuthenticated && userName) {
-      // Usuário já registrado, redirecionar direto para home
+      // Usuário já registrado, redirecionar direto para mural
       console.log('Usuário já autenticado, redirecionando...');
-      navigate('/home', { replace: true });
+      navigate('/mural', { replace: true });
       return;
     }
     
@@ -80,8 +80,8 @@ export const Login: React.FC = () => {
         localStorage.setItem('firstAccessId', accessId);
       }
 
-      // Redirecionar para a página home
-      navigate('/home');
+      // Redirecionar para o mural
+      navigate('/mural');
     } catch (err) {
       console.error('Erro inesperado:', err);
       // Mesmo com erro, permitir acesso se os dados básicos estão ok
@@ -90,7 +90,7 @@ export const Login: React.FC = () => {
         localStorage.setItem('isAuthenticated', 'true');
         localStorage.setItem('userName', trimmedName);
         localStorage.setItem('userIsAdult', isAdult ? 'true' : 'false');
-        navigate('/home');
+        navigate('/mural');
       } else {
         setError('Ocorreu um erro inesperado. Tente novamente.');
         setIsLoading(false);

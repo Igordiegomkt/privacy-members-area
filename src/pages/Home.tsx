@@ -1,5 +1,6 @@
 import React, { useEffect, useMemo, useState } from 'react';
 import { Header } from '../components/Header';
+import { BottomNavigation } from '../components/BottomNavigation';
 import { useProtection } from '../hooks/useProtection';
 import { registerAuthenticatedPageAccess } from '../lib/accessLogger';
 import { MEDIA_CONFIG, generateVideos, generatePhotos } from '../config/media';
@@ -258,6 +259,11 @@ const ContentTabs: React.FC<{
 
 const FeedPostCard: React.FC<{ post: FeedPost }> = ({ post }) => {
   const isVideo = post.type === 'video';
+  const [isPlaying, setIsPlaying] = React.useState(false);
+  const videoRef = React.useRef<HTMLVideoElement>(null);
+
+  const handlePlay = () => setIsPlaying(true);
+  const handlePause = () => setIsPlaying(false);
 
   return (
     <article className="mb-6 space-y-3 bg-dark-lighter/30 rounded-2xl p-4">
@@ -285,20 +291,35 @@ const FeedPostCard: React.FC<{ post: FeedPost }> = ({ post }) => {
       {/* Mídia */}
       <div className="relative w-full overflow-hidden rounded-xl">
         {isVideo ? (
-          <video
-            src={post.mediaUrl}
-            poster={post.thumbnail}
-            className={`w-full object-cover ${post.isPaid ? 'blur-xl' : ''} transition`}
-            style={{ 
-              aspectRatio: '9/16',
-              maxHeight: '600px',
-              objectFit: 'cover',
-              display: 'block'
-            }}
-            controls={!post.isPaid}
-            controlsList="nodownload"
-            preload="metadata"
-          />
+          <>
+            <video
+              ref={videoRef}
+              src={post.mediaUrl}
+              poster={post.thumbnail}
+              className={`w-full object-cover ${post.isPaid ? 'blur-xl' : ''} transition`}
+              style={{ 
+                aspectRatio: '9/16',
+                maxHeight: '600px',
+                objectFit: 'cover',
+                display: 'block'
+              }}
+              controls={!post.isPaid}
+              controlsList="nodownload"
+              preload="metadata"
+              onPlay={handlePlay}
+              onPause={handlePause}
+            />
+            {/* Overlay de vídeo (só aparece quando não está reproduzindo) */}
+            {!post.isPaid && !isPlaying && (
+              <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
+                <div className="flex h-16 w-16 items-center justify-center rounded-full bg-black/60">
+                  <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
+                    <path d="M8 5v14l11-7z" />
+                  </svg>
+                </div>
+              </div>
+            )}
+          </>
         ) : (
           <img
             src={post.mediaUrl}
@@ -313,17 +334,6 @@ const FeedPostCard: React.FC<{ post: FeedPost }> = ({ post }) => {
             loading="lazy"
             draggable={false}
           />
-        )}
-
-        {/* Overlay de vídeo (quando não é pago) */}
-        {isVideo && !post.isPaid && (
-          <div className="absolute inset-0 flex items-center justify-center pointer-events-none">
-            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-black/60">
-              <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
-                <path d="M8 5v14l11-7z" />
-              </svg>
-            </div>
-          </div>
         )}
 
         {/* Overlay de conteúdo pago */}
@@ -450,6 +460,8 @@ export const Home: React.FC = () => {
           )}
         </div>
       </main>
+
+      <BottomNavigation />
     </div>
   );
 };

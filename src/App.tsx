@@ -2,7 +2,8 @@ import React from 'react';
 import { BrowserRouter, Routes, Route, Navigate } from 'react-router-dom';
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
-import { Profile } from './pages/Profile';
+import { Feed } from './pages/Feed';
+import { Trending } from './pages/Trending';
 
 // Componente de rota protegida
 const ProtectedRoute: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -21,7 +22,7 @@ function App() {
       <Routes>
         <Route path="/login" element={<Login />} />
         <Route
-          path="/home"
+          path="/mural"
           element={
             <ProtectedRoute>
               <Home />
@@ -29,13 +30,24 @@ function App() {
           }
         />
         <Route
-          path="/profile"
+          path="/feed"
           element={
             <ProtectedRoute>
-              <Profile />
+              <Feed />
             </ProtectedRoute>
           }
         />
+        <Route
+          path="/trending"
+          element={
+            <ProtectedRoute>
+              <Trending />
+            </ProtectedRoute>
+          }
+        />
+        {/* Redirecionamentos para compatibilidade */}
+        <Route path="/home" element={<Navigate to="/mural" replace />} />
+        <Route path="/profile" element={<Navigate to="/feed" replace />} />
         <Route path="/" element={<Navigate to="/login" replace />} />
       </Routes>
     </BrowserRouter>

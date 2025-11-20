@@ -1,5 +1,6 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from '../components/Header';
+import { BottomNavigation } from '../components/BottomNavigation';
 import { Avatar } from '../components/Avatar';
 import { BioCard } from '../components/BioCard';
 import { MediaGrid } from '../components/MediaGrid';
@@ -228,6 +229,8 @@ export const Profile: React.FC = () => {
         media={selectedMedia} 
         onClose={handleCloseModal}
       />
+
+      <BottomNavigation />
     </div>
   );
 };

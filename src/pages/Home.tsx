@@ -3,34 +3,9 @@ import { Header } from '../components/Header';
 import { useProtection } from '../hooks/useProtection';
 import { registerAuthenticatedPageAccess } from '../lib/accessLogger';
 
-interface CreatorHighlight {
-  id: string;
-  name: string;
-  username: string;
-  avatar: string;
-  badge?: string;
-  isOnline?: boolean;
-  tag?: string;
-}
+type ContentFilter = 'posts' | 'media';
 
-interface DiscoveryCard {
-  id: string;
-  title: string;
-  description: string;
-  image: string;
-  tag: string;
-}
-
-interface BottomNavItem {
-  id: string;
-  label: string;
-  icon: React.ReactNode;
-  isActive?: boolean;
-}
-
-type FeedFilter = 'all' | 'photos' | 'videos' | 'paid';
-
-interface FeedItem {
+interface FeedPost {
   id: string;
   creator: string;
   username: string;
@@ -39,374 +14,328 @@ interface FeedItem {
   type: 'photo' | 'video';
   likes: string;
   comments: string;
+  views?: string;
   timestamp: string;
   description: string;
   isPaid?: boolean;
 }
 
-const privacyWeekCreators: CreatorHighlight[] = [
+const feedPosts: FeedPost[] = [
   {
-    id: 'denise',
-    name: 'Denise Rocha',
-    username: '@deniserocha',
-    avatar: 'https://images.unsplash.com/photo-1504593811423-6dd665756598?w=400&h=400&fit=crop',
-    badge: '🔥',
-    isOnline: true,
-  },
-  {
-    id: 'levadaa',
-    name: 'Levadaa',
-    username: '@levadaa',
-    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=400&h=400&fit=crop',
-    badge: 'VIP',
-  },
-  {
-    id: 'naih',
-    name: 'Naih',
-    username: '@naihpriv',
-    avatar: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=400&h=400&fit=crop',
-  },
-  {
-    id: 'karol',
-    name: 'Karol',
-    username: '@karolpvt',
-    avatar: 'https://images.unsplash.com/photo-1504593811423-6dd665756598?w=401&h=500&fit=crop',
-    badge: 'Novo',
-  },
-];
-
-const topCreators: CreatorHighlight[] = [
-  {
-    id: 'alice',
-    name: 'Alice Moraes',
-    username: '@alicevip',
-    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=500&h=500&fit=crop',
-    tag: 'Top 1',
-  },
-  {
-    id: 'bella',
-    name: 'Bella Castro',
-    username: '@bellacastro',
-    avatar: 'https://images.unsplash.com/photo-1521572163474-6864f9cf17ab?w=500&h=500&fit=crop',
-    tag: 'Live',
-    isOnline: true,
-  },
-  {
-    id: 'mia',
-    name: 'Mia Fernandes',
-    username: '@miafernandes',
-    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=401&h=400&fit=crop',
-  },
-  {
-    id: 'sofia',
-    name: 'Sofia Dias',
-    username: '@sofiadias',
-    avatar: 'https://images.unsplash.com/photo-1504593811423-6dd665756598?w=401&h=401&fit=crop',
-    tag: 'Promo',
-  },
-];
-
-const discoveryCards: DiscoveryCard[] = [
-  {
-    id: 'black-friday',
-    title: 'Black Friday VIP',
-    description: 'Planos com 50% OFF por tempo limitado',
-    image: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=600&h=400&fit=crop',
-    tag: 'Promoção',
-  },
-  {
-    id: 'new-creators',
-    title: 'Novas criadoras',
-    description: 'Perfis selecionados para você acompanhar',
-    image: 'https://images.unsplash.com/photo-1504593811423-6dd665756598?w=600&h=400&fit=crop',
-    tag: 'Descubra',
-  },
-];
-
-const bottomNavItems: BottomNavItem[] = [
-  {
-    id: 'mural',
-    label: 'Mural',
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M3 7l9-4 9 4-9 4-9-4zm0 0v10l9 4 9-4V7"
-        />
-      </svg>
-    ),
-  },
-  {
-    id: 'feed',
-    label: 'Feed',
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-      </svg>
-    ),
-  },
-  {
-    id: 'trending',
-    label: 'Em alta',
-    isActive: true,
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M13 10V3L4 14h7v7l9-11h-7z"
-        />
-      </svg>
-    ),
-  },
-  {
-    id: 'chat',
-    label: 'Chat',
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
-        <path
-          strokeLinecap="round"
-          strokeLinejoin="round"
-          d="M7 8h10M7 12h6m5 8l-4-4H7a4 4 0 01-4-4V7a4 4 0 014-4h10a4 4 0 014 4v5"
-        />
-      </svg>
-    ),
-  },
-  {
-    id: 'menu',
-    label: 'Menu',
-    icon: (
-      <svg viewBox="0 0 24 24" className="w-5 h-5" fill="none" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M12 6v.01M12 12v.01M12 18v.01M12 6a1 1 0 110-2 1 1 0 010 2z" />
-      </svg>
-    ),
-  },
-];
-
-const feedItems: FeedItem[] = [
-  {
-    id: 'feed-1',
-    creator: 'Denise Rocha',
-    username: '@deniserocha',
+    id: 'post-1',
+    creator: 'Bia',
+    username: '@bia',
     avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&h=200&fit=crop',
     mediaUrl: 'https://images.unsplash.com/photo-1517841905240-472988babdf9?w=800&h=1000&fit=crop',
-    type: 'photo',
-    likes: '42,1 mil',
-    comments: '1.248',
-    timestamp: 'há 2h',
-    description: 'Esquenta pro Privacy Week 🔥',
-  },
-  {
-    id: 'feed-2',
-    creator: 'Levadaa',
-    username: '@levadaa',
-    avatar: 'https://images.unsplash.com/photo-1504593811423-6dd665756598?w=200&h=200&fit=crop',
-    mediaUrl: 'https://images.unsplash.com/photo-1519183071298-a2962be90b8e?w=800&h=1000&fit=crop',
     type: 'video',
-    likes: '31,8 mil',
-    comments: '980',
-    timestamp: 'há 4h',
-    description: 'Clipe exclusivo só pros assinantes 👀',
+    likes: '290',
+    comments: '50',
+    views: '2K',
+    timestamp: 'há 2h',
+    description: 'Sou virgem de 19 anos, mas morro de vontade de te dar o meu primeiro...',
   },
   {
-    id: 'feed-3',
-    creator: 'Naih',
-    username: '@naihpriv',
-    avatar: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=200&h=200&fit=crop',
+    id: 'post-2',
+    creator: 'Bia',
+    username: '@bia',
+    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&h=200&fit=crop',
+    mediaUrl: 'https://images.unsplash.com/photo-1504593811423-6dd665756598?w=800&h=1000&fit=crop',
+    type: 'photo',
+    likes: '290',
+    comments: '50',
+    views: '2K',
+    timestamp: 'há 1h',
+    description: 'Mood de hoje 🧡',
+  },
+  {
+    id: 'post-3',
+    creator: 'Bia',
+    username: '@bia',
+    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&h=200&fit=crop',
+    mediaUrl: 'https://images.unsplash.com/photo-1519183071298-a2962be90b8e?w=800&h=1000&fit=crop',
+    type: 'photo',
+    likes: '290',
+    comments: '50',
+    views: '2K',
+    timestamp: 'há 3h',
+    description: 'Esquenta pro Privacy Week 🔥',
+    isPaid: true,
+  },
+  {
+    id: 'post-4',
+    creator: 'Bia',
+    username: '@bia',
+    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&h=200&fit=crop',
     mediaUrl: 'https://images.unsplash.com/photo-1487412720507-e7ab37603c6f?w=800&h=1000&fit=crop',
     type: 'photo',
-    likes: '18,5 mil',
-    comments: '543',
-    timestamp: 'há 6h',
-    description: 'Mood de sexta 🧡',
+    likes: '290',
+    comments: '50',
+    views: '2K',
+    timestamp: 'há 4h',
+    description: 'Selfie do espelho 📸',
   },
   {
-    id: 'feed-4',
-    creator: 'Conteúdo Premium',
-    username: '@novidade',
+    id: 'post-5',
+    creator: 'Bia',
+    username: '@bia',
+    avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&h=200&fit=crop',
+    mediaUrl: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=800&h=1000&fit=crop',
+    type: 'video',
+    likes: '290',
+    comments: '50',
+    views: '2K',
+    timestamp: 'há 5h',
+    description: 'Clipe exclusivo só pros assinantes 👀',
+    isPaid: true,
+  },
+  {
+    id: 'post-6',
+    creator: 'Bia',
+    username: '@bia',
     avatar: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&h=200&fit=crop',
     mediaUrl: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=1000&fit=crop',
     type: 'photo',
-    likes: '★ Exclusivo',
-    comments: '★ VIP',
-    timestamp: 'Conteúdo novo',
-    description: 'Desbloqueie pra ver tudo!',
-    isPaid: true,
+    likes: '290',
+    comments: '50',
+    views: '2K',
+    timestamp: 'há 6h',
+    description: 'Deitada na cama 😴',
   },
 ];
 
-const SectionHeader: React.FC<{ title: string; actionLabel?: string }> = ({ title, actionLabel = 'Ver tudo' }) => (
-  <div className="flex items-center justify-between mb-4">
-    <h2 className="text-xl font-semibold text-white">{title}</h2>
-    <button className="text-sm text-primary flex items-center gap-1">
-      {actionLabel}
-      <svg viewBox="0 0 24 24" className="w-4 h-4" fill="none" stroke="currentColor" strokeWidth={2}>
-        <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
+const ProfileHighlight: React.FC = () => (
+  <div className="relative mb-6">
+    {/* Banner */}
+    <div className="relative h-48 w-full overflow-hidden rounded-b-3xl">
+      <img
+        src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&h=400&fit=crop"
+        alt="Banner"
+        className="h-full w-full object-cover"
+        loading="lazy"
+      />
+      <div className="absolute inset-0 bg-gradient-to-b from-transparent to-black/60" />
+    </div>
+
+    {/* Avatar e Info */}
+    <div className="relative -mt-16 px-4">
+      <div className="flex items-start gap-4">
+        <div className="relative">
+          <img
+            src="https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=200&h=200&fit=crop"
+            alt="Bia"
+            className="h-24 w-24 rounded-full border-4 border-dark object-cover"
+            loading="lazy"
+          />
+          <span className="absolute bottom-0 right-0 h-4 w-4 rounded-full border-2 border-dark bg-green-400" />
+        </div>
+
+        <div className="flex-1 pt-2">
+          <h2 className="text-xl font-bold text-white">Bia</h2>
+          <p className="text-sm text-gray-400">@biabeeyfree</p>
+          <p className="mt-2 text-sm text-gray-300">
+            Sou virgem de 19 anos... mas morro de curiosidade desse mundo proibido 🐒 Pra voc
+          </p>
+          <button className="mt-2 text-sm font-semibold text-primary">Ler mais</button>
+
+          <div className="mt-4 flex items-center gap-6">
+            <div className="flex items-center gap-2">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
+              </svg>
+              <span className="text-sm text-gray-300">6</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+              </svg>
+              <span className="text-sm text-gray-300">5</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
+              <span className="text-sm text-gray-300">1</span>
+            </div>
+            <div className="flex items-center gap-2">
+              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+              <span className="text-sm text-gray-300">10.3</span>
+            </div>
+          </div>
+
+          <div className="mt-4 flex gap-3">
+            <button className="flex-1 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark">
+              <span className="flex items-center justify-center gap-2">
+                <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
+                  <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
+                </svg>
+                Mimo
+              </span>
+            </button>
+            <button className="flex-1 rounded-full border border-primary px-4 py-2 text-sm font-semibold text-primary">
+              <span className="flex items-center justify-center gap-2">
+                <svg className="h-4 w-4" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+                </svg>
+                Chat
+              </span>
+            </button>
+          </div>
+        </div>
+      </div>
+    </div>
+  </div>
+);
+
+const ContentTabs: React.FC<{
+  activeFilter: ContentFilter;
+  onChange: (filter: ContentFilter) => void;
+  postsCount: number;
+  mediaCount: number;
+}> = ({ activeFilter, onChange, postsCount, mediaCount }) => (
+  <div className="mb-6 flex items-center justify-center gap-8 border-b border-dark-lighter">
+    <button
+      onClick={() => onChange('posts')}
+      className={`flex items-center gap-2 border-b-2 pb-3 transition ${
+        activeFilter === 'posts'
+          ? 'border-primary text-primary'
+          : 'border-transparent text-gray-400'
+      }`}
+    >
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z" />
       </svg>
+      <span className="text-sm font-semibold">{postsCount} Postagens</span>
+    </button>
+    <button
+      onClick={() => onChange('media')}
+      className={`flex items-center gap-2 border-b-2 pb-3 transition ${
+        activeFilter === 'media'
+          ? 'border-primary text-primary'
+          : 'border-transparent text-gray-400'
+      }`}
+    >
+      <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
+      </svg>
+      <span className="text-sm font-semibold">{mediaCount} Mídias</span>
     </button>
   </div>
 );
 
-const CreatorCard: React.FC<{ creator: CreatorHighlight }> = ({ creator }) => (
-  <div className="min-w-[140px] rounded-3xl bg-dark-lighter/70 p-3 mr-4">
-    <div className="relative overflow-hidden rounded-2xl">
-      <img src={creator.avatar} alt={creator.name} className="h-40 w-full object-cover" loading="lazy" />
-      {creator.isOnline && <span className="absolute top-3 left-3 h-2.5 w-2.5 rounded-full bg-green-400 shadow-lg"></span>}
-      {creator.badge && (
-        <span className="absolute top-3 right-3 rounded-full bg-white/90 px-2 py-0.5 text-[10px] font-semibold uppercase text-dark">
-          {creator.badge}
-        </span>
-      )}
-    </div>
-    <div className="mt-3 space-y-1">
-      <p className="text-sm font-semibold text-white">{creator.name}</p>
-      <p className="text-xs text-gray-400">{creator.username}</p>
-      {creator.tag && <span className="text-[11px] text-primary uppercase font-semibold">{creator.tag}</span>}
-    </div>
-  </div>
-);
-
-const DiscoveryCardComponent: React.FC<{ card: DiscoveryCard }> = ({ card }) => (
-  <div className="flex items-center gap-3 rounded-3xl bg-dark-lighter/60 p-3">
-    <div className="relative h-16 w-16 overflow-hidden rounded-2xl">
-      <img src={card.image} alt={card.title} className="h-full w-full object-cover" loading="lazy" />
-      <span className="absolute inset-0 bg-gradient-to-tr from-primary/40 to-transparent" />
-    </div>
-    <div className="flex-1">
-      <span className="text-[11px] uppercase tracking-wide text-primary">{card.tag}</span>
-      <p className="text-sm font-semibold text-white">{card.title}</p>
-      <p className="text-xs text-gray-400">{card.description}</p>
-    </div>
-    <svg viewBox="0 0 24 24" className="w-4 h-4 text-gray-400" fill="none" stroke="currentColor" strokeWidth={2}>
-      <path strokeLinecap="round" strokeLinejoin="round" d="M9 5l7 7-7 7" />
-    </svg>
-  </div>
-);
-
-const HeroBanner: React.FC = () => (
-  <section className="relative overflow-hidden rounded-4xl rounded-[32px]">
-    <img
-      src="https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=900&h=600&fit=crop"
-      alt="Privacy Week"
-      className="h-56 w-full object-cover"
-      loading="lazy"
-    />
-    <div className="absolute inset-0 bg-gradient-to-b from-black/20 via-black/40 to-black/80 p-6 flex flex-col justify-end">
-      <p className="text-sm uppercase tracking-widest text-white/80">aproveite a</p>
-      <h2 className="text-3xl font-bold text-white leading-tight">privacy week</h2>
-      <p className="text-sm text-gray-200 mb-4">Assinaturas com experiências exclusivas</p>
-      <button className="self-start rounded-full bg-white/90 px-4 py-2 text-sm font-semibold text-dark transition hover:bg-white">
-        Assinar agora
-      </button>
-    </div>
-  </section>
-);
-
-const BottomNavigation: React.FC = () => (
-  <nav className="fixed bottom-5 left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-between rounded-full bg-dark-lighter/80 px-6 py-3 backdrop-blur">
-    {bottomNavItems.map((item) => (
-      <button
-        key={item.id}
-        className={`flex flex-col items-center gap-1 text-xs ${
-          item.isActive ? 'text-white' : 'text-gray-400'
-        }`}
-      >
-        <span
-          className={`flex h-10 w-10 items-center justify-center rounded-full ${
-            item.isActive ? 'bg-primary text-white shadow-primary/40 shadow-lg' : ''
-          }`}
-        >
-          {item.icon}
-        </span>
-        {item.label}
-      </button>
-    ))}
-  </nav>
-);
-
-const FeedFilters: React.FC<{
-  activeFilter: FeedFilter;
-  onChange: (filter: FeedFilter) => void;
-}> = ({ activeFilter, onChange }) => {
-  const filters: { id: FeedFilter; label: string }[] = [
-    { id: 'all', label: 'Todos' },
-    { id: 'photos', label: 'Fotos' },
-    { id: 'videos', label: 'Vídeos' },
-    { id: 'paid', label: 'Pagos' },
-  ];
+const FeedPostCard: React.FC<{ post: FeedPost }> = ({ post }) => {
+  const isVideo = post.type === 'video';
 
   return (
-    <div className="flex gap-3 rounded-full bg-dark-lighter/50 p-1">
-      {filters.map((filter) => (
-        <button
-          key={filter.id}
-          onClick={() => onChange(filter.id)}
-          className={`flex-1 rounded-full py-2 text-sm font-semibold transition ${
-            activeFilter === filter.id ? 'bg-white text-dark' : 'text-gray-300'
-          }`}
-        >
-          {filter.label}
-        </button>
-      ))}
-    </div>
-  );
-};
-
-const FeedCard: React.FC<{ item: FeedItem }> = ({ item }) => {
-  const isVideo = item.type === 'video';
-
-  return (
-    <article className="rounded-3xl bg-dark-lighter/70 p-4 space-y-3">
-      <header className="flex items-center gap-3">
-        <img src={item.avatar} alt={item.creator} className="h-10 w-10 rounded-full object-cover" loading="lazy" />
-        <div className="flex-1">
-          <p className="text-sm font-semibold text-white">{item.creator}</p>
-          <p className="text-xs text-gray-400">{item.username}</p>
+    <article className="mb-6 space-y-3">
+      {/* Header do Post */}
+      <header className="flex items-center justify-between px-4">
+        <div className="flex items-center gap-3">
+          <img
+            src={post.avatar}
+            alt={post.creator}
+            className="h-10 w-10 rounded-full object-cover"
+            loading="lazy"
+          />
+          <div>
+            <p className="text-sm font-semibold text-white">{post.creator}</p>
+            <p className="text-xs text-gray-400">{post.username}</p>
+          </div>
         </div>
-        <span className="text-[11px] text-gray-500">{item.timestamp}</span>
+        <span className="text-xs text-gray-500">{post.timestamp}</span>
       </header>
 
-      <div className="relative overflow-hidden rounded-3xl">
-        <img src={item.mediaUrl} alt={item.description} className={`w-full h-96 object-cover ${item.isPaid ? 'blur-xl' : ''} transition`} loading="lazy" />
-        {isVideo && !item.isPaid && (
-          <span className="absolute inset-0 flex items-center justify-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-white">
-              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="currentColor">
+      {/* Mídia */}
+      <div className="relative w-full">
+        <img
+          src={post.mediaUrl}
+          alt={post.description}
+          className={`w-full object-cover ${post.isPaid ? 'blur-xl' : 'h-auto'} transition`}
+          style={{ aspectRatio: post.isPaid ? '9/16' : 'auto', maxHeight: post.isPaid ? '600px' : 'none' }}
+          loading="lazy"
+        />
+
+        {/* Overlay de vídeo */}
+        {isVideo && !post.isPaid && (
+          <div className="absolute inset-0 flex items-center justify-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-black/60">
+              <svg className="h-8 w-8 text-white" fill="currentColor" viewBox="0 0 24 24">
                 <path d="M8 5v14l11-7z" />
               </svg>
-            </span>
-          </span>
+            </div>
+          </div>
         )}
-        {item.isPaid && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center gap-3 bg-black/60 text-center">
-            <span className="flex h-12 w-12 items-center justify-center rounded-full bg-white/10 text-white">
-              <svg viewBox="0 0 24 24" className="w-6 h-6" fill="none" stroke="currentColor" strokeWidth={2}>
-                <path strokeLinecap="round" strokeLinejoin="round" d="M12 11V7a4 4 0 00-8 0v4m15 0H5a1 1 0 00-1 1v7a1 1 0 001 1h14a1 1 0 001-1v-7a1 1 0 00-1-1z" />
+
+        {/* Overlay de conteúdo pago */}
+        {post.isPaid && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center gap-4 bg-black/70 text-center">
+            <div className="flex h-16 w-16 items-center justify-center rounded-full bg-white/10">
+              <svg className="h-8 w-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-            </span>
-            <p className="text-sm font-semibold text-white">Conteúdo exclusivo</p>
-            <p className="text-xs text-gray-300">Assine para desbloquear</p>
-            <button className="rounded-full bg-primary px-4 py-1 text-sm font-semibold text-dark">Ver planos</button>
+            </div>
+            <p className="text-base font-semibold text-white">Conteúdo exclusivo</p>
+            <button className="rounded-full bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-2 text-sm font-semibold text-white shadow-lg">
+              Ver planos
+            </button>
           </div>
         )}
       </div>
 
-      <p className="text-sm text-white">{item.description}</p>
-
-      {!item.isPaid && (
-        <div className="flex items-center justify-between text-xs text-gray-400">
-          <span>{item.likes} curtidas</span>
-          <span>{item.comments} comentários</span>
+      {/* Ações e Métricas */}
+      <div className="px-4 space-y-2">
+        {/* Botões de ação */}
+        <div className="flex items-center justify-between">
+          <div className="flex items-center gap-4">
+            <button className="text-white hover:text-red-500 transition">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
+              </svg>
+            </button>
+            <button className="text-white hover:text-blue-500 transition">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+            </button>
+            <button className="text-white hover:text-green-500 transition">
+              <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
+              </svg>
+            </button>
+          </div>
+          <button className="text-white hover:text-yellow-500 transition">
+            <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
+            </svg>
+          </button>
         </div>
-      )}
+
+        {/* Métricas */}
+        {!post.isPaid && (
+          <div className="space-y-1">
+            <p className="text-sm font-semibold text-white">{post.likes} curtidas</p>
+            <div className="flex items-center gap-4 text-xs text-gray-400">
+              <span>{post.comments} comentários</span>
+              {post.views && <span>{post.views} views</span>}
+            </div>
+          </div>
+        )}
+
+        {/* Descrição */}
+        <div className="space-y-1">
+          <p className="text-sm text-white">
+            <span className="font-semibold">{post.username}</span> {post.description}
+          </p>
+        </div>
+      </div>
     </article>
   );
 };
 
 export const Home: React.FC = () => {
   useProtection();
-  const [activeFeedFilter, setActiveFeedFilter] = useState<FeedFilter>('all');
+  const [activeFilter, setActiveFilter] = useState<ContentFilter>('posts');
 
   useEffect(() => {
     registerAuthenticatedPageAccess('home').catch((error) => {
@@ -414,63 +343,38 @@ export const Home: React.FC = () => {
     });
   }, []);
 
-  const filteredFeed = useMemo(() => {
-    switch (activeFeedFilter) {
-      case 'photos':
-        return feedItems.filter((item) => item.type === 'photo' && !item.isPaid);
-      case 'videos':
-        return feedItems.filter((item) => item.type === 'video' && !item.isPaid);
-      case 'paid':
-        return feedItems.filter((item) => item.isPaid);
-      default:
-        return feedItems;
+  const filteredPosts = useMemo(() => {
+    if (activeFilter === 'media') {
+      return feedPosts.filter((post) => post.type === 'video' || post.type === 'photo');
     }
-  }, [activeFeedFilter]);
+    return feedPosts;
+  }, [activeFilter]);
+
+  const postsCount = feedPosts.length;
+  const mediaCount = feedPosts.filter((p) => p.type === 'photo' || p.type === 'video').length;
 
   return (
-    <div className="min-h-screen bg-dark text-white pb-28">
+    <div className="min-h-screen bg-dark text-white pb-20">
       <Header />
 
-      <main className="mx-auto flex w-full max-w-md flex-col gap-10 px-4 py-6 sm:max-w-xl">
-        <HeroBanner />
+      <main className="mx-auto w-full max-w-md">
+        <ProfileHighlight />
+        
+        <div className="px-4">
+          <ContentTabs
+            activeFilter={activeFilter}
+            onChange={setActiveFilter}
+            postsCount={postsCount}
+            mediaCount={mediaCount}
+          />
+        </div>
 
-        <section>
-          <SectionHeader title="Privacy Week" />
-          <div className="flex overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-            {privacyWeekCreators.map((creator) => (
-              <CreatorCard key={creator.id} creator={creator} />
-            ))}
-          </div>
-        </section>
-
-        <section>
-          <SectionHeader title="Top creators" actionLabel="Ranking" />
-          <div className="flex overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
-            {topCreators.map((creator) => (
-              <CreatorCard key={creator.id} creator={creator} />
-            ))}
-          </div>
-        </section>
-
-        <section className="space-y-3">
-          <SectionHeader title="Descubra mais" actionLabel="Explorar" />
-          {discoveryCards.map((card) => (
-            <DiscoveryCardComponent key={card.id} card={card} />
+        <div className="space-y-0">
+          {filteredPosts.map((post) => (
+            <FeedPostCard key={post.id} post={post} />
           ))}
-        </section>
-
-        <section className="space-y-4">
-          <SectionHeader title="Feed da comunidade" actionLabel="Ver mais" />
-          <FeedFilters activeFilter={activeFeedFilter} onChange={setActiveFeedFilter} />
-          <div className="space-y-4">
-            {filteredFeed.map((item) => (
-              <FeedCard key={item.id} item={item} />
-            ))}
-          </div>
-        </section>
+        </div>
       </main>
-
-      <BottomNavigation />
     </div>
   );
 };

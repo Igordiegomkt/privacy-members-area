@@ -343,6 +343,7 @@ export const Home: React.FC = () => {
   const [activeFilter, setActiveFilter] = useState<ContentFilter>('posts');
 
   useEffect(() => {
+    console.log('Home component mounted');
     registerAuthenticatedPageAccess('home').catch((error) => {
       console.error('Erro ao registrar acesso autenticado (home):', error);
     });
@@ -358,11 +359,13 @@ export const Home: React.FC = () => {
   const postsCount = feedPosts.length;
   const mediaCount = feedPosts.filter((p) => p.type === 'photo' || p.type === 'video').length;
 
+  console.log('Rendering Home with', filteredPosts.length, 'posts');
+
   return (
-    <div className="min-h-screen bg-dark text-white pb-20">
+    <div className="min-h-screen bg-dark text-white pb-20" style={{ backgroundColor: '#0F0F0F' }}>
       <Header />
 
-      <main className="mx-auto w-full max-w-md">
+      <main className="mx-auto w-full max-w-md" style={{ width: '100%', maxWidth: '448px' }}>
         <ProfileHighlight />
         
         <div className="px-4">
@@ -374,10 +377,14 @@ export const Home: React.FC = () => {
           />
         </div>
 
-        <div className="space-y-0">
-          {filteredPosts.map((post) => (
-            <FeedPostCard key={post.id} post={post} />
-          ))}
+        <div className="space-y-0" style={{ display: 'flex', flexDirection: 'column' }}>
+          {filteredPosts.length > 0 ? (
+            filteredPosts.map((post) => (
+              <FeedPostCard key={post.id} post={post} />
+            ))
+          ) : (
+            <div className="p-4 text-center text-gray-400">Nenhum post encontrado</div>
+          )}
         </div>
       </main>
     </div>

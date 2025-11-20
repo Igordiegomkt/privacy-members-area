@@ -21,17 +21,37 @@ export const Login: React.FC = () => {
     saveUTMsToLocalStorage();
   }, []);
 
+  // Função para validar nome completo (nome e sobrenome)
+  const validateFullName = (fullName: string): boolean => {
+    const trimmedName = fullName.trim();
+    if (!trimmedName) return false;
+    
+    // Verifica se tem pelo menos 2 palavras (nome e sobrenome)
+    const words = trimmedName.split(/\s+/).filter(word => word.length > 0);
+    return words.length >= 2;
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
+    // Validar se o nome foi preenchido
     if (!name.trim()) {
       setError('Por favor, informe seu nome');
+      alert('⚠️ Por favor, informe seu nome completo (nome e sobrenome)');
+      return;
+    }
+
+    // Validar se tem nome e sobrenome
+    if (!validateFullName(name)) {
+      setError('Por favor, informe seu nome completo (nome e sobrenome)');
+      alert('⚠️ Por favor, informe seu nome completo com nome e sobrenome.\n\nExemplo: João Silva');
       return;
     }
 
     if (!isAdult) {
       setError('Você precisa confirmar que é maior de idade para continuar');
+      alert('⚠️ Você precisa confirmar que é maior de idade para continuar');
       return;
     }
 
@@ -89,12 +109,12 @@ export const Login: React.FC = () => {
             operating_system: deviceInfo.operating_system,
           };
 
-          const { data, error: supabaseError } = await (supabase
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            .from('first_access') as any)
-            .insert([payload])
-            .select('id')
-            .maybeSingle();
+          // Inserir dados no Supabase
+          // eslint-disable-next-line @typescript-eslint/no-explicit-any
+          const insertResult = (supabase.from('first_access') as any).insert([payload]).select('id');
+          const { data, error: supabaseError } = await insertResult;
+          
+          console.log('Supabase insert result:', { data, error: supabaseError });
 
         if (supabaseError) {
           console.error('Erro ao registrar acesso no Supabase:', supabaseError);
@@ -113,8 +133,12 @@ export const Login: React.FC = () => {
             console.warn('Erro ao registrar no Supabase, mas permitindo acesso continuar');
           }
           } else if (data) {
-            accessId = (data as { id: string })?.id || '';
-            console.log('Acesso registrado com sucesso:', accessId);
+            // O data pode ser um array ou um objeto único
+            const resultData = Array.isArray(data) ? data[0] : data;
+            accessId = (resultData as { id: string })?.id || '';
+            console.log('✅ Acesso registrado com sucesso no Supabase. ID:', accessId);
+          } else {
+            console.warn('⚠️ Supabase retornou sem dados e sem erro');
           }
         } catch (supabaseErr) {
           console.error('Erro ao conectar com Supabase:', supabaseErr);
@@ -169,7 +193,7 @@ export const Login: React.FC = () => {
 
           <div>
             <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
-              Qual é o seu nome?
+              Qual é o seu nome completo?
             </label>
             <input
               id="name"
@@ -178,9 +202,10 @@ export const Login: React.FC = () => {
               onChange={(e) => setName(e.target.value)}
               required
               className="w-full px-4 py-3 bg-dark-lighter border border-dark-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-primary transition-colors"
-              placeholder="Digite seu nome"
+              placeholder="Ex: João Silva"
               disabled={isLoading}
             />
+            <p className="mt-1 text-xs text-gray-500">Informe seu nome e sobrenome</p>
           </div>
 
           <div>

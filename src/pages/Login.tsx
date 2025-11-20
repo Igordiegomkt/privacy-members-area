@@ -1,13 +1,8 @@
 import React, { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { 
-  getCombinedUTMs, 
-  getDeviceInfo, 
-  getReferrerDomain,
-  saveUTMsToLocalStorage 
-} from '../utils/utmParser';
+import { saveUTMsToLocalStorage } from '../utils/utmParser';
 import { TrackingScripts } from '../components/TrackingScripts';
+import { registerFirstAccess } from '../lib/accessLogger';
 
 export const Login: React.FC = () => {
   const [name, setName] = useState('');
@@ -69,108 +64,18 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Obter informações do navegador
-      const userAgent = navigator.userAgent;
-      
-      // Capturar UTMs
-      const utms = getCombinedUTMs();
-      
-      // Obter informações do dispositivo
-      const deviceInfo = getDeviceInfo();
-      
-      // Obter referrer
-      const referrer = document.referrer || null;
-      const referrerDomain = getReferrerDomain(referrer);
-      
-      // Landing page (primeira página acessada)
       const landingPage = window.location.href;
-      
-      // Tentar obter IP (pode não funcionar em todos os casos, mas tentamos)
-      let ipAddress = 'unknown';
-      try {
-        // Usar um serviço externo para obter o IP (opcional)
-        // Em produção, você pode usar uma API server-side para isso
-        const response = await fetch('https://api.ipify.org?format=json');
-        const data = await response.json();
-        ipAddress = data.ip || 'unknown';
-      } catch (err) {
-        // Se falhar, usar 'unknown'
-        console.warn('Não foi possível obter o IP:', err);
-      }
-
-      // Tentar registrar o primeiro acesso no Supabase
-      let accessId = '';
-      if (supabase) {
-        console.log('✅ Supabase está configurado e disponível');
-        try {
-          const payload = {
-            name: name.trim(),
-            is_adult: isAdult,
-            ip_address: ipAddress,
-            user_agent: userAgent,
-            utm_source: utms.utm_source ?? null,
-            utm_medium: utms.utm_medium ?? null,
-            utm_campaign: utms.utm_campaign ?? null,
-            utm_term: utms.utm_term ?? null,
-            utm_content: utms.utm_content ?? null,
-            referrer: referrer || null,
-            referrer_domain: referrerDomain ?? null,
-            landing_page: landingPage,
-            device_type: deviceInfo.device_type,
-            browser: deviceInfo.browser,
-            operating_system: deviceInfo.operating_system,
-          };
-
-          // Inserir dados no Supabase - usando abordagem mais direta
-          console.log('🔵 Tentando inserir no Supabase...');
-          console.log('📦 Payload:', payload);
-          console.log('🔗 Supabase URL:', import.meta.env.VITE_SUPABASE_URL ? 'Configurado' : 'Não configurado');
-          
-          // Tentar inserir usando a API do Supabase
-          // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const { data, error: supabaseError } = await (supabase.from('first_access') as any)
-            .insert([payload])
-            .select('id')
-            .single();
-          
-          console.log('📥 Resposta do Supabase:', { data, error: supabaseError });
-
-          if (supabaseError) {
-            console.error('❌ Erro ao registrar acesso no Supabase:', supabaseError);
-            console.error('📋 Detalhes do erro:', {
-              message: supabaseError.message,
-              details: supabaseError.details,
-              hint: supabaseError.hint,
-              code: supabaseError.code
-            });
-            
-            // Se o erro for porque a tabela não existe, continuar mesmo assim
-            if (supabaseError.code === '42P01' || supabaseError.message?.includes('does not exist')) {
-              console.warn('⚠️ Tabela first_access não encontrada. Continuando sem registro no banco.');
-            } else if (supabaseError.code === 'PGRST116') {
-              console.warn('⚠️ Nenhuma linha retornada. Verifique se a tabela existe e as políticas RLS estão corretas.');
-            } else {
-              // Para outros erros, mostrar mensagem mas permitir continuar
-              console.warn('⚠️ Erro ao registrar no Supabase, mas permitindo acesso continuar');
-            }
-          } else if (data) {
-            // eslint-disable-next-line @typescript-eslint/no-explicit-any
-            accessId = (data as any).id || '';
-            console.log('✅ Acesso registrado com sucesso no Supabase. ID:', accessId);
-          } else {
-            console.warn('⚠️ Supabase retornou sem dados e sem erro');
-          }
-        } catch (supabaseErr) {
-          console.error('Erro ao conectar com Supabase:', supabaseErr);
-          // Continuar mesmo se o Supabase falhar
-        }
-      } else {
-        console.warn('Supabase não configurado. Continuando sem registro no banco.');
-      }
+      const trimmedName = name.trim();
+      const accessId = await registerFirstAccess({
+        name: trimmedName,
+        isAdult,
+        landingPage,
+      });
 
       // Salvar informações no localStorage (sempre, mesmo se Supabase falhar)
       localStorage.setItem('isAuthenticated', 'true');
-      localStorage.setItem('userName', name.trim());
+      localStorage.setItem('userName', trimmedName);
+      localStorage.setItem('userIsAdult', isAdult ? 'true' : 'false');
       if (accessId) {
         localStorage.setItem('firstAccessId', accessId);
       }
@@ -181,8 +86,10 @@ export const Login: React.FC = () => {
       console.error('Erro inesperado:', err);
       // Mesmo com erro, permitir acesso se os dados básicos estão ok
       if (name.trim() && isAdult) {
+        const trimmedName = name.trim();
         localStorage.setItem('isAuthenticated', 'true');
-        localStorage.setItem('userName', name.trim());
+        localStorage.setItem('userName', trimmedName);
+        localStorage.setItem('userIsAdult', isAdult ? 'true' : 'false');
         navigate('/profile');
       } else {
         setError('Ocorreu um erro inesperado. Tente novamente.');

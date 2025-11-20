@@ -368,7 +368,7 @@ const FeedCard: React.FC<{ item: FeedItem }> = ({ item }) => {
       </header>
 
       <div className="relative overflow-hidden rounded-3xl">
-        <img src={item.mediaUrl} alt={item.description} className={`w-full object-cover ${item.isPaid ? 'blur-xl' : 'h-96'} transition`} loading="lazy" />
+        <img src={item.mediaUrl} alt={item.description} className={`w-full h-96 object-cover ${item.isPaid ? 'blur-xl' : ''} transition`} loading="lazy" />
         {isVideo && !item.isPaid && (
           <span className="absolute inset-0 flex items-center justify-center">
             <span className="flex h-12 w-12 items-center justify-center rounded-full bg-black/60 text-white">
@@ -436,7 +436,7 @@ export const Home: React.FC = () => {
 
         <section>
           <SectionHeader title="Privacy Week" />
-          <div className="flex overflow-x-auto pb-2">
+          <div className="flex overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
             {privacyWeekCreators.map((creator) => (
               <CreatorCard key={creator.id} creator={creator} />
             ))}
@@ -445,7 +445,7 @@ export const Home: React.FC = () => {
 
         <section>
           <SectionHeader title="Top creators" actionLabel="Ranking" />
-          <div className="flex overflow-x-auto pb-2">
+          <div className="flex overflow-x-auto pb-2 -mx-4 px-4 scrollbar-hide">
             {topCreators.map((creator) => (
               <CreatorCard key={creator.id} creator={creator} />
             ))}

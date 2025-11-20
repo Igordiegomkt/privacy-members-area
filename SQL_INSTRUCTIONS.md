@@ -5,7 +5,7 @@
 ### 1. Acesse o Supabase Dashboard
 - Vá para: https://app.supabase.com
 - Faça login na sua conta
-- Selecione o projeto: `atexvoxukvaqittpqkov`
+- Selecione seu projeto
 
 ### 2. Abra o SQL Editor
 - No menu lateral esquerdo, clique em **SQL Editor**

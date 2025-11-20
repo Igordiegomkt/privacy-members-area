@@ -17,9 +17,14 @@
 2. Adicione as seguintes variáveis:
 
 ```env
-VITE_SUPABASE_URL=https://atexvoxukvaqittpqkov.supabase.co
+VITE_SUPABASE_URL=https://seu-projeto.supabase.co
 VITE_SUPABASE_ANON_KEY=sua_chave_anon_aqui
 ```
+
+**Onde encontrar:**
+- Dashboard do Supabase > Settings > API
+- Copie a **URL** do projeto
+- Copie a **anon/public key**
 
 ### Na Vercel
 

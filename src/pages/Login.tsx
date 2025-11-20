@@ -16,10 +16,21 @@ export const Login: React.FC = () => {
   const [error, setError] = useState('');
   const navigate = useNavigate();
 
-  // Capturar UTMs quando o componente carregar
+  // Verificar se já está autenticado e redirecionar automaticamente
   useEffect(() => {
+    const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+    const userName = localStorage.getItem('userName');
+    
+    if (isAuthenticated && userName) {
+      // Usuário já registrado, redirecionar direto para o perfil
+      console.log('Usuário já autenticado, redirecionando...');
+      navigate('/profile', { replace: true });
+      return;
+    }
+    
+    // Capturar UTMs quando o componente carregar
     saveUTMsToLocalStorage();
-  }, []);
+  }, [navigate]);
 
   // Função para validar nome completo (nome e sobrenome)
   const validateFullName = (fullName: string): boolean => {
@@ -90,6 +101,7 @@ export const Login: React.FC = () => {
       // Tentar registrar o primeiro acesso no Supabase
       let accessId = '';
       if (supabase) {
+        console.log('✅ Supabase está configurado e disponível');
         try {
           const payload = {
             name: name.trim(),
@@ -109,33 +121,41 @@ export const Login: React.FC = () => {
             operating_system: deviceInfo.operating_system,
           };
 
-          // Inserir dados no Supabase
+          // Inserir dados no Supabase - usando abordagem mais direta
+          console.log('🔵 Tentando inserir no Supabase...');
+          console.log('📦 Payload:', payload);
+          console.log('🔗 Supabase URL:', import.meta.env.VITE_SUPABASE_URL ? 'Configurado' : 'Não configurado');
+          
+          // Tentar inserir usando a API do Supabase
           // eslint-disable-next-line @typescript-eslint/no-explicit-any
-          const insertResult = (supabase.from('first_access') as any).insert([payload]).select('id');
-          const { data, error: supabaseError } = await insertResult;
+          const { data, error: supabaseError } = await (supabase.from('first_access') as any)
+            .insert([payload])
+            .select('id')
+            .single();
           
-          console.log('Supabase insert result:', { data, error: supabaseError });
+          console.log('📥 Resposta do Supabase:', { data, error: supabaseError });
 
-        if (supabaseError) {
-          console.error('Erro ao registrar acesso no Supabase:', supabaseError);
-          console.error('Detalhes do erro:', {
-            message: supabaseError.message,
-            details: supabaseError.details,
-            hint: supabaseError.hint,
-            code: supabaseError.code
-          });
-          
-          // Se o erro for porque a tabela não existe, continuar mesmo assim
-          if (supabaseError.code === '42P01' || supabaseError.message?.includes('does not exist')) {
-            console.warn('Tabela first_access não encontrada. Continuando sem registro no banco.');
-          } else {
-            // Para outros erros, mostrar mensagem mas permitir continuar
-            console.warn('Erro ao registrar no Supabase, mas permitindo acesso continuar');
-          }
+          if (supabaseError) {
+            console.error('❌ Erro ao registrar acesso no Supabase:', supabaseError);
+            console.error('📋 Detalhes do erro:', {
+              message: supabaseError.message,
+              details: supabaseError.details,
+              hint: supabaseError.hint,
+              code: supabaseError.code
+            });
+            
+            // Se o erro for porque a tabela não existe, continuar mesmo assim
+            if (supabaseError.code === '42P01' || supabaseError.message?.includes('does not exist')) {
+              console.warn('⚠️ Tabela first_access não encontrada. Continuando sem registro no banco.');
+            } else if (supabaseError.code === 'PGRST116') {
+              console.warn('⚠️ Nenhuma linha retornada. Verifique se a tabela existe e as políticas RLS estão corretas.');
+            } else {
+              // Para outros erros, mostrar mensagem mas permitir continuar
+              console.warn('⚠️ Erro ao registrar no Supabase, mas permitindo acesso continuar');
+            }
           } else if (data) {
-            // O data pode ser um array ou um objeto único
-            const resultData = Array.isArray(data) ? data[0] : data;
-            accessId = (resultData as { id: string })?.id || '';
+            // eslint-disable-next-line @typescript-eslint/no-explicit-any
+            accessId = (data as any).id || '';
             console.log('✅ Acesso registrado com sucesso no Supabase. ID:', accessId);
           } else {
             console.warn('⚠️ Supabase retornou sem dados e sem erro');

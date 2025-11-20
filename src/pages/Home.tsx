@@ -247,12 +247,17 @@ const FeedPostCard: React.FC<{ post: FeedPost }> = ({ post }) => {
       </header>
 
       {/* Mídia */}
-      <div className="relative w-full">
+      <div className="relative w-full overflow-hidden">
         <img
           src={post.mediaUrl}
           alt={post.description}
-          className={`w-full object-cover ${post.isPaid ? 'blur-xl' : 'h-auto'} transition`}
-          style={{ aspectRatio: post.isPaid ? '9/16' : 'auto', maxHeight: post.isPaid ? '600px' : 'none' }}
+          className={`w-full object-cover ${post.isPaid ? 'blur-xl' : ''} transition`}
+          style={{ 
+            aspectRatio: '9/16',
+            maxHeight: '600px',
+            objectFit: 'cover',
+            display: 'block'
+          }}
           loading="lazy"
         />
 

@@ -1,11 +1,103 @@
-import React, { useState } from 'react';
+import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
+import { User } from '@supabase/supabase-js';
+
+const UserList: React.FC = () => {
+  const [users, setUsers] = useState<User[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+  const [currentUser, setCurrentUser] = useState<User | null>(null);
+
+  const fetchUsers = useCallback(async () => {
+    setLoading(true);
+    setError(null);
+    try {
+      const { data: { user } } = await supabase.auth.getUser();
+      setCurrentUser(user);
+
+      const { data, error: invokeError } = await supabase.functions.invoke('get-users');
+      if (invokeError) throw invokeError;
+      if (data.error) throw new Error(data.error);
+      setUsers(data.users);
+    } catch (err: any) {
+      setError(`Erro ao buscar usuários: ${err.message}`);
+    } finally {
+      setLoading(false);
+    }
+  }, []);
+
+  useEffect(() => {
+    fetchUsers();
+  }, [fetchUsers]);
+
+  const handleDeleteUser = async (userId: string, userEmail: string) => {
+    if (window.confirm(`Tem certeza que deseja excluir o usuário ${userEmail}? Esta ação não pode ser desfeita.`)) {
+      try {
+        const { data, error } = await supabase.functions.invoke('delete-user', {
+          body: { userIdToDelete: userId },
+        });
+        if (error) throw error;
+        if (data.error) {
+          alert(`Erro ao excluir usuário: ${data.error}`);
+          return;
+        }
+        alert('Usuário excluído com sucesso.');
+        fetchUsers(); // Refresh the list
+      } catch (err: any) {
+        alert(`Erro ao excluir usuário: ${err.message}`);
+      }
+    }
+  };
+
+  if (loading) {
+    return <div className="text-center text-gray-400">Carregando usuários...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center text-red-400">{error}</div>;
+  }
+
+  return (
+    <div className="overflow-x-auto">
+      <table className="w-full text-sm text-left text-gray-400">
+        <thead className="text-xs text-gray-300 uppercase bg-dark-lighter">
+          <tr>
+            <th scope="col" className="px-6 py-3">Email</th>
+            <th scope="col" className="px-6 py-3">Criado em</th>
+            <th scope="col" className="px-6 py-3">Último Login</th>
+            <th scope="col" className="px-6 py-3">Ações</th>
+          </tr>
+        </thead>
+        <tbody>
+          {users.map((user) => (
+            <tr key={user.id} className="bg-dark-light border-b border-dark-lighter hover:bg-dark-lighter/50">
+              <td className="px-6 py-4 font-medium text-white whitespace-nowrap">{user.email}</td>
+              <td className="px-6 py-4">{new Date(user.created_at).toLocaleDateString('pt-BR')}</td>
+              <td className="px-6 py-4">{user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString('pt-BR') : 'Nunca'}</td>
+              <td className="px-6 py-4">
+                <button
+                  onClick={() => handleDeleteUser(user.id, user.email!)}
+                  disabled={currentUser?.id === user.id}
+                  className="font-medium text-red-500 hover:text-red-400 disabled:text-gray-600 disabled:cursor-not-allowed"
+                >
+                  Excluir
+                </button>
+              </td>
+            </tr>
+          ))}
+        </tbody>
+      </table>
+    </div>
+  );
+};
+
 
 export const ManageUsers: React.FC = () => {
   const [email, setEmail] = useState('');
   const [password, setPassword] = useState('');
   const [isLoading, setIsLoading] = useState(false);
   const [message, setMessage] = useState<{ type: 'success' | 'error'; text: string } | null>(null);
+  const [userListKey, setUserListKey] = useState(0);
 
   const handleCreateUser = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -23,17 +115,13 @@ export const ManageUsers: React.FC = () => {
         body: { email, password },
       });
 
-      if (error) {
-        throw new Error(error.message);
-      }
-      
-      if (data.error) {
-        throw new Error(data.error);
-      }
+      if (error) throw new Error(error.message);
+      if (data.error) throw new Error(data.error);
 
       setMessage({ type: 'success', text: `Usuário ${data.user.email} criado com sucesso!` });
       setEmail('');
       setPassword('');
+      setUserListKey(prev => prev + 1);
 
     } catch (error: any) {
       setMessage({ type: 'error', text: `Erro ao criar usuário: ${error.message}` });
@@ -46,8 +134,8 @@ export const ManageUsers: React.FC = () => {
     <div>
       <h1 className="text-3xl font-bold text-white mb-6">Gerenciar Usuários</h1>
       
-      <div className="bg-dark-light p-8 rounded-lg shadow-lg max-w-lg">
-        <h2 className="text-xl font-bold text-white mb-4">Criar Novo Usuário</h2>
+      <div className="bg-dark-light p-8 rounded-lg shadow-lg max-w-lg mb-8">
+        <h2 className="text-xl font-bold text-white mb-4">Criar Novo Usuário Admin</h2>
         <form onSubmit={handleCreateUser} className="space-y-6">
           {message && (
             <div className={`px-4 py-3 rounded-lg text-sm ${
@@ -100,6 +188,11 @@ export const ManageUsers: React.FC = () => {
             {isLoading ? 'Criando...' : 'Criar Usuário'}
           </button>
         </form>
+      </div>
+
+      <div className="bg-dark-light p-8 rounded-lg shadow-lg">
+        <h2 className="text-xl font-bold text-white mb-4">Usuários Admin Existentes</h2>
+        <UserList key={userListKey} />
       </div>
     </div>
   );

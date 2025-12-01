@@ -1,28 +1,49 @@
 import React, { useEffect, useState } from 'react';
 import { DashboardCard } from '../../components/admin/DashboardCard';
+import { AccessLogTable } from '../../components/admin/AccessLogTable';
 import { supabase } from '../../lib/supabase';
+import { FirstAccessRecord } from '../../types';
 
 export const AdminDashboard: React.FC = () => {
   const [userCount, setUserCount] = useState<number | string>('...');
+  const [accessLogs, setAccessLogs] = useState<FirstAccessRecord[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    const fetchUserCount = async () => {
+    const fetchDashboardData = async () => {
       setLoading(true);
-      const { count, error } = await supabase
+      
+      const countPromise = supabase
         .from('first_access')
         .select('*', { count: 'exact', head: true });
 
-      if (error) {
-        console.error("Error fetching user count:", error);
+      const logsPromise = supabase
+        .from('first_access')
+        .select('*')
+        .order('created_at', { ascending: false })
+        .limit(100);
+
+      const [countResult, logsResult] = await Promise.all([countPromise, logsPromise]);
+
+      // Handle count
+      if (countResult.error) {
+        console.error("Error fetching user count:", countResult.error);
         setUserCount('Erro');
       } else {
-        setUserCount(count ?? 0);
+        setUserCount(countResult.count ?? 0);
       }
+
+      // Handle logs
+      if (logsResult.error) {
+        console.error("Error fetching access logs:", logsResult.error);
+      } else {
+        setAccessLogs(logsResult.data as FirstAccessRecord[]);
+      }
+
       setLoading(false);
     };
 
-    fetchUserCount();
+    fetchDashboardData();
   }, []);
 
   return (
@@ -39,6 +60,8 @@ export const AdminDashboard: React.FC = () => {
         />
         {/* Add more cards here */}
       </div>
+
+      <AccessLogTable records={accessLogs} isLoading={loading} />
     </div>
   );
 };

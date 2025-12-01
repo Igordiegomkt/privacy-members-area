@@ -1,12 +1,5 @@
 import React from 'react';
-
-interface PresenceState {
-  [key: string]: {
-    page: string;
-    user: string;
-    last_seen: string;
-  }[];
-}
+import { PresenceState } from '../../types';
 
 interface RealtimeUsersWidgetProps {
   presence: PresenceState;

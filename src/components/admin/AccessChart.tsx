@@ -29,7 +29,7 @@ export const AccessChart: React.FC<AccessChartProps> = ({ data }) => {
             <YAxis stroke="#888888" fontSize={12} allowDecimals={false} />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255, 107, 53, 0.1)' }} />
             <Bar dataKey="count" name="Acessos">
-              {data.map((entry, index) => (
+              {data.map((_entry, index) => (
                 <Cell key={`cell-${index}`} fill="#FF6B35" />
               ))}
             </Bar>

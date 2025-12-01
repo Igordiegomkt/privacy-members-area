@@ -4,17 +4,9 @@ import { AccessLogTable } from '../../components/admin/AccessLogTable';
 import { RealtimeUsersWidget } from '../../components/admin/RealtimeUsersWidget';
 import { AccessChart } from '../../components/admin/AccessChart';
 import { supabase } from '../../lib/supabase';
-import { FirstAccessRecord } from '../../types';
+import { FirstAccessRecord, PresenceState, UserPresence } from '../../types';
 
 const REALTIME_CHANNEL = 'site-activity';
-
-interface PresenceState {
-  [key: string]: {
-    page: string;
-    user: string;
-    last_seen: string;
-  }[];
-}
 
 interface AccessByHour {
   hour: string;
@@ -99,8 +91,13 @@ export const AdminDashboard: React.FC = () => {
     });
 
     presenceChannel
-      .on('presence', { event: 'sync' }, () => setPresence(presenceChannel.presenceState<PresenceState>()))
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => setPresence(prev => ({ ...prev, [key]: newPresences as any })))
+      .on('presence', { event: 'sync' }, () => {
+        const state = presenceChannel.presenceState<UserPresence>();
+        setPresence(state);
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        setPresence(prev => ({ ...prev, [key]: newPresences }));
+      })
       .on('presence', { event: 'leave' }, ({ key }) => {
         setPresence(prev => {
           const newState = { ...prev };

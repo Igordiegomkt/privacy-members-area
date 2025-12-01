@@ -39,3 +39,13 @@ export interface FirstAccessRecord {
   created_at?: string;
 }
 
+// Types for Realtime Presence
+export interface UserPresence {
+  page: string;
+  user: string;
+  last_seen: string;
+}
+
+export interface PresenceState {
+  [key: string]: UserPresence[];
+}

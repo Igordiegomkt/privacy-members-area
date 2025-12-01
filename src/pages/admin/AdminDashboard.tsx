@@ -23,6 +23,8 @@ interface AccessByHour {
 
 export const AdminDashboard: React.FC = () => {
   const [totalAccessesToday, setTotalAccessesToday] = useState<number | string>('...');
+  const [totalAccessesLast7Days, setTotalAccessesLast7Days] = useState<number | string>('...');
+  const [totalAccessesThisMonth, setTotalAccessesThisMonth] = useState<number | string>('...');
   const [accessLogs, setAccessLogs] = useState<FirstAccessRecord[]>([]);
   const [presence, setPresence] = useState<PresenceState>({});
   const [accessesByHour, setAccessesByHour] = useState<AccessByHour[]>([]);
@@ -45,27 +47,40 @@ export const AdminDashboard: React.FC = () => {
     const fetchInitialData = async () => {
       setLoading(true);
       
+      // Date ranges
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayISO = today.toISOString();
 
-      const countPromise = supabase
-        .from('first_access')
-        .select('*', { count: 'exact', head: true })
-        .gte('created_at', todayISO);
+      const sevenDaysAgo = new Date();
+      sevenDaysAgo.setDate(sevenDaysAgo.getDate() - 7);
+      sevenDaysAgo.setHours(0, 0, 0, 0);
+      const sevenDaysAgoISO = sevenDaysAgo.toISOString();
 
-      const logsPromise = supabase
-        .from('first_access')
-        .select('*')
-        .order('created_at', { ascending: false })
-        .limit(20);
-      
+      const firstDayOfMonth = new Date(today.getFullYear(), today.getMonth(), 1);
+      firstDayOfMonth.setHours(0, 0, 0, 0);
+      const firstDayOfMonthISO = firstDayOfMonth.toISOString();
+
+      // Promises
+      const todayPromise = supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', todayISO);
+      const sevenDaysPromise = supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', sevenDaysAgoISO);
+      const monthPromise = supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', firstDayOfMonthISO);
+      const logsPromise = supabase.from('first_access').select('*').order('created_at', { ascending: false }).limit(20);
       const chartPromise = supabase.rpc('get_accesses_by_hour_today');
 
-      const [countResult, logsResult, chartResult] = await Promise.all([countPromise, logsPromise, chartPromise]);
+      const [todayResult, sevenDaysResult, monthResult, logsResult, chartResult] = await Promise.all([
+        todayPromise, sevenDaysPromise, monthPromise, logsPromise, chartPromise
+      ]);
 
-      if (countResult.error) console.error("Error fetching count:", countResult.error);
-      else setTotalAccessesToday(countResult.count ?? 0);
+      // Set state from results
+      if (todayResult.error) console.error("Error fetching today's count:", todayResult.error);
+      else setTotalAccessesToday(todayResult.count ?? 0);
+
+      if (sevenDaysResult.error) console.error("Error fetching 7-day count:", sevenDaysResult.error);
+      else setTotalAccessesLast7Days(sevenDaysResult.count ?? 0);
+
+      if (monthResult.error) console.error("Error fetching month count:", monthResult.error);
+      else setTotalAccessesThisMonth(monthResult.count ?? 0);
 
       if (logsResult.error) console.error("Error fetching logs:", logsResult.error);
       else setAccessLogs(logsResult.data as FirstAccessRecord[]);
@@ -84,13 +99,8 @@ export const AdminDashboard: React.FC = () => {
     });
 
     presenceChannel
-      .on('presence', { event: 'sync' }, () => {
-        const newState = presenceChannel.presenceState<PresenceState>();
-        setPresence(newState);
-      })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        setPresence(prev => ({ ...prev, [key]: newPresences as any }));
-      })
+      .on('presence', { event: 'sync' }, () => setPresence(presenceChannel.presenceState<PresenceState>()))
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => setPresence(prev => ({ ...prev, [key]: newPresences as any })))
       .on('presence', { event: 'leave' }, ({ key }) => {
         setPresence(prev => {
           const newState = { ...prev };
@@ -106,7 +116,11 @@ export const AdminDashboard: React.FC = () => {
         (payload) => {
           const newRecord = payload.new as FirstAccessRecord;
           setAccessLogs(prev => [newRecord, ...prev.slice(0, 19)]);
+          
+          // Increment all relevant counters
           setTotalAccessesToday(prev => (typeof prev === 'number' ? prev + 1 : 1));
+          setTotalAccessesLast7Days(prev => (typeof prev === 'number' ? prev + 1 : 1));
+          setTotalAccessesThisMonth(prev => (typeof prev === 'number' ? prev + 1 : 1));
           
           // Update chart data
           const recordHour = new Date(newRecord.created_at!).getHours();
@@ -137,6 +151,18 @@ export const AdminDashboard: React.FC = () => {
           value={loading ? '...' : totalAccessesToday}
           description="Total de acessos registrados hoje."
           icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
+        />
+        <DashboardCard
+          title="Últimos 7 Dias"
+          value={loading ? '...' : totalAccessesLast7Days}
+          description="Total de acessos na última semana."
+          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"></path></svg>}
+        />
+        <DashboardCard
+          title="Acessos no Mês"
+          value={loading ? '...' : totalAccessesThisMonth}
+          description="Total de acessos no mês corrente."
+          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2zM7 15h.01M12 15h.01M17 15h.01"></path></svg>}
         />
         <DashboardCard
           title="Usuários Online"

@@ -96,7 +96,7 @@ export const AdminDashboard: React.FC = () => {
         setPresence(state);
       })
       .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        setPresence(prev => ({ ...prev, [key]: newPresences }));
+        setPresence(prev => ({ ...prev, [key]: newPresences as UserPresence[] }));
       })
       .on('presence', { event: 'leave' }, ({ key }) => {
         setPresence(prev => {

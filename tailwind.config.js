@@ -15,9 +15,9 @@ export default {
           DEFAULT: '#FFD700', // Dourado (Mantido)
         },
         dark: {
-          DEFAULT: '#211522', // Fundo: Vinho Secreto
-          light: '#392A48',   // Superfícies: Roxo Profundo
-          lighter: '#4E3A5E', // Detalhes: Ametista Escuro
+          DEFAULT: '#1C1917', // Fundo: Grafite Vulcânico
+          light: '#292524',   // Superfícies
+          lighter: '#44403C', // Detalhes
         },
         'text-light': '#F5F5F5',
       },

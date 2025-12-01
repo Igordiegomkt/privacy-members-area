@@ -84,7 +84,8 @@ export const AdminDashboard: React.FC = () => {
     presenceChannel
       .on('presence', { event: 'sync' }, () => {
         const newState = presenceChannel.presenceState<UserPresence>();
-        setPresence(newState);
+        // Create a shallow copy to ensure React detects the change and re-renders.
+        setPresence({ ...newState });
       })
       .subscribe();
 

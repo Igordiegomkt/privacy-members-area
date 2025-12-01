@@ -1,7 +1,8 @@
 import React, { useState, useRef, useEffect } from 'react';
 import { Link } from 'react-router-dom';
+import { Logo } from './Logo';
 
-export const Header: React.FC = () => {
+export function Header(): React.ReactElement {
   const [isMenuOpen, setIsMenuOpen] = useState(false);
   const menuRef = useRef<HTMLDivElement>(null);
 
@@ -21,9 +22,7 @@ export const Header: React.FC = () => {
   return (
     <header className="sticky top-0 z-40 bg-dark border-b border-dark-lighter">
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
-        <h1 className="text-xl font-bold text-white">
-          pr<span className="text-primary">i</span>vacy
-        </h1>
+        <Logo />
         
         <div className="flex items-center gap-4">
           <button
@@ -102,4 +101,4 @@ export const Header: React.FC = () => {
       </div>
     </header>
   );
-};
+}

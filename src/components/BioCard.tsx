@@ -12,7 +12,7 @@ export const BioCard: React.FC<BioCardProps> = ({ profile }) => {
       <div className="mb-3">
         <div className="flex items-center gap-2 mb-1">
           <h1 className="text-xl sm:text-2xl font-bold text-white">{profile.name}</h1>
-          <span className="text-primary text-lg sm:text-xl">✓</span>
+          <span className="text-accent text-lg sm:text-xl">✓</span>
         </div>
         <span className="text-gray-400 text-sm">@{profile.username}</span>
       </div>
@@ -71,4 +71,3 @@ export const BioCard: React.FC<BioCardProps> = ({ profile }) => {
     </div>
   );
 };
-

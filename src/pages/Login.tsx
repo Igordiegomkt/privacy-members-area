@@ -3,6 +3,7 @@ import { useNavigate } from 'react-router-dom';
 import { saveUTMsToLocalStorage } from '../utils/utmParser';
 import { TrackingScripts } from '../components/TrackingScripts';
 import { registerFirstAccess } from '../lib/accessLogger';
+import { Logo } from '../components/Logo';
 
 export const Login: React.FC = () => {
   const [name, setName] = useState('');
@@ -104,10 +105,10 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-md">
         {/* Logo */}
         <div className="text-center mb-12">
-          <h1 className="text-4xl font-bold text-white mb-2">
-            pr<span className="text-primary">i</span>vacy
-          </h1>
-          <p className="text-gray-400 text-sm">Área de Membros Exclusiva</p>
+          <div className="flex justify-center">
+            <Logo textSize="text-4xl" iconSize="w-10 h-10" />
+          </div>
+          <p className="text-gray-400 text-sm mt-2">Área de Membros Exclusiva</p>
         </div>
 
         {/* Login Form */}

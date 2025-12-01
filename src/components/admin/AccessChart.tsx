@@ -27,10 +27,10 @@ export const AccessChart: React.FC<AccessChartProps> = ({ data }) => {
             <CartesianGrid strokeDasharray="3 3" stroke="#2A2A2A" />
             <XAxis dataKey="hour" stroke="#888888" fontSize={12} />
             <YAxis stroke="#888888" fontSize={12} allowDecimals={false} />
-            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255, 107, 53, 0.1)' }} />
+            <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(217, 4, 41, 0.1)' }} />
             <Bar dataKey="count" name="Acessos">
               {data.map((_entry, index) => (
-                <Cell key={`cell-${index}`} fill="#FF6B35" />
+                <Cell key={`cell-${index}`} fill="#D90429" />
               ))}
             </Bar>
           </BarChart>

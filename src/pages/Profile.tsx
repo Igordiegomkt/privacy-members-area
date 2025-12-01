@@ -1,6 +1,5 @@
 import React, { useState, useEffect, useCallback, useRef } from 'react';
 import { Header } from '../components/Header';
-import { BottomNavigation } from '../components/BottomNavigation';
 import { Avatar } from '../components/Avatar';
 import { BioCard } from '../components/BioCard';
 import { MediaGrid } from '../components/MediaGrid';
@@ -8,6 +7,7 @@ import { MediaModal } from '../components/MediaModal';
 import { CreatorProfile, MediaItem } from '../types';
 import { generateAllMedia } from '../config/media';
 import { useProtection } from '../hooks/useProtection';
+import { Tabs, TabsList, TabsTrigger } from '../components/ui/tabs';
 
 // Dados do perfil
 const profileData: CreatorProfile = {
@@ -24,10 +24,10 @@ const profileData: CreatorProfile = {
 };
 
 export const Profile: React.FC = () => {
-  // Proteções básicas
   useProtection();
 
   const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [isModalOpen, setIsModalOpen] = useState(false);
   const [media, setMedia] = useState<MediaItem[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
@@ -38,21 +38,15 @@ export const Profile: React.FC = () => {
 
   const ITEMS_PER_PAGE = 12;
 
-  // Carregar todas as mídias disponíveis e embaralhar
   useEffect(() => {
     const allMedia = generateAllMedia();
     allMediaItems.current = allMedia;
     filteredMedia.current = allMedia;
-    
-    // Carregar primeiros itens
-    const initialMedia = allMedia.slice(0, ITEMS_PER_PAGE);
-    setMedia(initialMedia);
+    setMedia(allMedia.slice(0, ITEMS_PER_PAGE));
   }, []);
 
-  // Filtrar mídias baseado no filtro ativo
   useEffect(() => {
     let filtered: MediaItem[] = [];
-    
     switch (activeFilter) {
       case 'photos':
         filtered = allMediaItems.current.filter(m => m.type === 'image');
@@ -61,63 +55,51 @@ export const Profile: React.FC = () => {
         filtered = allMediaItems.current.filter(m => m.type === 'video');
         break;
       case 'paid':
-        // Por enquanto, todas as mídias são consideradas "pagos"
         filtered = allMediaItems.current;
         break;
       default:
         filtered = allMediaItems.current;
     }
-    
     filteredMedia.current = filtered;
     setMedia(filtered.slice(0, ITEMS_PER_PAGE));
     setPage(1);
     setHasMore(filtered.length > ITEMS_PER_PAGE);
   }, [activeFilter]);
 
-  // Função para carregar mais mídias
   const loadMoreMedia = useCallback(async () => {
     if (isLoading || !hasMore) return;
-
     setIsLoading(true);
-    
     setTimeout(() => {
       const startIndex = page * ITEMS_PER_PAGE;
       const endIndex = startIndex + ITEMS_PER_PAGE;
       const newMedia = filteredMedia.current.slice(startIndex, endIndex);
-      
       if (newMedia.length === 0) {
         setHasMore(false);
       } else {
         setMedia((prev) => [...prev, ...newMedia]);
         setPage((prev) => prev + 1);
       }
-      
       setIsLoading(false);
     }, 300);
   }, [isLoading, hasMore, page]);
 
-  // Detectar scroll para carregar mais
   useEffect(() => {
     const handleScroll = () => {
-      const scrollHeight = document.documentElement.scrollHeight;
-      const scrollTop = document.documentElement.scrollTop;
-      const clientHeight = document.documentElement.clientHeight;
-
-      if (scrollHeight - scrollTop - clientHeight < 300) {
+      if (window.innerHeight + document.documentElement.scrollTop >= document.documentElement.offsetHeight - 300) {
         loadMoreMedia();
       }
     };
-
     window.addEventListener('scroll', handleScroll);
     return () => window.removeEventListener('scroll', handleScroll);
   }, [loadMoreMedia]);
 
-  const handleMediaClick = (media: MediaItem) => {
-    setSelectedMedia(media);
+  const handleMediaClick = (mediaItem: MediaItem) => {
+    setSelectedMedia(mediaItem);
+    setIsModalOpen(true);
   };
 
   const handleCloseModal = () => {
-    setSelectedMedia(null);
+    setIsModalOpen(false);
   };
 
   const totalMedia = filteredMedia.current.length;
@@ -129,89 +111,41 @@ export const Profile: React.FC = () => {
       <Header />
       
       <main className="max-w-4xl mx-auto pb-8">
-        {/* Profile Section */}
         <div className="w-full pt-4 sm:pt-6 pb-4">
           <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6 px-4 sm:px-6">
             <div className="flex-shrink-0 mx-auto sm:mx-0">
-              <Avatar 
-                src={profileData.avatar} 
-                alt={profileData.name}
-                size="xl"
-              />
+              <Avatar src={profileData.avatar} alt={profileData.name} size="xl" />
             </div>
-            
             <div className="flex-1 w-full sm:w-auto">
               <BioCard profile={profileData} />
             </div>
           </div>
         </div>
 
-        {/* Stats Bar e Filter Tabs */}
         <div className="px-4 sm:px-6 mb-4">
           <div className="flex justify-between items-center text-sm text-gray-400 mb-3">
             <span>{profileData.stats.posts.toLocaleString()} Postagens</span>
             <span>{totalMedia} Mídias</span>
           </div>
           
-          {/* Filter Tabs */}
-          <div className="flex gap-4 sm:gap-6 border-b border-dark-lighter">
-            <button 
-              onClick={() => setActiveFilter('all')}
-              className={`px-2 py-3 font-medium text-sm transition-colors ${
-                activeFilter === 'all' 
-                  ? 'text-primary border-b-2 border-primary' 
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Todos
-            </button>
-            <button 
-              onClick={() => setActiveFilter('photos')}
-              className={`px-2 py-3 font-medium text-sm transition-colors ${
-                activeFilter === 'photos' 
-                  ? 'text-primary border-b-2 border-primary' 
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Fotos ({totalPhotos})
-            </button>
-            <button 
-              onClick={() => setActiveFilter('videos')}
-              className={`px-2 py-3 font-medium text-sm transition-colors ${
-                activeFilter === 'videos' 
-                  ? 'text-primary border-b-2 border-primary' 
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Vídeos ({totalVideos})
-            </button>
-            <button 
-              onClick={() => setActiveFilter('paid')}
-              className={`px-2 py-3 font-medium text-sm transition-colors ${
-                activeFilter === 'paid' 
-                  ? 'text-primary border-b-2 border-primary' 
-                  : 'text-gray-400 hover:text-white'
-              }`}
-            >
-              Pagos
-            </button>
-          </div>
+          <Tabs defaultValue="all" onValueChange={(value) => setActiveFilter(value as any)}>
+            <TabsList>
+              <TabsTrigger value="all">Todos</TabsTrigger>
+              <TabsTrigger value="photos">Fotos ({totalPhotos})</TabsTrigger>
+              <TabsTrigger value="videos">Vídeos ({totalVideos})</TabsTrigger>
+              <TabsTrigger value="paid">Pagos</TabsTrigger>
+            </TabsList>
+          </Tabs>
         </div>
 
-        {/* Media Grid */}
-        <MediaGrid 
-          media={media} 
-          onMediaClick={handleMediaClick}
-        />
+        <MediaGrid media={media} onMediaClick={handleMediaClick} />
 
-        {/* Loading Indicator */}
         {isLoading && (
           <div className="flex justify-center items-center py-8">
             <div className="animate-spin rounded-full h-8 w-8 border-t-2 border-b-2 border-primary"></div>
           </div>
         )}
 
-        {/* End of Content */}
         {!hasMore && media.length > 0 && (
           <div className="text-center py-8 text-gray-400 text-sm">
             Todos os conteúdos foram carregados
@@ -219,13 +153,7 @@ export const Profile: React.FC = () => {
         )}
       </main>
 
-      {/* Media Modal */}
-      <MediaModal 
-        media={selectedMedia} 
-        onClose={handleCloseModal}
-      />
-
-      <BottomNavigation />
+      <MediaModal media={selectedMedia} isOpen={isModalOpen} onClose={handleCloseModal} />
     </div>
   );
 };

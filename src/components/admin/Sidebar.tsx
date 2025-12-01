@@ -1,8 +1,9 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
+import { Logo } from '../Logo';
 
-export const Sidebar: React.FC = () => {
+export function Sidebar(): React.ReactElement {
   const navigate = useNavigate();
   const location = useLocation();
 
@@ -27,9 +28,7 @@ export const Sidebar: React.FC = () => {
   return (
     <aside className="w-64 bg-dark-light flex flex-col p-4">
       <div className="text-center py-4 mb-8">
-        <h1 className="text-2xl font-bold text-white">
-          pr<span className="text-primary">i</span>vacy
-        </h1>
+        <Logo textSize="text-2xl" />
         <span className="text-sm text-gray-400">Admin Panel</span>
       </div>
       <nav className="flex-1">
@@ -62,4 +61,4 @@ export const Sidebar: React.FC = () => {
       </div>
     </aside>
   );
-};
+}

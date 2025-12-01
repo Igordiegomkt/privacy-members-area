@@ -8,17 +8,20 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#FF6B35',
-          dark: '#E55A2B',
+          DEFAULT: '#D90429', // Pimenta Ardente
+          dark: '#B00321',
+        },
+        accent: {
+          DEFAULT: '#FFD700', // Dourado
         },
         dark: {
-          DEFAULT: '#0F0F0F',
-          light: '#1A1A1A',
-          lighter: '#2A2A2A',
-        }
+          DEFAULT: '#121212', // Carvão
+          light: '#1E1E1E',
+          lighter: '#2C2C2C',
+        },
+        'text-light': '#F5F5F5',
       },
     },
   },
   plugins: [],
 }
-

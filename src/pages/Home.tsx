@@ -197,7 +197,7 @@ const ProfileHighlight: React.FC = () => (
           </div>
 
           <div className="mt-4 flex gap-3">
-            <button className="flex-1 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-dark">
+            <button className="flex-1 rounded-full bg-primary px-4 py-2 text-sm font-semibold text-white">
               <span className="flex items-center justify-center gap-2">
                 <svg className="h-4 w-4" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M12 2C6.48 2 2 6.48 2 12s4.48 10 10 10 10-4.48 10-10S17.52 2 12 2zm-2 15l-5-5 1.41-1.41L10 14.17l7.59-7.59L19 8l-9 9z" />
@@ -345,7 +345,7 @@ const FeedPostCard: React.FC<{ post: FeedPost }> = ({ post }) => {
             </div>
             <p className="text-base font-semibold text-white">Conteúdo exclusivo</p>
             <p className="text-xs text-gray-300">Assine para desbloquear</p>
-            <button className="rounded-full bg-gradient-to-r from-orange-500 to-orange-600 px-6 py-2 text-sm font-semibold text-white shadow-lg hover:from-orange-600 hover:to-orange-700 transition">
+            <button className="rounded-full bg-primary hover:bg-primary-dark px-6 py-2 text-sm font-semibold text-white shadow-lg transition">
               Ver planos
             </button>
           </div>
@@ -428,7 +428,7 @@ export const Home: React.FC = () => {
   const mediaCount = feedPosts.filter((p) => p.type === 'photo' || p.type === 'video').length;
 
   return (
-    <div className="min-h-screen bg-dark text-white pb-20" style={{ backgroundColor: '#0F0F0F' }}>
+    <div className="min-h-screen bg-dark text-white pb-20" style={{ backgroundColor: '#121212' }}>
       <Header />
 
       <main className="mx-auto w-full max-w-md" style={{ width: '100%', maxWidth: '448px' }}>

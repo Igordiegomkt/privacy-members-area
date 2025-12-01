@@ -8,7 +8,6 @@ import { MediaModal } from '../components/MediaModal';
 import { CreatorProfile, MediaItem } from '../types';
 import { generateAllMedia } from '../config/media';
 import { useProtection } from '../hooks/useProtection';
-import { registerAuthenticatedPageAccess } from '../lib/accessLogger';
 
 // Dados do perfil
 const profileData: CreatorProfile = {
@@ -41,10 +40,6 @@ export const Profile: React.FC = () => {
 
   // Carregar todas as mídias disponíveis e embaralhar
   useEffect(() => {
-    registerAuthenticatedPageAccess('profile').catch((error) => {
-      console.error('Erro ao registrar acesso autenticado (profile):', error);
-    });
-
     const allMedia = generateAllMedia();
     allMediaItems.current = allMedia;
     filteredMedia.current = allMedia;
@@ -234,4 +229,3 @@ export const Profile: React.FC = () => {
     </div>
   );
 };
-

@@ -2,7 +2,6 @@ import React, { useEffect, useMemo, useState } from 'react';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { useProtection } from '../hooks/useProtection';
-import { registerAuthenticatedPageAccess } from '../lib/accessLogger';
 import { MEDIA_CONFIG, generateVideos, generatePhotos } from '../config/media';
 
 type ContentFilter = 'posts' | 'media';
@@ -413,15 +412,9 @@ export const Home: React.FC = () => {
   const [feedPosts, setFeedPosts] = useState<FeedPost[]>([]);
 
   useEffect(() => {
-    console.log('Home component mounted - generating feed posts');
-    registerAuthenticatedPageAccess('home').catch((error) => {
-      console.error('Erro ao registrar acesso autenticado (home):', error);
-    });
-
     // Gerar posts dinamicamente a cada acesso (embaralhamento)
     const posts = generateFeedPosts();
     setFeedPosts(posts);
-    console.log('Generated', posts.length, 'feed posts');
   }, []);
 
   const filteredPosts = useMemo(() => {

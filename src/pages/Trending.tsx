@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { useProtection } from '../hooks/useProtection';
-import { registerAuthenticatedPageAccess } from '../lib/accessLogger';
 
 interface Creator {
   id: string;
@@ -123,9 +122,7 @@ export const Trending: React.FC = () => {
   useProtection();
 
   useEffect(() => {
-    registerAuthenticatedPageAccess('trending').catch((error) => {
-      console.error('Erro ao registrar acesso autenticado (trending):', error);
-    });
+    // A chamada de registro foi removida daqui
   }, []);
 
   return (
@@ -149,4 +146,3 @@ export const Trending: React.FC = () => {
     </div>
   );
 };
-

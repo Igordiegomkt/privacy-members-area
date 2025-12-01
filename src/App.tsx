@@ -11,6 +11,7 @@ import { AdminLayout } from './components/admin/AdminLayout';
 import { ResetPassword } from './pages/admin/ResetPassword';
 import { supabase } from './lib/supabase';
 import { ManageUsers } from './pages/admin/ManageUsers';
+import { UserLayout } from './components/UserLayout';
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -45,12 +46,9 @@ const AuthHandler: React.FC = () => {
 
 // Componente para redirecionamento inteligente da raiz
 const RootRedirector: React.FC = () => {
-  // Verifica se a URL contém um hash de autenticação do Supabase
   const isAuthCallback = window.location.hash.includes('access_token');
 
   if (isAuthCallback) {
-    // Se for um callback de autenticação, exibe um loader.
-    // Isso dá tempo para o Supabase JS processar o hash e para o AuthHandler navegar.
     return (
       <div className="min-h-screen bg-dark flex items-center justify-center">
         <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
@@ -59,7 +57,6 @@ const RootRedirector: React.FC = () => {
     );
   }
 
-  // Se não for um callback, faz o redirecionamento normal
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
   return <Navigate to={isAuthenticated ? "/mural" : "/login"} replace />;
 };
@@ -71,30 +68,11 @@ function App() {
       <Routes>
         {/* User Routes */}
         <Route path="/login" element={<Login />} />
-        <Route
-          path="/mural"
-          element={
-            <ProtectedRouteUser>
-              <Home />
-            </ProtectedRouteUser>
-          }
-        />
-        <Route
-          path="/feed"
-          element={
-            <ProtectedRouteUser>
-              <Feed />
-            </ProtectedRouteUser>
-          }
-        />
-        <Route
-          path="/trending"
-          element={
-            <ProtectedRouteUser>
-              <Trending />
-            </ProtectedRouteUser>
-          }
-        />
+        <Route element={<ProtectedRouteUser><UserLayout /></ProtectedRouteUser>}>
+          <Route path="/mural" element={<Home />} />
+          <Route path="/feed" element={<Feed />} />
+          <Route path="/trending" element={<Trending />} />
+        </Route>
         
         {/* Admin Routes */}
         <Route path="/admin/login" element={<AdminLogin />} />

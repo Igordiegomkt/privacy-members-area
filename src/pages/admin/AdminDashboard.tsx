@@ -1,67 +1,160 @@
 import React, { useEffect, useState } from 'react';
 import { DashboardCard } from '../../components/admin/DashboardCard';
 import { AccessLogTable } from '../../components/admin/AccessLogTable';
+import { RealtimeUsersWidget } from '../../components/admin/RealtimeUsersWidget';
+import { AccessChart } from '../../components/admin/AccessChart';
 import { supabase } from '../../lib/supabase';
 import { FirstAccessRecord } from '../../types';
 
+const REALTIME_CHANNEL = 'site-activity';
+
+interface PresenceState {
+  [key: string]: {
+    page: string;
+    user: string;
+    last_seen: string;
+  }[];
+}
+
+interface AccessByHour {
+  hour: string;
+  count: number;
+}
+
 export const AdminDashboard: React.FC = () => {
-  const [userCount, setUserCount] = useState<number | string>('...');
+  const [totalAccessesToday, setTotalAccessesToday] = useState<number | string>('...');
   const [accessLogs, setAccessLogs] = useState<FirstAccessRecord[]>([]);
+  const [presence, setPresence] = useState<PresenceState>({});
+  const [accessesByHour, setAccessesByHour] = useState<AccessByHour[]>([]);
   const [loading, setLoading] = useState(true);
 
+  const formatDataForChart = (data: { hour: string; count: number }[]): AccessByHour[] => {
+    const hours = Array.from({ length: 24 }, (_, i) => i);
+    const hourMap = new Map(data.map(item => [new Date(item.hour).getHours(), item.count]));
+    
+    return hours.map(hour => {
+      const formattedHour = `${String(hour).padStart(2, '0')}:00`;
+      return {
+        hour: formattedHour,
+        count: hourMap.get(hour) || 0,
+      };
+    });
+  };
+
   useEffect(() => {
-    const fetchDashboardData = async () => {
+    const fetchInitialData = async () => {
       setLoading(true);
       
+      const today = new Date();
+      today.setHours(0, 0, 0, 0);
+      const todayISO = today.toISOString();
+
       const countPromise = supabase
         .from('first_access')
-        .select('*', { count: 'exact', head: true });
+        .select('*', { count: 'exact', head: true })
+        .gte('created_at', todayISO);
 
       const logsPromise = supabase
         .from('first_access')
         .select('*')
         .order('created_at', { ascending: false })
-        .limit(100);
+        .limit(20);
+      
+      const chartPromise = supabase.rpc('get_accesses_by_hour_today');
 
-      const [countResult, logsResult] = await Promise.all([countPromise, logsPromise]);
+      const [countResult, logsResult, chartResult] = await Promise.all([countPromise, logsPromise, chartPromise]);
 
-      // Handle count
-      if (countResult.error) {
-        console.error("Error fetching user count:", countResult.error);
-        setUserCount('Erro');
-      } else {
-        setUserCount(countResult.count ?? 0);
-      }
+      if (countResult.error) console.error("Error fetching count:", countResult.error);
+      else setTotalAccessesToday(countResult.count ?? 0);
 
-      // Handle logs
-      if (logsResult.error) {
-        console.error("Error fetching access logs:", logsResult.error);
-      } else {
-        setAccessLogs(logsResult.data as FirstAccessRecord[]);
-      }
+      if (logsResult.error) console.error("Error fetching logs:", logsResult.error);
+      else setAccessLogs(logsResult.data as FirstAccessRecord[]);
+      
+      if (chartResult.error) console.error("Error fetching chart data:", chartResult.error);
+      else setAccessesByHour(formatDataForChart(chartResult.data));
 
       setLoading(false);
     };
 
-    fetchDashboardData();
+    fetchInitialData();
+
+    // Set up Supabase Realtime subscriptions
+    const presenceChannel = supabase.channel(REALTIME_CHANNEL, {
+      config: { presence: { key: `admin-${Date.now()}` } },
+    });
+
+    presenceChannel
+      .on('presence', { event: 'sync' }, () => {
+        const newState = presenceChannel.presenceState<PresenceState>();
+        setPresence(newState);
+      })
+      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
+        setPresence(prev => ({ ...prev, [key]: newPresences as any }));
+      })
+      .on('presence', { event: 'leave' }, ({ key }) => {
+        setPresence(prev => {
+          const newState = { ...prev };
+          delete newState[key];
+          return newState;
+        });
+      })
+      .subscribe();
+
+    const dbChangesChannel = supabase
+      .channel('db-first_access-changes')
+      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'first_access' }, 
+        (payload) => {
+          const newRecord = payload.new as FirstAccessRecord;
+          setAccessLogs(prev => [newRecord, ...prev.slice(0, 19)]);
+          setTotalAccessesToday(prev => (typeof prev === 'number' ? prev + 1 : 1));
+          
+          // Update chart data
+          const recordHour = new Date(newRecord.created_at!).getHours();
+          setAccessesByHour(prev => {
+            const newChartData = [...prev];
+            const hourIndex = newChartData.findIndex(d => parseInt(d.hour.split(':')[0]) === recordHour);
+            if (hourIndex > -1) {
+              newChartData[hourIndex] = { ...newChartData[hourIndex], count: newChartData[hourIndex].count + 1 };
+            }
+            return newChartData;
+          });
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(presenceChannel);
+      supabase.removeChannel(dbChangesChannel);
+    };
   }, []);
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-white mb-6">Dashboard</h1>
+      <h1 className="text-3xl font-bold text-white mb-6">Dashboard em Tempo Real</h1>
       <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
         <DashboardCard
-          title="Usuários Registrados"
-          value={loading ? '...' : userCount}
-          description="Total de usuários que acessaram o site."
-          icon={
-            <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 4.354a4 4 0 110 5.292M15 21H3v-1a6 6 0 0112 0v1zm0 0h6v-1a6 6 0 00-9-5.197M15 21a6 6 0 00-9-5.197m0 0A5.995 5.995 0 0012 12a5.995 5.995 0 00-3-5.197M15 21a6 6 0 00-9-5.197" /></svg>
-          }
+          title="Acessos Hoje"
+          value={loading ? '...' : totalAccessesToday}
+          description="Total de acessos registrados hoje."
+          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>}
         />
-        {/* Add more cards here */}
+        <DashboardCard
+          title="Usuários Online"
+          value={Object.keys(presence).length}
+          description="Usuários ativos no site neste momento."
+          icon={<svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5.636 18.364a9 9 0 010-12.728m12.728 0a9 9 0 010 12.728m-9.9-2.829a5 5 0 010-7.07m7.072 0a5 5 0 010 7.07M15 12a3 3 0 11-6 0 3 3 0 016 0z" /></svg>}
+        />
       </div>
 
-      <AccessLogTable records={accessLogs} isLoading={loading} />
+      <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mt-8">
+        <RealtimeUsersWidget presence={presence} />
+        <div className="bg-dark-light p-6 rounded-lg shadow-lg col-span-1">
+           <h2 className="text-xl font-bold text-white mb-4">Últimos Acessos</h2>
+           <AccessLogTable records={accessLogs} isLoading={loading} />
+        </div>
+      </div>
+      
+      <AccessChart data={accessesByHour} />
     </div>
   );
 };

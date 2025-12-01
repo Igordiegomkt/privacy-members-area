@@ -80,32 +80,35 @@ export const AdminDashboard: React.FC = () => {
 
     fetchInitialData();
 
-    const presenceChannel = supabase.channel(REALTIME_CHANNEL);
-    presenceChannel
+    const channel = supabase.channel(REALTIME_CHANNEL);
+
+    channel
       .on('presence', { event: 'sync' }, () => {
-        const newState = presenceChannel.presenceState<UserPresence>();
-        // Create a shallow copy to ensure React detects the change and re-renders.
+        const newState = channel.presenceState<UserPresence>();
         setPresence({ ...newState });
       })
-      .subscribe();
-
-    const dbChangesChannel = supabase
-      .channel('db-first_access-changes')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'first_access' }, 
+      .on(
+        'postgres_changes',
+        { event: 'INSERT', schema: 'public', table: 'first_access' },
         (payload) => {
           const newRecord = payload.new as FirstAccessRecord;
-          setAccessLogs(prev => [newRecord, ...prev.slice(0, 19)]);
-          
-          setTotalAccessesToday(prev => (typeof prev === 'number' ? prev + 1 : 1));
-          setTotalAccessesLast7Days(prev => (typeof prev === 'number' ? prev + 1 : 1));
-          setTotalAccessesThisMonth(prev => (typeof prev === 'number' ? prev + 1 : 1));
-          
+          setAccessLogs((prev) => [newRecord, ...prev.slice(0, 19)]);
+
+          setTotalAccessesToday((prev) => (typeof prev === 'number' ? prev + 1 : 1));
+          setTotalAccessesLast7Days((prev) => (typeof prev === 'number' ? prev + 1 : 1));
+          setTotalAccessesThisMonth((prev) => (typeof prev === 'number' ? prev + 1 : 1));
+
           const recordHour = new Date(newRecord.created_at!).getHours();
-          setAccessesByHour(prev => {
+          setAccessesByHour((prev) => {
             const newChartData = [...prev];
-            const hourIndex = newChartData.findIndex(d => parseInt(d.hour.split(':')[0]) === recordHour);
+            const hourIndex = newChartData.findIndex(
+              (d) => parseInt(d.hour.split(':')[0]) === recordHour
+            );
             if (hourIndex > -1) {
-              newChartData[hourIndex] = { ...newChartData[hourIndex], count: newChartData[hourIndex].count + 1 };
+              newChartData[hourIndex] = {
+                ...newChartData[hourIndex],
+                count: newChartData[hourIndex].count + 1,
+              };
             }
             return newChartData;
           });
@@ -114,8 +117,7 @@ export const AdminDashboard: React.FC = () => {
       .subscribe();
 
     return () => {
-      supabase.removeChannel(presenceChannel);
-      supabase.removeChannel(dbChangesChannel);
+      supabase.removeChannel(channel);
     };
   }, []);
 

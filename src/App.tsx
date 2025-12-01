@@ -10,6 +10,7 @@ import { ProtectedRouteAdmin } from './components/admin/ProtectedRouteAdmin';
 import { AdminLayout } from './components/admin/AdminLayout';
 import { ResetPassword } from './pages/admin/ResetPassword';
 import { supabase } from './lib/supabase';
+import { ManageUsers } from './pages/admin/ManageUsers';
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -101,6 +102,7 @@ function App() {
         <Route element={<ProtectedRouteAdmin />}>
           <Route element={<AdminLayout />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
+            <Route path="/admin/users" element={<ManageUsers />} />
           </Route>
         </Route>
 

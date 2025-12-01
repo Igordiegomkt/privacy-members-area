@@ -39,7 +39,6 @@ export const AdminDashboard: React.FC = () => {
     const fetchInitialData = async () => {
       setLoading(true);
       
-      // Date ranges
       const today = new Date();
       today.setHours(0, 0, 0, 0);
       const todayISO = today.toISOString();
@@ -53,18 +52,14 @@ export const AdminDashboard: React.FC = () => {
       firstDayOfMonth.setHours(0, 0, 0, 0);
       const firstDayOfMonthISO = firstDayOfMonth.toISOString();
 
-      // Promises
-      const todayPromise = supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', todayISO);
-      const sevenDaysPromise = supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', sevenDaysAgoISO);
-      const monthPromise = supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', firstDayOfMonthISO);
-      const logsPromise = supabase.from('first_access').select('*').order('created_at', { ascending: false }).limit(20);
-      const chartPromise = supabase.rpc('get_accesses_by_hour_today');
-
       const [todayResult, sevenDaysResult, monthResult, logsResult, chartResult] = await Promise.all([
-        todayPromise, sevenDaysPromise, monthPromise, logsPromise, chartPromise
+        supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', todayISO),
+        supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', sevenDaysAgoISO),
+        supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', firstDayOfMonthISO),
+        supabase.from('first_access').select('*').order('created_at', { ascending: false }).limit(20),
+        supabase.rpc('get_accesses_by_hour_today')
       ]);
 
-      // Set state from results
       if (todayResult.error) console.error("Error fetching today's count:", todayResult.error);
       else setTotalAccessesToday(todayResult.count ?? 0);
 
@@ -85,25 +80,11 @@ export const AdminDashboard: React.FC = () => {
 
     fetchInitialData();
 
-    // Set up Supabase Realtime subscriptions
-    const presenceChannel = supabase.channel(REALTIME_CHANNEL, {
-      config: { presence: { key: `admin-${Date.now()}` } },
-    });
-
+    const presenceChannel = supabase.channel(REALTIME_CHANNEL);
     presenceChannel
       .on('presence', { event: 'sync' }, () => {
-        const state = presenceChannel.presenceState<UserPresence>();
-        setPresence(state);
-      })
-      .on('presence', { event: 'join' }, ({ key, newPresences }) => {
-        setPresence(prev => ({ ...prev, [key]: newPresences as unknown as UserPresence[] }));
-      })
-      .on('presence', { event: 'leave' }, ({ key }) => {
-        setPresence(prev => {
-          const newState = { ...prev };
-          delete newState[key];
-          return newState;
-        });
+        const newState = presenceChannel.presenceState<UserPresence>();
+        setPresence(newState);
       })
       .subscribe();
 
@@ -114,12 +95,10 @@ export const AdminDashboard: React.FC = () => {
           const newRecord = payload.new as FirstAccessRecord;
           setAccessLogs(prev => [newRecord, ...prev.slice(0, 19)]);
           
-          // Increment all relevant counters
           setTotalAccessesToday(prev => (typeof prev === 'number' ? prev + 1 : 1));
           setTotalAccessesLast7Days(prev => (typeof prev === 'number' ? prev + 1 : 1));
           setTotalAccessesThisMonth(prev => (typeof prev === 'number' ? prev + 1 : 1));
           
-          // Update chart data
           const recordHour = new Date(newRecord.created_at!).getHours();
           setAccessesByHour(prev => {
             const newChartData = [...prev];

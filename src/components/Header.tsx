@@ -26,7 +26,7 @@ export function Header(): React.ReactElement {
         
         <div className="flex items-center gap-4">
           <button
-            className="text-white hover:text-primary transition-colors"
+            className="text-text-primary hover:text-primary transition-colors"
             aria-label="Buscar"
           >
             <svg
@@ -45,7 +45,7 @@ export function Header(): React.ReactElement {
           </button>
           
           <button
-            className="text-white hover:text-primary transition-colors relative"
+            className="text-text-primary hover:text-primary transition-colors relative"
             aria-label="Notificações"
           >
             <svg
@@ -67,7 +67,7 @@ export function Header(): React.ReactElement {
           <div className="relative" ref={menuRef}>
             <button
               onClick={() => setIsMenuOpen(!isMenuOpen)}
-              className="text-white hover:text-primary transition-colors"
+              className="text-text-primary hover:text-primary transition-colors"
               aria-label="Menu"
             >
               <svg
@@ -89,7 +89,7 @@ export function Header(): React.ReactElement {
               <div className="absolute right-0 mt-2 w-48 bg-dark-light rounded-md shadow-lg py-1 z-50 border border-dark-lighter">
                 <Link
                   to="/admin/login"
-                  className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-dark-lighter hover:text-white"
+                  className="block w-full text-left px-4 py-2 text-sm text-text-secondary hover:bg-dark-lighter hover:text-text-primary"
                   onClick={() => setIsMenuOpen(false)}
                 >
                   Painel Admin

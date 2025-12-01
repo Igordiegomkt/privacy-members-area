@@ -162,37 +162,37 @@ const ProfileHighlight: React.FC = () => (
         </div>
 
         <div className="flex-1 pt-2">
-          <h2 className="text-xl font-bold text-white">Bia</h2>
-          <p className="text-sm text-gray-400">@biabeeyfree</p>
-          <p className="mt-2 text-sm text-gray-300">
+          <h2 className="text-xl font-bold text-text-primary">Bia</h2>
+          <p className="text-sm text-text-secondary">@biabeeyfree</p>
+          <p className="mt-2 text-sm text-text-secondary">
             Sou virgem de 19 anos... mas morro de curiosidade desse mundo proibido 🐒 Pra voc
           </p>
           <button className="mt-2 text-sm font-semibold text-primary">Ler mais</button>
 
           <div className="mt-4 flex items-center gap-6">
             <div className="flex items-center gap-2">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z" />
               </svg>
-              <span className="text-sm text-gray-300">{MEDIA_CONFIG.TOTAL_PHOTOS}</span>
+              <span className="text-sm text-text-secondary">{MEDIA_CONFIG.TOTAL_PHOTOS}</span>
             </div>
             <div className="flex items-center gap-2">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 10l4.553-2.276A1 1 0 0121 8.618v6.764a1 1 0 01-1.447.894L15 14M5 18h8a2 2 0 002-2V8a2 2 0 00-2-2H5a2 2 0 00-2 2v8a2 2 0 002 2z" />
               </svg>
-              <span className="text-sm text-gray-300">{MEDIA_CONFIG.TOTAL_VIDEOS}</span>
+              <span className="text-sm text-text-secondary">{MEDIA_CONFIG.TOTAL_VIDEOS}</span>
             </div>
             <div className="flex items-center gap-2">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
               </svg>
-              <span className="text-sm text-gray-300">1</span>
+              <span className="text-sm text-text-secondary">1</span>
             </div>
             <div className="flex items-center gap-2">
-              <svg className="h-5 w-5 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+              <svg className="h-5 w-5 text-text-secondary" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
-              <span className="text-sm text-gray-300">10.3</span>
+              <span className="text-sm text-text-secondary">10.3</span>
             </div>
           </div>
 
@@ -232,7 +232,7 @@ const ContentTabs: React.FC<{
       className={`flex items-center gap-2 border-b-2 pb-3 transition ${
         activeFilter === 'posts'
           ? 'border-primary text-primary'
-          : 'border-transparent text-gray-400'
+          : 'border-transparent text-text-secondary'
       }`}
     >
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -245,7 +245,7 @@ const ContentTabs: React.FC<{
       className={`flex items-center gap-2 border-b-2 pb-3 transition ${
         activeFilter === 'media'
           ? 'border-primary text-primary'
-          : 'border-transparent text-gray-400'
+          : 'border-transparent text-text-secondary'
       }`}
     >
       <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
@@ -265,7 +265,7 @@ const FeedPostCard: React.FC<{ post: FeedPost }> = ({ post }) => {
   const handlePause = () => setIsPlaying(false);
 
   return (
-    <article className="mb-6 space-y-3 bg-dark-lighter/30 rounded-2xl p-4">
+    <article className="mb-6 space-y-3 bg-dark-light rounded-2xl p-4">
       {/* Header do Post */}
       <header className="flex items-center justify-between">
         <div className="flex items-center gap-3">
@@ -276,11 +276,11 @@ const FeedPostCard: React.FC<{ post: FeedPost }> = ({ post }) => {
             loading="lazy"
           />
           <div>
-            <p className="text-sm font-semibold text-white">{post.creator}</p>
-            <p className="text-xs text-gray-400">{post.username}</p>
+            <p className="text-sm font-semibold text-text-primary">{post.creator}</p>
+            <p className="text-xs text-text-secondary">{post.username}</p>
           </div>
         </div>
-        <button className="text-gray-400 hover:text-white transition">
+        <button className="text-text-secondary hover:text-text-primary transition">
           <svg className="h-5 w-5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z" />
           </svg>
@@ -357,23 +357,23 @@ const FeedPostCard: React.FC<{ post: FeedPost }> = ({ post }) => {
         {/* Botões de ação */}
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-4">
-            <button className="text-white hover:text-red-500 transition active:scale-95">
+            <button className="text-text-primary hover:text-red-500 transition active:scale-95">
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
               </svg>
             </button>
-            <button className="text-white hover:text-blue-500 transition active:scale-95">
+            <button className="text-text-primary hover:text-blue-500 transition active:scale-95">
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
               </svg>
             </button>
-            <button className="text-white hover:text-green-500 transition active:scale-95">
+            <button className="text-text-primary hover:text-green-500 transition active:scale-95">
               <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                 <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8.684 13.342C8.886 12.938 9 12.482 9 12c0-.482-.114-.938-.316-1.342m0 2.684a3 3 0 110-2.684m0 2.684l6.632 3.316m-6.632-6l6.632-3.316m0 0a3 3 0 105.367-2.684 3 3 0 00-5.367 2.684zm0 9.316a3 3 0 105.368 2.684 3 3 0 00-5.368-2.684z" />
               </svg>
             </button>
           </div>
-          <button className="text-white hover:text-yellow-500 transition active:scale-95">
+          <button className="text-text-primary hover:text-yellow-500 transition active:scale-95">
             <svg className="h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
               <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M5 5a2 2 0 012-2h10a2 2 0 012 2v16l-7-3.5L5 21V5z" />
             </svg>
@@ -383,11 +383,11 @@ const FeedPostCard: React.FC<{ post: FeedPost }> = ({ post }) => {
         {/* Métricas */}
         {!post.isPaid && (
           <div className="space-y-1">
-            <p className="text-sm font-semibold text-white">
+            <p className="text-sm font-semibold text-text-primary">
               <span className="mr-1">❤️</span>
               {post.likes} curtidas
             </p>
-            <div className="flex items-center gap-4 text-xs text-gray-400">
+            <div className="flex items-center gap-4 text-xs text-text-secondary">
               <span>💬 {post.comments} comentários</span>
               {post.views && <span>👁️ {post.views} views</span>}
             </div>
@@ -396,10 +396,10 @@ const FeedPostCard: React.FC<{ post: FeedPost }> = ({ post }) => {
 
         {/* Descrição */}
         <div className="space-y-1">
-          <p className="text-sm text-white">
+          <p className="text-sm text-text-primary">
             <span className="font-semibold">{post.username}</span> {post.description}
           </p>
-          <span className="text-xs text-gray-500">{post.timestamp}</span>
+          <span className="text-xs text-text-secondary">{post.timestamp}</span>
         </div>
       </div>
     </article>
@@ -428,7 +428,7 @@ export const Home: React.FC = () => {
   const mediaCount = feedPosts.filter((p) => p.type === 'photo' || p.type === 'video').length;
 
   return (
-    <div className="min-h-screen bg-dark text-white pb-20" style={{ backgroundColor: '#121212' }}>
+    <div className="min-h-screen bg-dark text-text-primary pb-20">
       <Header />
 
       <main className="mx-auto w-full max-w-md" style={{ width: '100%', maxWidth: '448px' }}>
@@ -449,7 +449,7 @@ export const Home: React.FC = () => {
               <FeedPostCard key={post.id} post={post} />
             ))
           ) : (
-            <div className="p-4 text-center text-gray-400">Carregando conteúdos...</div>
+            <div className="p-4 text-center text-text-secondary">Carregando conteúdos...</div>
           )}
         </div>
       </main>

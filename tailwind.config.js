@@ -8,18 +8,21 @@ export default {
     extend: {
       colors: {
         primary: {
-          DEFAULT: '#D90429', // Pimenta Ardente (Mantido)
+          DEFAULT: '#D90429', // Pimenta Ardente
           dark: '#B00321',
         },
         accent: {
-          DEFAULT: '#FFD700', // Dourado (Mantido)
+          DEFAULT: '#FFD700', // Dourado
         },
-        dark: {
-          DEFAULT: '#1C1917', // Fundo: Grafite Vulcânico
-          light: '#292524',   // Superfícies
-          lighter: '#44403C', // Detalhes
+        dark: { // NOTE: This is now the LIGHT theme "Veludo Picante"
+          DEFAULT: '#F7F4F2', // Background: Branco Acetinado
+          light: '#FFFFFF',   // Surface: Branco Puro
+          lighter: '#F0EBE8', // Details/Hover: Areia Quente
         },
-        'text-light': '#F5F5F5',
+        text: {
+          primary: '#312A27',   // Café Expresso
+          secondary: '#786A64', // Café com Leite
+        },
       },
     },
   },

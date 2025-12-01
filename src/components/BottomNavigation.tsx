@@ -43,7 +43,7 @@ export const BottomNavigation: React.FC = () => {
   };
 
   return (
-    <nav className="fixed bottom-5 left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-around rounded-full bg-dark-lighter/90 px-4 py-3 backdrop-blur-md shadow-lg border border-dark-lighter">
+    <nav className="fixed bottom-5 left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-around rounded-full bg-dark-light/90 px-4 py-3 backdrop-blur-md shadow-lg border border-dark-lighter">
       {navItems.map((item) => {
         const active = isActive(item.path);
         return (
@@ -51,7 +51,7 @@ export const BottomNavigation: React.FC = () => {
             key={item.id}
             onClick={() => navigate(item.path)}
             className={`flex flex-col items-center gap-1 transition-all ${
-              active ? 'text-primary' : 'text-gray-400'
+              active ? 'text-primary' : 'text-text-secondary'
             }`}
           >
             <span
@@ -68,4 +68,3 @@ export const BottomNavigation: React.FC = () => {
     </nav>
   );
 };
-

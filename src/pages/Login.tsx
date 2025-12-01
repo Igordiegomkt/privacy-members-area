@@ -108,7 +108,7 @@ export const Login: React.FC = () => {
           <div className="flex justify-center">
             <Logo textSize="text-4xl" iconSize="w-10 h-10" />
           </div>
-          <p className="text-gray-400 text-sm mt-2">Área de Membros Exclusiva</p>
+          <p className="text-text-secondary text-sm mt-2">Área de Membros Exclusiva</p>
         </div>
 
         {/* Login Form */}
@@ -120,7 +120,7 @@ export const Login: React.FC = () => {
           )}
 
           <div>
-            <label htmlFor="name" className="block text-sm font-medium text-gray-300 mb-2">
+            <label htmlFor="name" className="block text-sm font-medium text-text-secondary mb-2">
               Qual é o seu nome completo?
             </label>
             <input
@@ -129,11 +129,11 @@ export const Login: React.FC = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-4 py-3 bg-dark-lighter border border-dark-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-primary transition-colors"
+              className="w-full px-4 py-3 bg-dark-lighter border border-dark-lighter rounded-lg text-text-primary placeholder-text-secondary focus:outline-none focus:border-primary transition-colors"
               placeholder="Ex: João Silva"
               disabled={isLoading}
             />
-            <p className="mt-1 text-xs text-gray-500">Informe seu nome e sobrenome</p>
+            <p className="mt-1 text-xs text-text-secondary">Informe seu nome e sobrenome</p>
           </div>
 
           <div>
@@ -145,8 +145,8 @@ export const Login: React.FC = () => {
                 className="mt-1 w-5 h-5 bg-dark-lighter border-dark-lighter rounded text-primary focus:ring-primary focus:ring-offset-0 cursor-pointer"
                 disabled={isLoading}
               />
-              <span className="text-sm text-gray-300 flex-1">
-                Eu confirmo que sou <strong className="text-white">maior de idade</strong> e tenho pelo menos 18 anos
+              <span className="text-sm text-text-secondary flex-1">
+                Eu confirmo que sou <strong className="text-text-primary">maior de idade</strong> e tenho pelo menos 18 anos
               </span>
             </label>
           </div>
@@ -162,7 +162,7 @@ export const Login: React.FC = () => {
 
         {/* Footer */}
         <div className="mt-8 text-center">
-          <p className="text-xs text-gray-500">
+          <p className="text-xs text-text-secondary">
             Ao continuar, você concorda com nossos termos de uso e política de privacidade
           </p>
         </div>

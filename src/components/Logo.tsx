@@ -25,7 +25,7 @@ interface LogoProps {
 }
 
 export const Logo: React.FC<LogoProps> = ({ 
-  className = 'text-white', 
+  className = 'text-text-primary', 
   iconSize = 'w-6 h-6', 
   textSize = 'text-xl' 
 }) => {

@@ -1,11 +1,23 @@
-import React from 'react';
+import React, { useState, useRef, useEffect } from 'react';
+import { Link } from 'react-router-dom';
 
-interface HeaderProps {
-  avatar?: string;
-  name?: string;
-}
+export const Header: React.FC = () => {
+  const [isMenuOpen, setIsMenuOpen] = useState(false);
+  const menuRef = useRef<HTMLDivElement>(null);
 
-export const Header: React.FC<HeaderProps> = () => {
+  // Efeito para fechar o menu ao clicar fora dele
+  useEffect(() => {
+    const handleClickOutside = (event: MouseEvent) => {
+      if (menuRef.current && !menuRef.current.contains(event.target as Node)) {
+        setIsMenuOpen(false);
+      }
+    };
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => {
+      document.removeEventListener('mousedown', handleClickOutside);
+    };
+  }, []);
+
   return (
     <header className="sticky top-0 z-40 bg-dark border-b border-dark-lighter">
       <div className="max-w-4xl mx-auto px-4 py-3 flex items-center justify-between">
@@ -53,27 +65,41 @@ export const Header: React.FC<HeaderProps> = () => {
             <span className="absolute -top-1 -right-1 w-2 h-2 bg-primary rounded-full"></span>
           </button>
           
-          <button
-            className="text-white hover:text-primary transition-colors"
-            aria-label="Menu"
-          >
-            <svg
-              className="w-5 h-5 sm:w-6 sm:h-6"
-              fill="none"
-              stroke="currentColor"
-              viewBox="0 0 24 24"
+          <div className="relative" ref={menuRef}>
+            <button
+              onClick={() => setIsMenuOpen(!isMenuOpen)}
+              className="text-white hover:text-primary transition-colors"
+              aria-label="Menu"
             >
-              <path
-                strokeLinecap="round"
-                strokeLinejoin="round"
-                strokeWidth={2}
-                d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
-              />
-            </svg>
-          </button>
+              <svg
+                className="w-5 h-5 sm:w-6 sm:h-6"
+                fill="none"
+                stroke="currentColor"
+                viewBox="0 0 24 24"
+              >
+                <path
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                  strokeWidth={2}
+                  d="M12 5v.01M12 12v.01M12 19v.01M12 6a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2zm0 7a1 1 0 110-2 1 1 0 010 2z"
+                />
+              </svg>
+            </button>
+
+            {isMenuOpen && (
+              <div className="absolute right-0 mt-2 w-48 bg-dark-light rounded-md shadow-lg py-1 z-50 border border-dark-lighter">
+                <Link
+                  to="/admin/login"
+                  className="block w-full text-left px-4 py-2 text-sm text-gray-300 hover:bg-dark-lighter hover:text-white"
+                  onClick={() => setIsMenuOpen(false)}
+                >
+                  Painel Admin
+                </Link>
+              </div>
+            )}
+          </div>
         </div>
       </div>
     </header>
   );
 };
-

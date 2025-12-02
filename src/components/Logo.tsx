@@ -13,10 +13,10 @@ export const Logo: React.FC<LogoProps> = ({
   textSize = 'text-2xl' 
 }) => {
   return (
-    <div className={`flex items-center gap-1.5 ${className}`}>
+    <div className={`flex items-center gap-2 ${className}`}>
       <LogoIcon className={`${iconSize} text-privacy-orange`} />
       <h1 className={`${textSize} font-bold tracking-tighter text-privacy-text-primary`}>
-        Privacy
+        Meu Privacy
       </h1>
     </div>
   );

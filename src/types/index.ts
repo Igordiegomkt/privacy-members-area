@@ -49,3 +49,36 @@ export interface UserPresence {
 export interface PresenceState {
   [key: string]: UserPresence[];
 }
+
+// --- Marketplace Types ---
+
+export type ProductType = 'pack' | 'single_media' | 'subscription';
+
+export type MediaAccessStatus = 'free' | 'paid_locked' | 'paid_unlocked';
+
+export interface Product {
+  id: string;
+  name: string;
+  description?: string;
+  price_cents: number;
+  type: ProductType;
+  cover_thumbnail?: string;
+  status: 'active' | 'inactive';
+  created_at: string;
+}
+
+export interface ProductMedia {
+  id: string;
+  product_id: string;
+  media_id: string;
+  created_at: string;
+}
+
+export interface UserPurchase {
+  id: string;
+  user_id: string;
+  product_id: string;
+  price_paid_cents: number;
+  status: 'paid' | 'pending' | 'failed';
+  created_at: string;
+}

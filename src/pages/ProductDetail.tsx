@@ -3,7 +3,7 @@ import { useParams, Link } from 'react-router-dom';
 import { Product } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
-import { fetchProductById } from '../lib/marketplace';
+import { fetchProductById, hasUserPurchased, createPurchase } from '../lib/marketplace';
 
 const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -14,6 +14,9 @@ export const ProductDetail: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [isPurchased, setIsPurchased] = useState(false);
+  const [purchaseLoading, setPurchaseLoading] = useState(false);
+  const [purchaseError, setPurchaseError] = useState<string | null>(null);
 
   useEffect(() => {
     if (!id) {
@@ -22,12 +25,17 @@ export const ProductDetail: React.FC = () => {
       return;
     }
 
-    const loadProduct = async () => {
+    const loadProductData = async () => {
       try {
         setLoading(true);
         setError(null);
         const fetchedProduct = await fetchProductById(id);
         setProduct(fetchedProduct);
+
+        if (fetchedProduct) {
+          const purchased = await hasUserPurchased(id);
+          setIsPurchased(purchased);
+        }
       } catch (e) {
         setError('Não foi possível carregar o produto.');
       } finally {
@@ -35,8 +43,24 @@ export const ProductDetail: React.FC = () => {
       }
     };
 
-    loadProduct();
+    loadProductData();
   }, [id]);
+
+  const handlePurchase = async () => {
+    if (!product || !id) return;
+    setPurchaseError(null);
+    setPurchaseLoading(true);
+    try {
+      await createPurchase(id);
+      setIsPurchased(true);
+      alert('Compra realizada com sucesso!');
+    } catch (err: any) {
+      console.error(err);
+      setPurchaseError(err.message ?? 'Não foi possível concluir a compra.');
+    } finally {
+      setPurchaseLoading(false);
+    }
+  };
 
   if (loading) {
     return (
@@ -82,12 +106,21 @@ export const ProductDetail: React.FC = () => {
             <p className="text-privacy-text-secondary mt-4 flex-1">{product.description}</p>
             <div className="mt-6">
               <p className="text-3xl font-bold text-primary">{formatPrice(product.price_cents)}</p>
-              <button 
-                onClick={() => alert('TODO: Implementar fluxo de compra (inserir em user_purchases + pagamento)')}
-                className="w-full mt-4 bg-primary hover:opacity-90 text-privacy-black font-semibold py-3 rounded-lg transition-opacity"
-              >
-                Desbloquear Acesso
-              </button>
+              
+              {isPurchased ? (
+                <button disabled className="w-full mt-4 bg-green-500/20 text-green-400 font-semibold py-3 rounded-lg cursor-not-allowed">
+                  Já comprado
+                </button>
+              ) : (
+                <button 
+                  onClick={handlePurchase}
+                  disabled={purchaseLoading}
+                  className="w-full mt-4 bg-primary hover:opacity-90 text-privacy-black font-semibold py-3 rounded-lg transition-opacity disabled:opacity-50 disabled:cursor-wait"
+                >
+                  {purchaseLoading ? 'Processando...' : 'Desbloquear Acesso'}
+                </button>
+              )}
+              {purchaseError && <p className="text-red-400 text-sm mt-2 text-center">{purchaseError}</p>}
             </div>
           </div>
         </div>

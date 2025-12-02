@@ -1,15 +1,29 @@
 import React, { useEffect, useState } from 'react';
+import { Link } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { useProtection } from '../hooks/useProtection';
 import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
 
 const PurchaseItem: React.FC<{ purchase: UserPurchaseWithProduct }> = ({ purchase }) => {
-  const product = purchase.products;
-  if (!product) return null; // Não renderiza se o produto associado não for encontrado
+  const product = purchase.product;
+
+  if (!product) {
+    return (
+      <div className="flex items-center gap-4 bg-privacy-surface p-4 rounded-lg opacity-60">
+        <div className="w-16 h-16 bg-privacy-border rounded-md flex-shrink-0" />
+        <div className="flex-1">
+          <h3 className="font-semibold text-privacy-text-secondary italic">Produto não está mais disponível</h3>
+          <p className="text-sm text-privacy-text-secondary">
+            Comprado em: {new Date(purchase.created_at).toLocaleDateString('pt-BR')}
+          </p>
+        </div>
+      </div>
+    );
+  }
 
   return (
-    <div className="flex items-center gap-4 bg-privacy-surface p-4 rounded-lg">
+    <Link to={`/produto/${product.id}`} className="flex items-center gap-4 bg-privacy-surface p-4 rounded-lg hover:bg-privacy-border transition-colors">
       <img src={product.cover_thumbnail} alt={product.name} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
       <div className="flex-1">
         <h3 className="font-semibold text-privacy-text-primary">{product.name}</h3>
@@ -20,7 +34,7 @@ const PurchaseItem: React.FC<{ purchase: UserPurchaseWithProduct }> = ({ purchas
       <span className="text-sm font-semibold text-green-400 bg-green-500/10 px-2 py-1 rounded-full capitalize">
         {purchase.status === 'paid' ? 'Desbloqueado' : purchase.status}
       </span>
-    </div>
+    </Link>
   );
 };
 

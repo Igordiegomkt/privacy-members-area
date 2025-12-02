@@ -14,7 +14,7 @@ export const Logo: React.FC<LogoProps> = ({
 }) => {
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <LogoIcon className={`text-privacy-orange ${iconSize}`} />
+      <LogoIcon className={`${iconSize}`} />
       <h1 className={`${textSize} font-bold tracking-tighter`}>
         Meu Privacy
       </h1>

@@ -15,6 +15,7 @@ import { UserLayout } from './components/UserLayout';
 import { Marketplace } from './pages/Marketplace';
 import { ProductDetail } from './pages/ProductDetail';
 import { MyPurchases } from './pages/MyPurchases';
+import { CarolinaHub } from './pages/CarolinaHub';
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -61,7 +62,7 @@ const RootRedirector: React.FC = () => {
   }
 
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-  return <Navigate to={isAuthenticated ? "/mural" : "/login"} replace />;
+  return <Navigate to={isAuthenticated ? "/carolina" : "/login"} replace />;
 };
 
 function App() {
@@ -72,6 +73,7 @@ function App() {
         {/* User Routes */}
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRouteUser><UserLayout /></ProtectedRouteUser>}>
+          <Route path="/carolina" element={<CarolinaHub />} />
           <Route path="/mural" element={<Home />} />
           <Route path="/feed" element={<Feed />} />
           <Route path="/trending" element={<Trending />} />
@@ -91,7 +93,7 @@ function App() {
         </Route>
 
         {/* Redirects */}
-        <Route path="/home" element={<Navigate to="/mural" replace />} />
+        <Route path="/home" element={<Navigate to="/carolina" replace />} />
         <Route path="/profile" element={<Navigate to="/feed" replace />} />
         <Route path="/" element={<RootRedirector />} />
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />

@@ -15,7 +15,7 @@ export const Login: React.FC = () => {
   useEffect(() => {
     const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
     if (isAuthenticated) {
-      navigate('/mural', { replace: true });
+      navigate('/carolina', { replace: true });
       return;
     }
     saveUTMsToLocalStorage();
@@ -53,7 +53,7 @@ export const Login: React.FC = () => {
     } finally {
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userName', name.trim());
-      navigate('/mural');
+      navigate('/carolina');
     }
   };
 

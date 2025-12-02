@@ -7,6 +7,6 @@ export const LogoIcon: React.FC<{ className?: string }> = ({ className }) => (
     xmlns="http://www.w3.org/2000/svg"
     fill="currentColor"
   >
-    <path d="M2.5 21V3h4.92L12 10.38 16.58 3H21.5v18h-3.5V6.71l-3.58 6.16-3.5-6.16V21H2.5z"/>
+    <path d="M2 21V3h7l3 4.5L15 3h7v18h-5V8l-5 7.5L5 8v13H2z"/>
   </svg>
 );

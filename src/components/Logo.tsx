@@ -8,14 +8,14 @@ interface LogoProps {
 }
 
 export const Logo: React.FC<LogoProps> = ({ 
-  className = 'text-privacy-text-primary', 
+  className = '', 
   iconSize = 'w-7 h-7', 
   textSize = 'text-2xl' 
 }) => {
   return (
     <div className={`flex items-center gap-2 ${className}`}>
-      <LogoIcon className={`${iconSize}`} />
-      <h1 className={`${textSize} font-bold tracking-tighter`}>
+      <LogoIcon className={`${iconSize} text-privacy-orange`} />
+      <h1 className={`${textSize} font-bold tracking-tighter text-privacy-text-primary`}>
         Meu Privacy
       </h1>
     </div>

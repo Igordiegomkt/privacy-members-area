@@ -1,10 +1,12 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { useProtection } from '../hooks/useProtection';
 import { fetchProducts } from '../lib/marketplace';
+
+const BASE_PRODUCT_NAME = 'Conteudo Vip Carolina Andrade';
 
 const formatPrice = (cents: number) => {
   return (cents / 100).toLocaleString('pt-BR', {
@@ -36,8 +38,34 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }) => (
   </Link>
 );
 
+const BaseProductCard: React.FC<{ product: Product }> = ({ product }) => {
+  const navigate = useNavigate();
+
+  return (
+    <div className="mb-8">
+      <h2 className="text-xl font-bold text-white mb-4">Seu acesso VIP</h2>
+      <div className="bg-privacy-surface rounded-lg p-6 flex flex-col sm:flex-row items-start sm:items-center justify-between gap-4">
+        <div className="flex items-center gap-4">
+          <img src={product.cover_thumbnail} alt={product.name} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
+          <div>
+            <h3 className="font-semibold text-privacy-text-primary">{product.name}</h3>
+            <p className="text-sm text-privacy-text-secondary mt-1">Você já tem acesso a este conteúdo.</p>
+          </div>
+        </div>
+        <button
+          onClick={() => navigate('/carolina')}
+          className="w-full sm:w-auto bg-primary hover:opacity-90 text-privacy-black font-semibold py-2 px-6 rounded-lg transition-opacity whitespace-nowrap"
+        >
+          Entrar no VIP
+        </button>
+      </div>
+    </div>
+  );
+};
+
 const MarketplaceContent: React.FC = () => {
-  const [products, setProducts] = useState<Product[]>([]);
+  const [baseProduct, setBaseProduct] = useState<Product | null>(null);
+  const [otherProducts, setOtherProducts] = useState<Product[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -47,7 +75,12 @@ const MarketplaceContent: React.FC = () => {
         setLoading(true);
         setError(null);
         const fetchedProducts = await fetchProducts();
-        setProducts(fetchedProducts);
+        
+        const base = fetchedProducts.find(p => p.name === BASE_PRODUCT_NAME) || null;
+        const others = fetchedProducts.filter(p => p.name !== BASE_PRODUCT_NAME);
+
+        setBaseProduct(base);
+        setOtherProducts(others);
       } catch (e) {
         setError('Não foi possível carregar a loja. Tente novamente mais tarde.');
       } finally {
@@ -65,16 +98,25 @@ const MarketplaceContent: React.FC = () => {
     return <div className="text-center py-16 text-red-400">{error}</div>;
   }
 
-  if (products.length === 0) {
+  if (!baseProduct && otherProducts.length === 0) {
     return <div className="text-center py-16 text-privacy-text-secondary">Ainda não há produtos disponíveis.</div>;
   }
 
   return (
-    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-      {products.map((product) => (
-        <ProductCard key={product.id} product={product} />
-      ))}
-    </div>
+    <>
+      {baseProduct && <BaseProductCard product={baseProduct} />}
+
+      {otherProducts.length > 0 && (
+        <div>
+          <h2 className="text-xl font-bold text-white mb-4">Conteúdos exclusivos para você</h2>
+          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+            {otherProducts.map((product) => (
+              <ProductCard key={product.id} product={product} />
+            ))}
+          </div>
+        </div>
+      )}
+    </>
   );
 };
 

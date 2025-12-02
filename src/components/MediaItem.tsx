@@ -1,8 +1,8 @@
 import React, { useState, useEffect, useRef } from 'react';
-import { MediaItem as MediaItemType } from '../types';
+import { MediaItemWithAccess } from '../lib/models';
 
 interface MediaItemProps {
-  media: MediaItemType;
+  media: MediaItemWithAccess;
   onClick: () => void;
   onLoad?: () => void;
 }
@@ -10,43 +10,25 @@ interface MediaItemProps {
 export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick, onLoad }) => {
   const [isLoaded, setIsLoaded] = useState(false);
   const [hasError, setHasError] = useState(false);
-  const imgRef = useRef<HTMLImageElement>(null);
   const containerRef = useRef<HTMLDivElement>(null);
+  const isLocked = media.accessStatus === 'locked';
 
-  // Intersection Observer para lazy loading
   useEffect(() => {
     if (!containerRef.current || isLoaded) return;
 
     const observer = new IntersectionObserver(
       (entries) => {
-        entries.forEach((entry) => {
-          if (entry.isIntersecting && !isLoaded) {
-            setIsLoaded(true);
-            observer.disconnect();
-          }
-        });
+        if (entries[0].isIntersecting) {
+          setIsLoaded(true);
+          observer.disconnect();
+        }
       },
-      {
-        rootMargin: '100px', // Começar a carregar 100px antes de aparecer
-      }
+      { rootMargin: '100px' }
     );
 
     observer.observe(containerRef.current);
-
-    return () => {
-      observer.disconnect();
-    };
+    return () => observer.disconnect();
   }, [isLoaded]);
-
-  const handleImageLoad = () => {
-    if (onLoad) {
-      onLoad();
-    }
-  };
-
-  const handleImageError = () => {
-    setHasError(true);
-  };
 
   return (
     <div
@@ -55,19 +37,18 @@ export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick, onLoad }) 
       onClick={onClick}
     >
       {hasError ? (
-        <div className="w-full h-full flex items-center justify-center bg-privacy-surface text-privacy-text-secondary text-xs p-2">
+        <div className="w-full h-full flex items-center justify-center text-privacy-text-secondary text-xs p-2">
           Erro ao carregar
         </div>
       ) : (
         <>
           {isLoaded ? (
             <img
-              ref={imgRef}
               src={media.thumbnail}
               alt={media.title || 'Media thumbnail'}
-              className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-              onLoad={handleImageLoad}
-              onError={handleImageError}
+              className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${isLocked ? 'blur-md' : ''}`}
+              onLoad={onLoad}
+              onError={() => setHasError(true)}
               loading="lazy"
               draggable={false}
             />
@@ -75,17 +56,21 @@ export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick, onLoad }) 
             <div className="w-full h-full bg-privacy-surface animate-pulse" />
           )}
           
-          {media.type === 'video' && isLoaded && (
+          {media.type === 'video' && isLoaded && !isLocked && (
             <div className="absolute inset-0 flex items-center justify-center bg-black bg-opacity-20 pointer-events-none">
               <div className="bg-black bg-opacity-50 rounded-full p-2">
-                <svg
-                  className="w-6 h-6 sm:w-8 sm:h-8 text-privacy-text-primary"
-                  fill="currentColor"
-                  viewBox="0 0 24 24"
-                >
+                <svg className="w-6 h-6 sm:w-8 sm:h-8 text-privacy-text-primary" fill="currentColor" viewBox="0 0 24 24">
                   <path d="M8 5v14l11-7z" />
                 </svg>
               </div>
+            </div>
+          )}
+
+          {isLocked && (
+            <div className="absolute inset-0 flex items-center justify-center bg-black/60">
+              <svg className="w-8 h-8 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" />
+              </svg>
             </div>
           )}
 

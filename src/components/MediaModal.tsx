@@ -1,9 +1,9 @@
 import React from 'react';
-import { MediaItem } from '../types';
+import { MediaItemWithAccess } from '../lib/models';
 import { Dialog, DialogContent } from './ui/dialog';
 
 interface MediaModalProps {
-  media: MediaItem | null;
+  media: MediaItemWithAccess | null;
   isOpen: boolean;
   onClose: () => void;
 }

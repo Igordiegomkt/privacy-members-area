@@ -1,10 +1,10 @@
 import React from 'react';
-import { MediaItem as MediaItemType } from '../types';
 import { MediaItem } from './MediaItem';
+import { MediaItemWithAccess } from '../lib/models';
 
 interface MediaGridProps {
-  media: MediaItemType[];
-  onMediaClick: (media: MediaItemType) => void;
+  media: MediaItemWithAccess[];
+  onMediaClick: (media: MediaItemWithAccess) => void;
   onMediaLoad?: () => void;
 }
 
@@ -32,4 +32,3 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ media, onMediaClick, onMed
     </div>
   );
 };
-

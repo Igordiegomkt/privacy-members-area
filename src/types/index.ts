@@ -4,6 +4,8 @@ export interface MediaItem {
   thumbnail: string;
   url: string;
   title?: string;
+  model_id?: string;
+  is_free?: boolean;
 }
 
 export interface CreatorProfile {
@@ -50,7 +52,17 @@ export interface PresenceState {
   [key: string]: UserPresence[];
 }
 
-// --- Marketplace Types ---
+// --- Marketplace & Model Types ---
+
+export interface Model {
+  id: string;
+  name: string;
+  username: string;
+  bio?: string;
+  avatar_url?: string;
+  cover_url?: string;
+  created_at: string;
+}
 
 export type ProductType = 'pack' | 'single_media' | 'subscription';
 
@@ -65,6 +77,8 @@ export interface Product {
   cover_thumbnail?: string;
   status: 'active' | 'inactive';
   created_at: string;
+  model_id?: string;
+  is_base_membership?: boolean;
 }
 
 export interface ProductMedia {

@@ -4,10 +4,11 @@ import { Avatar } from '../components/Avatar';
 import { BioCard } from '../components/BioCard';
 import { MediaGrid } from '../components/MediaGrid';
 import { MediaModal } from '../components/MediaModal';
-import { CreatorProfile, MediaItem } from '../types';
+import { CreatorProfile } from '../types';
 import { generateAllMedia } from '../config/media';
 import { useProtection } from '../hooks/useProtection';
 import { BottomNavigation } from '../components/BottomNavigation';
+import { MediaItemWithAccess } from '../lib/models';
 
 // Dados do perfil de Carolina Andrade
 const profileData: CreatorProfile = {
@@ -26,18 +27,21 @@ const profileData: CreatorProfile = {
 export const CarolinaHub: React.FC = () => {
   useProtection();
 
-  const [selectedMedia, setSelectedMedia] = useState<MediaItem | null>(null);
+  const [selectedMedia, setSelectedMedia] = useState<MediaItemWithAccess | null>(null);
   const [isModalOpen, setIsModalOpen] = useState(false);
-  const [media, setMedia] = useState<MediaItem[]>([]);
+  const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
   const [isLoading, setIsLoading] = useState(false);
   const [hasMore, setHasMore] = useState(true);
   const [page, setPage] = useState(1);
-  const allMediaItems = useRef<MediaItem[]>([]);
+  const allMediaItems = useRef<MediaItemWithAccess[]>([]);
 
   const ITEMS_PER_PAGE = 12;
 
   useEffect(() => {
-    const allMedia = generateAllMedia();
+    const allMedia = generateAllMedia().map(item => ({
+      ...item,
+      accessStatus: 'unlocked' as const,
+    }));
     allMediaItems.current = allMedia;
     setMedia(allMedia.slice(0, ITEMS_PER_PAGE));
   }, []);
@@ -69,7 +73,7 @@ export const CarolinaHub: React.FC = () => {
     return () => window.removeEventListener('scroll', handleScroll);
   }, [loadMoreMedia]);
 
-  const handleMediaClick = (mediaItem: MediaItem) => {
+  const handleMediaClick = (mediaItem: MediaItemWithAccess) => {
     setSelectedMedia(mediaItem);
     setIsModalOpen(true);
   };

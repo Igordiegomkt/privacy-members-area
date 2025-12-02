@@ -6,6 +6,10 @@ export type MediaItemWithAccess = MediaItem & {
   accessStatus: 'unlocked' | 'locked' | 'free';
 };
 
+export interface ModelWithStats extends Model {
+  total_purchases: number;
+}
+
 /**
  * Busca uma modelo pelo seu username.
  */
@@ -79,4 +83,49 @@ export const fetchMediaForModel = async (modelId: string, isBaseContent: boolean
     }
     return { ...item, accessStatus };
   });
+};
+
+/**
+ * Busca as modelos mais populares com base no número de compras.
+ */
+export const fetchTrendingModels = async (): Promise<ModelWithStats[]> => {
+  // 1. Buscar todas as compras com o model_id do produto
+  const { data: purchases, error: purchaseError } = await supabase
+    .from('user_purchases')
+    .select('products(model_id)');
+
+  if (purchaseError || !purchases) {
+    console.error('Error fetching purchases for trending models:', purchaseError);
+    return [];
+  }
+
+  // 2. Contar compras por model_id
+  const purchaseCounts = new Map<string, number>();
+  purchases.forEach(p => {
+    const modelId = (p.products as any)?.model_id;
+    if (modelId) {
+      purchaseCounts.set(modelId, (purchaseCounts.get(modelId) || 0) + 1);
+    }
+  });
+
+  if (purchaseCounts.size === 0) return [];
+
+  // 3. Buscar os dados das modelos
+  const { data: models, error: modelError } = await supabase
+    .from('models')
+    .select('*')
+    .in('id', Array.from(purchaseCounts.keys()));
+
+  if (modelError || !models) {
+    console.error('Error fetching models for trending:', modelError);
+    return [];
+  }
+
+  // 4. Combinar dados e ordenar
+  const modelsWithStats: ModelWithStats[] = models.map(model => ({
+    ...model,
+    total_purchases: purchaseCounts.get(model.id) || 0,
+  }));
+
+  return modelsWithStats.sort((a, b) => b.total_purchases - a.total_purchases);
 };

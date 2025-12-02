@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
-import { Feed } from './pages/Feed';
 import { Trending } from './pages/Trending';
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
@@ -17,6 +16,8 @@ import { ProductDetail } from './pages/ProductDetail';
 import { MyPurchases } from './pages/MyPurchases';
 import { CarolinaHub } from './pages/CarolinaHub';
 import { ModelProfile } from './pages/ModelProfile';
+import { GlobalFeed } from './pages/GlobalFeed';
+import { TrendingModels } from './pages/TrendingModels';
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -65,7 +66,8 @@ function App() {
           <Route path="/modelo/:username" element={<ModelProfile />} />
           <Route path="/carolina" element={<CarolinaHub />} />
           <Route path="/mural" element={<Home />} />
-          <Route path="/feed" element={<Feed />} />
+          <Route path="/feed" element={<GlobalFeed />} />
+          <Route path="/em-alta" element={<TrendingModels />} />
           <Route path="/trending" element={<Trending />} />
           <Route path="/loja" element={<Marketplace />} />
           <Route path="/produto/:id" element={<ProductDetail />} />

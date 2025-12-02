@@ -1,52 +1,10 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { Link } from 'react-router-dom';
 import { Product } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { useProtection } from '../hooks/useProtection';
-
-const mockProducts: Product[] = [
-  {
-    id: 'prod_1',
-    name: 'Pack "Essencial"',
-    description: 'Uma coleção com 20 fotos e 5 vídeos exclusivos. O melhor começo para conhecer meu conteúdo.',
-    price_cents: 2990,
-    type: 'pack',
-    cover_thumbnail: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=500&h=500&fit=crop',
-    status: 'active',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'prod_2',
-    name: 'Vídeo "Banho de Espuma"',
-    description: 'Um vídeo de 10 minutos com uma performance sensual e provocante. Conteúdo explícito.',
-    price_cents: 1490,
-    type: 'single_media',
-    cover_thumbnail: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=500&h=500&fit=crop',
-    status: 'active',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'prod_3',
-    name: 'Assinatura VIP Mensal',
-    description: 'Acesso total a todo o meu conteúdo, incluindo postagens diárias, vídeos semanais e chat exclusivo.',
-    price_cents: 4990,
-    type: 'subscription',
-    cover_thumbnail: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=500&h=500&fit=crop',
-    status: 'active',
-    created_at: new Date().toISOString(),
-  },
-  {
-    id: 'prod_4',
-    name: 'Pack "Verão Quente"',
-    description: '30 fotos na praia e 10 vídeos exclusivos gravados durante o verão. O calor vai subir!',
-    price_cents: 3990,
-    type: 'pack',
-    cover_thumbnail: 'https://images.unsplash.com/photo-1519183071298-a2962be90b8e?w=500&h=500&fit=crop',
-    status: 'active',
-    created_at: new Date().toISOString(),
-  },
-];
+import { fetchProducts } from '../lib/marketplace';
 
 const formatPrice = (cents: number) => {
   return (cents / 100).toLocaleString('pt-BR', {
@@ -78,6 +36,48 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }) => (
   </Link>
 );
 
+const MarketplaceContent: React.FC = () => {
+  const [products, setProducts] = useState<Product[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
+
+  useEffect(() => {
+    const loadProducts = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const fetchedProducts = await fetchProducts();
+        setProducts(fetchedProducts);
+      } catch (e) {
+        setError('Não foi possível carregar a loja. Tente novamente mais tarde.');
+      } finally {
+        setLoading(false);
+      }
+    };
+    loadProducts();
+  }, []);
+
+  if (loading) {
+    return <div className="text-center py-16 text-privacy-text-secondary">Carregando ofertas...</div>;
+  }
+
+  if (error) {
+    return <div className="text-center py-16 text-red-400">{error}</div>;
+  }
+
+  if (products.length === 0) {
+    return <div className="text-center py-16 text-privacy-text-secondary">Ainda não há produtos disponíveis.</div>;
+  }
+
+  return (
+    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+      {products.map((product) => (
+        <ProductCard key={product.id} product={product} />
+      ))}
+    </div>
+  );
+};
+
 export const Marketplace: React.FC = () => {
   useProtection();
 
@@ -89,11 +89,7 @@ export const Marketplace: React.FC = () => {
           <h1 className="text-2xl font-bold text-white mb-1">Loja de Conteúdos</h1>
           <p className="text-sm text-privacy-text-secondary">Packs exclusivos, conteúdos avulsos e assinaturas VIP.</p>
         </div>
-        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-          {mockProducts.map((product) => (
-            <ProductCard key={product.id} product={product} />
-          ))}
-        </div>
+        <MarketplaceContent />
       </main>
       <BottomNavigation />
     </div>

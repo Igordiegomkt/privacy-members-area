@@ -1,16 +1,9 @@
-import React from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { Product } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
-
-// Mock data - em um cenário real, viria de um contexto ou API
-const mockProducts: Product[] = [
-    { id: 'prod_1', name: 'Pack "Essencial"', description: 'Uma coleção com 20 fotos e 5 vídeos exclusivos. O melhor começo para conhecer meu conteúdo.', price_cents: 2990, type: 'pack', cover_thumbnail: 'https://images.unsplash.com/photo-1524504388940-b1c1722653e1?w=800&h=800&fit=crop', status: 'active', created_at: new Date().toISOString() },
-    { id: 'prod_2', name: 'Vídeo "Banho de Espuma"', description: 'Um vídeo de 10 minutos com uma performance sensual e provocante. Conteúdo explícito.', price_cents: 1490, type: 'single_media', cover_thumbnail: 'https://images.unsplash.com/photo-1544723795-3fb6469f5b39?w=800&h=800&fit=crop', status: 'active', created_at: new Date().toISOString() },
-    { id: 'prod_3', name: 'Assinatura VIP Mensal', description: 'Acesso total a todo o meu conteúdo, incluindo postagens diárias, vídeos semanais e chat exclusivo.', price_cents: 4990, type: 'subscription', cover_thumbnail: 'https://images.unsplash.com/photo-1507003211169-0a1dd7228f2d?w=800&h=800&fit=crop', status: 'active', created_at: new Date().toISOString() },
-    { id: 'prod_4', name: 'Pack "Verão Quente"', description: '30 fotos na praia e 10 vídeos exclusivos gravados durante o verão. O calor vai subir!', price_cents: 3990, type: 'pack', cover_thumbnail: 'https://images.unsplash.com/photo-1519183071298-a2962be90b8e?w=800&h=800&fit=crop', status: 'active', created_at: new Date().toISOString() },
-];
+import { fetchProductById } from '../lib/marketplace';
 
 const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -18,15 +11,50 @@ const formatPrice = (cents: number) => {
 
 export const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
-  const product = mockProducts.find(p => p.id === id);
+  const [product, setProduct] = useState<Product | null>(null);
+  const [loading, setLoading] = useState(true);
+  const [error, setError] = useState<string | null>(null);
 
-  if (!product) {
+  useEffect(() => {
+    if (!id) {
+      setLoading(false);
+      setError('ID do produto não fornecido.');
+      return;
+    }
+
+    const loadProduct = async () => {
+      try {
+        setLoading(true);
+        setError(null);
+        const fetchedProduct = await fetchProductById(id);
+        setProduct(fetchedProduct);
+      } catch (e) {
+        setError('Não foi possível carregar o produto.');
+      } finally {
+        setLoading(false);
+      }
+    };
+
+    loadProduct();
+  }, [id]);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-privacy-black text-white flex items-center justify-center">
+        <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+
+  if (error || !product) {
     return (
       <div className="min-h-screen bg-privacy-black text-white flex flex-col">
         <Header />
         <main className="flex-1 flex flex-col items-center justify-center text-center px-4">
-          <h1 className="text-2xl font-bold mb-2">Produto não encontrado</h1>
-          <p className="text-privacy-text-secondary mb-4">O item que você está procurando não existe ou foi removido.</p>
+          <h1 className="text-2xl font-bold mb-2">{error ? 'Ocorreu um erro' : 'Produto não encontrado'}</h1>
+          <p className="text-privacy-text-secondary mb-4">
+            {error || 'O item que você está procurando não existe ou foi removido.'}
+          </p>
           <Link to="/loja" className="bg-primary text-privacy-black font-semibold py-2 px-6 rounded-lg">
             Voltar para a Loja
           </Link>
@@ -55,7 +83,7 @@ export const ProductDetail: React.FC = () => {
             <div className="mt-6">
               <p className="text-3xl font-bold text-primary">{formatPrice(product.price_cents)}</p>
               <button 
-                onClick={() => alert('TODO: Implementar fluxo de compra')}
+                onClick={() => alert('TODO: Implementar fluxo de compra (inserir em user_purchases + pagamento)')}
                 className="w-full mt-4 bg-primary hover:opacity-90 text-privacy-black font-semibold py-3 rounded-lg transition-opacity"
               >
                 Desbloquear Acesso

@@ -1,5 +1,5 @@
 import React, { useEffect, useState } from 'react';
-import { useParams, Link } from 'react-router-dom';
+import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
@@ -11,6 +11,7 @@ const formatPrice = (cents: number) => {
 
 export const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
+  const navigate = useNavigate();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -33,6 +34,7 @@ export const ProductDetail: React.FC = () => {
         setProduct(fetchedProduct);
 
         if (fetchedProduct) {
+          // A função hasUserPurchased já contém a lógica do produto base
           const purchased = await hasUserPurchased(id);
           setIsPurchased(purchased);
         }
@@ -108,9 +110,18 @@ export const ProductDetail: React.FC = () => {
               <p className="text-3xl font-bold text-primary">{formatPrice(product.price_cents)}</p>
               
               {isPurchased ? (
-                <button disabled className="w-full mt-4 bg-green-500/20 text-green-400 font-semibold py-3 rounded-lg cursor-not-allowed">
-                  Já comprado
-                </button>
+                product.is_base_membership ? (
+                  <button 
+                    onClick={() => navigate('/modelo/carolina-andrade')}
+                    className="w-full mt-4 bg-primary hover:opacity-90 text-privacy-black font-semibold py-3 rounded-lg transition-opacity"
+                  >
+                    Entrar no VIP
+                  </button>
+                ) : (
+                  <button disabled className="w-full mt-4 bg-green-500/20 text-green-400 font-semibold py-3 rounded-lg cursor-not-allowed">
+                    Já comprado
+                  </button>
+                )
               ) : (
                 <button 
                   onClick={handlePurchase}

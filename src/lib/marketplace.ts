@@ -8,13 +8,15 @@ export type UserPurchaseWithProduct = UserPurchase & {
   product: Product | null;
 };
 
+const PRODUCT_COLUMNS = 'id, name, description, price_cents, type, status, cover_thumbnail, created_at, model_id, is_base_membership';
+
 /**
  * Busca todos os produtos ativos no marketplace.
  */
 export const fetchProducts = async (): Promise<Product[]> => {
   const { data, error } = await supabase
     .from('products')
-    .select('id, name, description, price_cents, type, status, cover_thumbnail, created_at')
+    .select(PRODUCT_COLUMNS)
     .eq('status', 'active')
     .order('created_at', { ascending: false });
 
@@ -32,7 +34,7 @@ export const fetchProducts = async (): Promise<Product[]> => {
 export const fetchProductById = async (id: string): Promise<Product | null> => {
   const { data, error } = await supabase
     .from('products')
-    .select('id, name, description, price_cents, type, status, cover_thumbnail, created_at')
+    .select(PRODUCT_COLUMNS)
     .eq('id', id)
     .single();
 
@@ -57,7 +59,7 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
     .from('user_purchases')
     .select(`
       id, user_id, product_id, price_paid_cents, status, created_at,
-      products (id, name, description, price_cents, type, status, cover_thumbnail, created_at)
+      products (${PRODUCT_COLUMNS})
     `)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
@@ -67,11 +69,8 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
     throw new Error('Não foi possível buscar as compras do usuário.');
   }
 
-  // Mapeia o retorno para que a propriedade aninhada seja `product` (singular)
   return (data ?? []).map(row => {
     const { products, ...purchaseData } = row;
-    // The Supabase join returns `products` which can be an object or an array.
-    // We expect a single object for this relationship, so we handle both cases.
     const singleProduct = Array.isArray(products) ? (products[0] ?? null) : (products ?? null);
     return {
       ...purchaseData,
@@ -82,8 +81,17 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
 
 /**
  * Verifica se o usuário autenticado já comprou um produto específico.
+ * O produto base (is_base_membership) é sempre considerado comprado.
  */
 export const hasUserPurchased = async (productId: string): Promise<boolean> => {
+  const product = await fetchProductById(productId);
+  if (!product) return false;
+
+  // Regra de negócio: produto base é sempre considerado comprado.
+  if (product.is_base_membership) {
+    return true;
+  }
+
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) return false;
 
@@ -104,13 +112,20 @@ export const hasUserPurchased = async (productId: string): Promise<boolean> => {
 
 /**
  * Cria um registro de compra "fictícia" para o usuário autenticado.
+ * Não cria registro para o produto base.
  */
-export const createPurchase = async (productId: string): Promise<UserPurchase> => {
+export const createPurchase = async (productId: string): Promise<UserPurchase | null> => {
   const { data: { user } } = await supabase.auth.getUser();
   if (!user) throw new Error('Usuário não autenticado.');
 
   const product = await fetchProductById(productId);
   if (!product) throw new Error('Produto não encontrado.');
+
+  // Regra de negócio: não registrar compra para o produto base.
+  if (product.is_base_membership) {
+    console.log('Compra do produto base ignorada, pois o acesso já está incluído.');
+    return null;
+  }
 
   const { data, error } = await supabase
     .from('user_purchases')

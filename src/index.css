@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-dark text-text-primary antialiased;
+    @apply bg-privacy-black text-privacy-text-primary antialiased;
   }
 }
 

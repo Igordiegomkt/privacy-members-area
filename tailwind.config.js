@@ -1,4 +1,6 @@
 /** @type {import('tailwindcss').Config} */
+const defaultTheme = require('tailwindcss/defaultTheme');
+
 export default {
   content: [
     "./index.html",
@@ -6,23 +8,17 @@ export default {
   ],
   theme: {
     extend: {
+      fontFamily: {
+        sans: ['Poppins', ...defaultTheme.fontFamily.sans],
+      },
       colors: {
-        primary: {
-          DEFAULT: '#D90429', // Pimenta Ardente
-          dark: '#B00321',
-        },
-        accent: {
-          DEFAULT: '#FFD700', // Dourado
-        },
-        dark: { // NOTE: This is now the LIGHT theme "Veludo Picante"
-          DEFAULT: '#F7F4F2', // Background: Branco Acetinado
-          light: '#FFFFFF',   // Surface: Branco Puro
-          lighter: '#F0EBE8', // Details/Hover: Areia Quente
-        },
-        text: {
-          primary: '#312A27',   // Café Expresso
-          secondary: '#786A64', // Café com Leite
-        },
+        'privacy-black': '#121212', // Fundo principal
+        'privacy-surface': '#1A1A1A', // Fundo de cards e superfícies
+        'privacy-border': '#2C2C2C', // Bordas sutis
+        'privacy-orange': '#F5A623', // Cor de destaque principal
+        'privacy-text-primary': '#FFFFFF', // Texto principal
+        'privacy-text-secondary': '#A0A0A0', // Texto secundário e ícones
+        'privacy-online': '#00C48C', // Indicador de online
       },
     },
   },

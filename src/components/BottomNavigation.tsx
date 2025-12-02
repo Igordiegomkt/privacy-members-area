@@ -10,9 +10,7 @@ export const BottomNavigation: React.FC = () => {
       id: 'mural',
       label: 'Mural',
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
+        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6" /></svg>
       ),
       path: '/mural',
     },
@@ -20,9 +18,7 @@ export const BottomNavigation: React.FC = () => {
       id: 'feed',
       label: 'Feed',
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-        </svg>
+        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" /></svg>
       ),
       path: '/feed',
     },
@@ -30,9 +26,7 @@ export const BottomNavigation: React.FC = () => {
       id: 'trending',
       label: 'Em alta',
       icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-        </svg>
+        <svg className="w-7 h-7" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" /></svg>
       ),
       path: '/trending',
     },
@@ -43,24 +37,18 @@ export const BottomNavigation: React.FC = () => {
   };
 
   return (
-    <nav className="fixed bottom-5 left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-around rounded-full bg-dark-light/90 px-4 py-3 backdrop-blur-md shadow-lg border border-dark-lighter">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex w-full items-center justify-around bg-privacy-surface/80 backdrop-blur-md border-t border-privacy-border">
       {navItems.map((item) => {
         const active = isActive(item.path);
         return (
           <button
             key={item.id}
             onClick={() => navigate(item.path)}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              active ? 'text-primary' : 'text-text-secondary'
+            className={`flex flex-col items-center gap-1 py-2 px-4 transition-colors ${
+              active ? 'text-privacy-orange' : 'text-privacy-text-secondary hover:text-privacy-text-primary'
             }`}
           >
-            <span
-              className={`flex h-10 w-10 items-center justify-center rounded-full transition-all ${
-                active ? 'bg-primary/20 text-primary' : ''
-              }`}
-            >
-              {item.icon}
-            </span>
+            {item.icon}
             <span className="text-xs font-medium">{item.label}</span>
           </button>
         );

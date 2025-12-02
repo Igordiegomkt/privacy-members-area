@@ -12,7 +12,7 @@ export const Logo: React.FC<LogoProps> = ({
   return (
     <div className={`flex items-center ${className}`}>
       <h1 className={`${textSize} font-bold tracking-tighter text-privacy-text-primary`}>
-        <span className="text-privacy-orange">M</span>eu Privacy
+        <span className="text-primary">M</span>eu Privacy
       </h1>
     </div>
   );

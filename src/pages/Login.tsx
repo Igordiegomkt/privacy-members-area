@@ -79,7 +79,7 @@ export const Login: React.FC = () => {
               value={name}
               onChange={(e) => setName(e.target.value)}
               required
-              className="w-full px-4 py-3 bg-privacy-surface border border-privacy-border rounded-lg text-privacy-text-primary placeholder-privacy-text-secondary focus:outline-none focus:border-privacy-orange transition-colors"
+              className="w-full px-4 py-3 bg-privacy-surface border border-privacy-border rounded-lg text-privacy-text-primary placeholder-privacy-text-secondary focus:outline-none focus:border-primary transition-colors"
               placeholder="Nome completo"
               disabled={isLoading}
             />
@@ -91,7 +91,7 @@ export const Login: React.FC = () => {
                 type="checkbox"
                 checked={isAdult}
                 onChange={(e) => setIsAdult(e.target.checked)}
-                className="w-5 h-5 bg-privacy-surface border-privacy-border rounded text-privacy-orange focus:ring-privacy-orange focus:ring-offset-privacy-black"
+                className="w-5 h-5 bg-privacy-surface border-privacy-border rounded text-primary focus:ring-primary focus:ring-offset-privacy-black"
                 disabled={isLoading}
               />
               <span className="text-sm text-privacy-text-secondary">
@@ -103,7 +103,7 @@ export const Login: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading || !isAdult || !name.trim()}
-            className="w-full bg-privacy-orange hover:opacity-90 text-privacy-black font-semibold py-3 rounded-lg transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-primary hover:opacity-90 text-privacy-black font-semibold py-3 rounded-lg transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Entrando...' : 'Entrar'}
           </button>

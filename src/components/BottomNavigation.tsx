@@ -45,7 +45,7 @@ export const BottomNavigation: React.FC = () => {
             key={item.id}
             onClick={() => navigate(item.path)}
             className={`flex flex-col items-center gap-1 py-2 px-4 transition-colors ${
-              active ? 'text-privacy-orange' : 'text-privacy-text-secondary hover:text-privacy-text-primary'
+              active ? 'text-primary' : 'text-privacy-text-secondary hover:text-privacy-text-primary'
             }`}
           >
             {item.icon}

@@ -87,7 +87,7 @@ const CreatorCard: React.FC<{ creator: Creator }> = ({ creator }) => (
           <img
             src={creator.avatar}
             alt={creator.name}
-            className="w-8 h-8 rounded-full object-cover border-2 border-privacy-orange"
+            className="w-8 h-8 rounded-full object-cover border-2 border-primary"
           />
           {creator.isOnline && (
             <span className="absolute -bottom-0.5 -right-0.5 w-2.5 h-2.5 bg-privacy-online rounded-full border border-black" />

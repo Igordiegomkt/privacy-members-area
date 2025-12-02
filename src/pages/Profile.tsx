@@ -107,7 +107,7 @@ export const Profile: React.FC = () => {
   const totalVideos = allMediaItems.current.filter(m => m.type === 'video').length;
 
   return (
-    <div className="min-h-screen bg-dark">
+    <div className="min-h-screen bg-privacy-black">
       <Header />
       
       <main className="max-w-4xl mx-auto pb-8">
@@ -123,7 +123,7 @@ export const Profile: React.FC = () => {
         </div>
 
         <div className="px-4 sm:px-6 mb-4">
-          <div className="flex justify-between items-center text-sm text-gray-400 mb-3">
+          <div className="flex justify-between items-center text-sm text-privacy-text-secondary mb-3">
             <span>{profileData.stats.posts.toLocaleString()} Postagens</span>
             <span>{totalMedia} Mídias</span>
           </div>
@@ -147,7 +147,7 @@ export const Profile: React.FC = () => {
         )}
 
         {!hasMore && media.length > 0 && (
-          <div className="text-center py-8 text-gray-400 text-sm">
+          <div className="text-center py-8 text-privacy-text-secondary text-sm">
             Todos os conteúdos foram carregados
           </div>
         )}

@@ -50,7 +50,7 @@ const UserList: React.FC = () => {
   };
 
   if (loading) {
-    return <div className="text-center text-gray-400">Carregando usuários...</div>;
+    return <div className="text-center text-privacy-text-secondary">Carregando usuários...</div>;
   }
 
   if (error) {
@@ -59,8 +59,8 @@ const UserList: React.FC = () => {
 
   return (
     <div className="overflow-x-auto">
-      <table className="w-full text-sm text-left text-gray-400">
-        <thead className="text-xs text-gray-300 uppercase bg-dark-lighter">
+      <table className="w-full text-sm text-left text-privacy-text-secondary">
+        <thead className="text-xs text-privacy-text-secondary uppercase bg-privacy-border">
           <tr>
             <th scope="col" className="px-6 py-3">Email</th>
             <th scope="col" className="px-6 py-3">Criado em</th>
@@ -70,15 +70,15 @@ const UserList: React.FC = () => {
         </thead>
         <tbody>
           {users.map((user) => (
-            <tr key={user.id} className="bg-dark-light border-b border-dark-lighter hover:bg-dark-lighter/50">
-              <td className="px-6 py-4 font-medium text-white whitespace-nowrap">{user.email}</td>
+            <tr key={user.id} className="bg-privacy-surface border-b border-privacy-border hover:bg-privacy-border/50">
+              <td className="px-6 py-4 font-medium text-privacy-text-primary whitespace-nowrap">{user.email}</td>
               <td className="px-6 py-4">{new Date(user.created_at).toLocaleDateString('pt-BR')}</td>
               <td className="px-6 py-4">{user.last_sign_in_at ? new Date(user.last_sign_in_at).toLocaleString('pt-BR') : 'Nunca'}</td>
               <td className="px-6 py-4">
                 <button
                   onClick={() => handleDeleteUser(user.id, user.email!)}
                   disabled={currentUser?.id === user.id}
-                  className="font-medium text-red-500 hover:text-red-400 disabled:text-gray-600 disabled:cursor-not-allowed"
+                  className="font-medium text-red-500 hover:text-red-400 disabled:text-privacy-text-secondary disabled:opacity-50 disabled:cursor-not-allowed"
                 >
                   Excluir
                 </button>
@@ -132,10 +132,10 @@ export const ManageUsers: React.FC = () => {
 
   return (
     <div>
-      <h1 className="text-3xl font-bold text-white mb-6">Gerenciar Usuários</h1>
+      <h1 className="text-3xl font-bold text-privacy-text-primary mb-6">Gerenciar Usuários</h1>
       
-      <div className="bg-dark-light p-8 rounded-lg shadow-lg max-w-lg mb-8">
-        <h2 className="text-xl font-bold text-white mb-4">Criar Novo Usuário Admin</h2>
+      <div className="bg-privacy-surface p-8 rounded-lg shadow-lg max-w-lg mb-8">
+        <h2 className="text-xl font-bold text-privacy-text-primary mb-4">Criar Novo Usuário Admin</h2>
         <form onSubmit={handleCreateUser} className="space-y-6">
           {message && (
             <div className={`px-4 py-3 rounded-lg text-sm ${
@@ -148,7 +148,7 @@ export const ManageUsers: React.FC = () => {
           )}
 
           <div>
-            <label htmlFor="email" className="block text-sm font-medium text-gray-300 mb-2">
+            <label htmlFor="email" className="block text-sm font-medium text-privacy-text-secondary mb-2">
               Email do Novo Usuário
             </label>
             <input
@@ -157,14 +157,14 @@ export const ManageUsers: React.FC = () => {
               value={email}
               onChange={(e) => setEmail(e.target.value)}
               required
-              className="w-full px-4 py-3 bg-dark-lighter border border-dark-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-primary transition-colors"
+              className="w-full px-4 py-3 bg-privacy-surface border border-privacy-border rounded-lg text-privacy-text-primary placeholder-privacy-text-secondary focus:outline-none focus:border-primary transition-colors"
               placeholder="novo.usuario@email.com"
               disabled={isLoading}
             />
           </div>
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-privacy-text-secondary mb-2">
               Senha
             </label>
             <input
@@ -173,25 +173,25 @@ export const ManageUsers: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 bg-dark-lighter border border-dark-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-primary transition-colors"
+              className="w-full px-4 py-3 bg-privacy-surface border border-privacy-border rounded-lg text-privacy-text-primary placeholder-privacy-text-secondary focus:outline-none focus:border-primary transition-colors"
               placeholder="••••••••"
               disabled={isLoading}
             />
-             <p className="mt-1 text-xs text-gray-500">Mínimo de 6 caracteres.</p>
+             <p className="mt-1 text-xs text-privacy-text-secondary">Mínimo de 6 caracteres.</p>
           </div>
 
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-primary hover:bg-primary-dark text-dark font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-primary hover:bg-primary-dark text-privacy-black font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Criando...' : 'Criar Usuário'}
           </button>
         </form>
       </div>
 
-      <div className="bg-dark-light p-8 rounded-lg shadow-lg">
-        <h2 className="text-xl font-bold text-white mb-4">Usuários Admin Existentes</h2>
+      <div className="bg-privacy-surface p-8 rounded-lg shadow-lg">
+        <h2 className="text-xl font-bold text-privacy-text-primary mb-4">Usuários Admin Existentes</h2>
         <UserList key={userListKey} />
       </div>
     </div>

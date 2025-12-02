@@ -26,10 +26,10 @@ export function Sidebar(): React.ReactElement {
   ];
 
   return (
-    <aside className="w-64 bg-dark-light flex flex-col p-4">
+    <aside className="w-64 bg-privacy-surface flex flex-col p-4">
       <div className="text-center py-4 mb-8">
         <Logo textSize="text-2xl" />
-        <span className="text-sm text-gray-400">Admin Panel</span>
+        <span className="text-sm text-privacy-text-secondary">Admin Panel</span>
       </div>
       <nav className="flex-1">
         <ul className="space-y-2">
@@ -39,8 +39,8 @@ export function Sidebar(): React.ReactElement {
                 href={item.path}
                 className={`flex items-center gap-3 px-4 py-3 rounded-lg transition-colors ${
                   location.pathname === item.path
-                    ? 'text-white bg-primary/20'
-                    : 'text-gray-300 hover:bg-dark-lighter'
+                    ? 'text-privacy-text-primary bg-primary/20'
+                    : 'text-privacy-text-secondary hover:bg-privacy-border'
                 }`}
               >
                 {item.icon}
@@ -53,7 +53,7 @@ export function Sidebar(): React.ReactElement {
       <div>
         <button
           onClick={handleLogout}
-          className="w-full flex items-center gap-3 px-4 py-3 text-gray-300 hover:bg-dark-lighter rounded-lg transition-colors"
+          className="w-full flex items-center gap-3 px-4 py-3 text-privacy-text-secondary hover:bg-privacy-border rounded-lg transition-colors"
         >
           <svg className="w-5 h-5" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M17 16l4-4m0 0l-4-4m4 4H7m6 4v1a3 3 0 01-3 3H6a3 3 0 01-3-3V7a3 3 0 013-3h4a3 3 0 013 3v1" /></svg>
           <span>Sair</span>

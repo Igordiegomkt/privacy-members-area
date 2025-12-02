@@ -40,16 +40,16 @@ export const ResetPassword: React.FC = () => {
   };
 
   return (
-    <div className="min-h-screen bg-dark flex items-center justify-center px-4">
+    <div className="min-h-screen bg-privacy-black flex items-center justify-center px-4">
       <div className="w-full max-w-sm">
         <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white">
+          <h1 className="text-3xl font-bold text-privacy-text-primary">
             Redefinir Senha
           </h1>
-          <p className="text-gray-400">Crie uma nova senha para sua conta de administrador.</p>
+          <p className="text-privacy-text-secondary">Crie uma nova senha para sua conta de administrador.</p>
         </div>
 
-        <form onSubmit={handleResetPassword} className="space-y-6 bg-dark-light p-8 rounded-lg shadow-lg">
+        <form onSubmit={handleResetPassword} className="space-y-6 bg-privacy-surface p-8 rounded-lg shadow-lg">
           {message && (
             <div className={`px-4 py-3 rounded-lg text-sm ${
               message.type === 'success' 
@@ -61,7 +61,7 @@ export const ResetPassword: React.FC = () => {
           )}
 
           <div>
-            <label htmlFor="password" className="block text-sm font-medium text-gray-300 mb-2">
+            <label htmlFor="password" className="block text-sm font-medium text-privacy-text-secondary mb-2">
               Nova Senha
             </label>
             <input
@@ -70,14 +70,14 @@ export const ResetPassword: React.FC = () => {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 bg-dark-lighter border border-dark-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-primary transition-colors"
+              className="w-full px-4 py-3 bg-privacy-surface border border-privacy-border rounded-lg text-privacy-text-primary placeholder-privacy-text-secondary focus:outline-none focus:border-primary transition-colors"
               placeholder="••••••••"
               disabled={isLoading}
             />
           </div>
 
           <div>
-            <label htmlFor="confirmPassword" className="block text-sm font-medium text-gray-300 mb-2">
+            <label htmlFor="confirmPassword" className="block text-sm font-medium text-privacy-text-secondary mb-2">
               Confirmar Nova Senha
             </label>
             <input
@@ -86,7 +86,7 @@ export const ResetPassword: React.FC = () => {
               value={confirmPassword}
               onChange={(e) => setConfirmPassword(e.target.value)}
               required
-              className="w-full px-4 py-3 bg-dark-lighter border border-dark-lighter rounded-lg text-white placeholder-gray-500 focus:outline-none focus:border-primary transition-colors"
+              className="w-full px-4 py-3 bg-privacy-surface border border-privacy-border rounded-lg text-privacy-text-primary placeholder-privacy-text-secondary focus:outline-none focus:border-primary transition-colors"
               placeholder="••••••••"
               disabled={isLoading}
             />
@@ -95,7 +95,7 @@ export const ResetPassword: React.FC = () => {
           <button
             type="submit"
             disabled={isLoading}
-            className="w-full bg-primary hover:bg-primary-dark text-dark font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
+            className="w-full bg-primary hover:bg-primary-dark text-privacy-black font-semibold py-3 rounded-lg transition-colors disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Redefinindo...' : 'Redefinir Senha'}
           </button>

@@ -62,7 +62,7 @@ export const Login: React.FC = () => {
       <TrackingScripts />
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
-          <Logo textSize="text-4xl" iconSize="w-10 h-10" />
+          <Logo textSize="text-4xl" />
         </div>
 
         <form onSubmit={handleSubmit} className="space-y-6">

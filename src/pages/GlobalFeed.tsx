@@ -11,10 +11,10 @@ const GlobalFeedCard: React.FC<{ item: GlobalFeedItem; onMediaClick: (media: Med
   const navigate = useNavigate();
   const { media, model } = item;
   const isLocked = media.accessStatus === 'locked';
+  const isUnlockedModel = media.accessStatus === 'unlocked';
 
   const handleCardClick = () => {
     if (isLocked) {
-      // Redireciona para o perfil da modelo se o conteúdo estiver bloqueado
       navigate(`/modelo/${model.username}`);
     } else {
       onMediaClick(media);
@@ -24,12 +24,19 @@ const GlobalFeedCard: React.FC<{ item: GlobalFeedItem; onMediaClick: (media: Med
   return (
     <article className="mb-6 bg-privacy-surface rounded-2xl overflow-hidden">
       {/* Card Header */}
-      <Link to={`/modelo/${model.username}`} className="flex items-center gap-3 p-4 hover:bg-privacy-border/50 transition-colors">
-        <img src={model.avatar_url} alt={model.name} className="w-10 h-10 rounded-full object-cover" />
-        <div>
-          <p className="font-semibold text-sm text-privacy-text-primary">{model.name}</p>
-          <p className="text-xs text-privacy-text-secondary">@{model.username}</p>
+      <Link to={`/modelo/${model.username}`} className="flex items-center justify-between p-4 hover:bg-privacy-border/50 transition-colors">
+        <div className="flex items-center gap-3">
+          <img src={model.avatar_url} alt={model.name} className="w-10 h-10 rounded-full object-cover" />
+          <div>
+            <p className="font-semibold text-sm text-privacy-text-primary">{model.name}</p>
+            <p className="text-xs text-privacy-text-secondary">@{model.username}</p>
+          </div>
         </div>
+        {isUnlockedModel ? (
+            <span className="text-xs font-semibold bg-green-500/20 text-green-400 px-2 py-1 rounded-full">✔ Você já tem acesso</span>
+        ) : (
+            <span className="text-xs font-semibold bg-purple-500/20 text-purple-400 px-2 py-1 rounded-full">💘 Sugestão pra você</span>
+        )}
       </Link>
 
       {/* Media Content */}
@@ -37,13 +44,12 @@ const GlobalFeedCard: React.FC<{ item: GlobalFeedItem; onMediaClick: (media: Med
         <img
           src={media.thumbnail}
           alt="Feed content"
-          className={`w-full h-auto max-h-[70vh] object-contain ${isLocked ? 'blur-md' : ''}`}
+          className={`w-full h-auto max-h-[70vh] object-contain bg-black ${isLocked ? 'blur-md' : ''}`}
         />
         {isLocked && (
           <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-center p-4">
-            <svg className="w-12 h-12 text-white mb-4" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-            <p className="font-semibold text-white">Conteúdo exclusivo</p>
-            <p className="text-sm text-privacy-text-secondary mt-1">Assine para ver o conteúdo de {model.name}</p>
+            <p className="font-semibold text-white text-lg">🔒 Conteúdo Premium</p>
+            <p className="text-sm text-privacy-text-secondary mt-1">Toque para ver como desbloquear</p>
           </div>
         )}
       </div>
@@ -86,7 +92,7 @@ export const GlobalFeed: React.FC = () => {
       <main className="mx-auto w-full max-w-md px-4 py-6">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-white">Feed</h1>
-          <p className="text-sm text-privacy-text-secondary">Novidades e recomendações para você</p>
+          <p className="text-sm text-privacy-text-secondary">Novos conteúdos das modelos que você já tem acesso e sugestões pra você conhecer outras.</p>
         </div>
 
         {loading && <div className="text-center py-10">Carregando...</div>}

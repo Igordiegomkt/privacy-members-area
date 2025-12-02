@@ -2,6 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Model, Product } from '../types';
 import { fetchModelByUsername, fetchMediaForModel, fetchProductsForModel, MediaItemWithAccess } from '../lib/models';
+import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { Avatar } from '../components/Avatar';
@@ -14,17 +15,41 @@ const BASE_MODEL_USERNAME = 'carolina-andrade';
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const ProductCard: React.FC<{ product: Product }> = ({ product }) => (
-    <div onClick={() => useNavigate()(`/produto/${product.id}`)} className="bg-privacy-surface rounded-lg overflow-hidden group cursor-pointer">
-        <div className="relative aspect-square">
-            <img src={product.cover_thumbnail} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+const ProductCard: React.FC<{ product: Product; isPurchased: boolean; modelName: string; isFirst: boolean }> = ({ product, isPurchased, modelName, isFirst }) => {
+    const navigate = useNavigate();
+
+    return (
+        <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
+            <div className="relative aspect-square cursor-pointer" onClick={() => navigate(`/produto/${product.id}`)}>
+                <img src={product.cover_thumbnail} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                {isFirst && !isPurchased && (
+                    <div className="absolute top-2 left-2 bg-primary text-privacy-black rounded-full px-2 py-1 text-xs font-bold">
+                        🔥 Mais vendido de {modelName.split(' ')[0]}
+                    </div>
+                )}
+                {isPurchased && (
+                    <div className="absolute top-2 left-2 bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold">
+                        ✔ Já é seu
+                    </div>
+                )}
+            </div>
+            <div className="p-4 flex flex-col flex-1">
+                <h3 className="font-semibold text-privacy-text-primary truncate flex-1">{product.name}</h3>
+                <p className="text-lg font-bold text-primary mt-1">{formatPrice(product.price_cents)}</p>
+                <button
+                    onClick={() => navigate(`/produto/${product.id}`)}
+                    className={`w-full mt-3 text-sm font-semibold py-2 rounded-lg transition-colors ${
+                        isPurchased
+                            ? 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
+                            : 'bg-primary text-privacy-black hover:opacity-90'
+                    }`}
+                >
+                    {isPurchased ? 'Ver conteúdo' : 'Desbloquear agora'}
+                </button>
+            </div>
         </div>
-        <div className="p-4">
-            <h3 className="font-semibold text-privacy-text-primary truncate">{product.name}</h3>
-            <p className="text-lg font-bold text-primary mt-1">{formatPrice(product.price_cents)}</p>
-        </div>
-    </div>
-);
+    );
+};
 
 export const ModelProfile: React.FC = () => {
     useProtection();
@@ -33,6 +58,7 @@ export const ModelProfile: React.FC = () => {
     const [model, setModel] = useState<Model | null>(null);
     const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
+    const [userPurchases, setUserPurchases] = useState<UserPurchaseWithProduct[]>([]);
     const [loading, setLoading] = useState(true);
     const [selectedMedia, setSelectedMedia] = useState<MediaItemWithAccess | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
@@ -42,7 +68,13 @@ export const ModelProfile: React.FC = () => {
 
         const loadProfileData = async () => {
             setLoading(true);
-            const fetchedModel = await fetchModelByUsername(username);
+            const [fetchedModel, purchases] = await Promise.all([
+                fetchModelByUsername(username),
+                fetchUserPurchases()
+            ]);
+            
+            setUserPurchases(purchases);
+
             if (fetchedModel) {
                 setModel(fetchedModel);
                 const isBase = fetchedModel.username === BASE_MODEL_USERNAME;
@@ -84,6 +116,8 @@ export const ModelProfile: React.FC = () => {
         photos: media.filter(m => m.type === 'image').length,
         videos: media.filter(m => m.type === 'video').length,
     };
+    
+    const purchasedProductIds = new Set(userPurchases.map(p => p.product_id));
 
     return (
         <div className="min-h-screen bg-privacy-black text-white pb-24">
@@ -113,6 +147,16 @@ export const ModelProfile: React.FC = () => {
                     <div><span className="font-bold">{stats.videos}</span> <span className="text-sm text-privacy-text-secondary">vídeos</span></div>
                 </div>
 
+                {/* VIP Banner for Carolina */}
+                {model.username === BASE_MODEL_USERNAME && (
+                    <div className="px-4 sm:px-6 mb-6">
+                        <div className="text-center bg-primary/10 border border-primary/30 rounded-lg p-4 text-sm">
+                            <p className="font-semibold text-primary">💎 Você já é VIP da Carolina.</p>
+                            <p className="text-privacy-text-secondary mt-1">Aproveite todos os conteúdos liberados no mural e descubra packs extras na aba Loja.</p>
+                        </div>
+                    </div>
+                )}
+
                 {/* Tabs */}
                 <Tabs defaultValue="mural" className="w-full">
                     <TabsList className="grid w-full grid-cols-3">
@@ -120,19 +164,31 @@ export const ModelProfile: React.FC = () => {
                         <TabsTrigger value="feed">Feed</TabsTrigger>
                         <TabsTrigger value="loja">Loja</TabsTrigger>
                     </TabsList>
-                    <TabsContent value="mural" className="mt-4">
+                    <TabsContent value="mural" className="mt-6">
+                        <div className="px-4 sm:px-6 mb-4">
+                            <h2 className="text-xl font-bold">Mural VIP</h2>
+                            <p className="text-sm text-privacy-text-secondary">Todas as fotos e vídeos exclusivos de {model.name} em um lugar só.</p>
+                        </div>
                         <MediaGrid media={media} onMediaClick={handleMediaClick} />
                     </TabsContent>
-                    <TabsContent value="feed" className="mt-4 px-4">
-                        <p className="text-center text-privacy-text-secondary">O feed em formato de timeline será implementado em breve.</p>
+                    <TabsContent value="feed" className="mt-6 px-4">
+                        <p className="text-center text-privacy-text-secondary py-10">O feed em formato de timeline será implementado em breve.</p>
                     </TabsContent>
-                    <TabsContent value="loja" className="mt-4 px-4">
+                    <TabsContent value="loja" className="mt-6 px-4">
                         {products.length > 0 ? (
                             <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                                {products.map(p => <ProductCard key={p.id} product={p} />)}
+                                {products.map((p, index) => (
+                                    <ProductCard 
+                                        key={p.id} 
+                                        product={p} 
+                                        isPurchased={purchasedProductIds.has(p.id) || !!p.is_base_membership}
+                                        modelName={model.name}
+                                        isFirst={index === 0}
+                                    />
+                                ))}
                             </div>
                         ) : (
-                            <p className="text-center text-privacy-text-secondary">Nenhum produto na loja desta modelo.</p>
+                            <p className="text-center text-privacy-text-secondary py-10">Nenhum produto na loja desta modelo.</p>
                         )}
                     </TabsContent>
                 </Tabs>

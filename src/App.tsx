@@ -12,6 +12,9 @@ import { ResetPassword } from './pages/admin/ResetPassword';
 import { supabase } from './lib/supabase';
 import { ManageUsers } from './pages/admin/ManageUsers';
 import { UserLayout } from './components/UserLayout';
+import { Marketplace } from './pages/Marketplace';
+import { ProductDetail } from './pages/ProductDetail';
+import { MyPurchases } from './pages/MyPurchases';
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -72,6 +75,9 @@ function App() {
           <Route path="/mural" element={<Home />} />
           <Route path="/feed" element={<Feed />} />
           <Route path="/trending" element={<Trending />} />
+          <Route path="/loja" element={<Marketplace />} />
+          <Route path="/produto/:id" element={<ProductDetail />} />
+          <Route path="/minhas-compras" element={<MyPurchases />} />
         </Route>
         
         {/* Admin Routes */}

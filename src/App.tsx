@@ -18,6 +18,11 @@ import { CarolinaHub } from './pages/CarolinaHub';
 import { ModelProfile } from './pages/ModelProfile';
 import { GlobalFeed } from './pages/GlobalFeed';
 import { TrendingModels } from './pages/TrendingModels';
+import { ManageModels } from './pages/admin/ManageModels';
+import { ModelForm } from './pages/admin/ModelForm';
+import { ManageProducts } from './pages/admin/ManageProducts';
+import { ManageContent } from './pages/admin/ManageContent';
+import { PaymentSettings } from './pages/admin/PaymentSettings';
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -81,6 +86,12 @@ function App() {
           <Route element={<AdminLayout />}>
             <Route path="/admin/dashboard" element={<AdminDashboard />} />
             <Route path="/admin/users" element={<ManageUsers />} />
+            <Route path="/admin/modelos" element={<ManageModels />} />
+            <Route path="/admin/modelos/nova" element={<ModelForm />} />
+            <Route path="/admin/modelos/:id" element={<ModelForm />} />
+            <Route path="/admin/modelos/:id/produtos" element={<ManageProducts />} />
+            <Route path="/admin/modelos/:id/conteudos" element={<ManageContent />} />
+            <Route path="/admin/configuracoes" element={<PaymentSettings />} />
           </Route>
         </Route>
 

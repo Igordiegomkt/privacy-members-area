@@ -1,4 +1,4 @@
-# Spicy - Área de Membros
+# Meu Privacy - Área de Membros
 
 Uma aplicação web responsiva de área de membros inspirada na plataforma Privacy, construída com React, TypeScript e Tailwind CSS.
 

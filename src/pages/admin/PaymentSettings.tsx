@@ -12,30 +12,46 @@ interface PaymentProvider {
 export const PaymentSettings: React.FC = () => {
     const [providers, setProviders] = useState<PaymentProvider[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
     const fetchProviders = useCallback(async () => {
         setLoading(true);
+        setError(null);
+        console.log('[PaymentSettings] Fetching providers...');
         const { data, error } = await supabase.from('payment_providers_config').select('*');
-        if (error) alert(error.message);
-        else setProviders(data as PaymentProvider[]);
+        
+        console.log('[PaymentSettings] Supabase response:', { data, error });
+        if (error) {
+            setError(error.message);
+        } else {
+            setProviders(data as PaymentProvider[]);
+        }
         setLoading(false);
     }, []);
 
     useEffect(() => { fetchProviders(); }, [fetchProviders]);
 
     const handleActivate = async (providerId: string) => {
-        // Deactivate all others
-        await supabase.from('payment_providers_config').update({ is_active: false }).neq('id', providerId);
-        // Activate the selected one
-        const { error } = await supabase.from('payment_providers_config').update({ is_active: true }).eq('id', providerId);
-        if (error) alert(error.message);
-        else {
+        console.log(`[PaymentSettings] Activating provider: ${providerId}`);
+        setError(null);
+        try {
+            // Deactivate all others in a transaction-like manner
+            const { error: deactivateError } = await supabase.from('payment_providers_config').update({ is_active: false }).neq('id', providerId);
+            if (deactivateError) throw deactivateError;
+
+            // Activate the selected one
+            const { error: activateError } = await supabase.from('payment_providers_config').update({ is_active: true }).eq('id', providerId);
+            if (activateError) throw activateError;
+
             alert('Provedor ativado com sucesso!');
-            fetchProviders();
+            fetchProviders(); // Refresh the list
+        } catch (err: any) {
+            console.error('[PaymentSettings] Activation error:', err);
+            setError(err.message);
         }
     };
 
-    if (loading) return <p>Carregando...</p>;
+    if (loading) return <p className="text-privacy-text-secondary">Carregando configurações...</p>;
 
     return (
         <div>
@@ -44,6 +60,8 @@ export const PaymentSettings: React.FC = () => {
                 Gerencie os provedores de pagamento. Apenas um pode estar ativo por vez. As chaves secretas (Access Tokens) devem ser configuradas como segredos nas Edge Functions.
             </p>
             
+            {error && <p className="text-red-400 bg-red-500/10 p-3 rounded-md mb-4">{error}</p>}
+
             <div className="space-y-4">
                 {providers.map(provider => (
                     <div key={provider.id} className="bg-privacy-surface p-6 rounded-lg flex justify-between items-center">
@@ -56,7 +74,7 @@ export const PaymentSettings: React.FC = () => {
                             {provider.is_active ? (
                                 <span className="bg-green-500 text-white font-bold py-2 px-4 rounded">Ativo</span>
                             ) : (
-                                <button onClick={() => handleActivate(provider.id)} className="bg-primary text-black font-bold py-2 px-4 rounded">
+                                <button onClick={() => handleActivate(provider.id)} className="bg-primary hover:opacity-90 text-black font-bold py-2 px-4 rounded">
                                     Ativar
                                 </button>
                             )}

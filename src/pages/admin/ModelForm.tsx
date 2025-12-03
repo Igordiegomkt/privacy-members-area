@@ -15,9 +15,12 @@ export const ModelForm: React.FC = () => {
     if (isEditing) {
       const fetchModel = async () => {
         setLoading(true);
+        console.log(`[ModelForm] Fetching model with id: ${id}`);
         const { data, error } = await supabase.from('models').select('*').eq('id', id).single();
+        
+        console.log('[ModelForm] Supabase fetch response:', { data, error });
         if (error) {
-          setError(error.message);
+          setError(`Erro ao carregar modelo: ${error.message}`);
         } else if (data) {
           setModel(data);
         }
@@ -36,13 +39,15 @@ export const ModelForm: React.FC = () => {
     e.preventDefault();
     setLoading(true);
     setError(null);
+    console.log('[ModelForm] Submitting form data:', model);
 
-    const { error } = isEditing
-      ? await supabase.from('models').update(model).eq('id', id)
-      : await supabase.from('models').insert(model);
+    const { data, error: submissionError } = isEditing
+      ? await supabase.from('models').update(model).eq('id', id).select().single()
+      : await supabase.from('models').insert(model).select().single();
 
-    if (error) {
-      setError(error.message);
+    console.log('[ModelForm] Supabase submission response:', { data, error: submissionError });
+    if (submissionError) {
+      setError(`Erro ao salvar: ${submissionError.message}`);
     } else {
       alert(`Modelo ${isEditing ? 'atualizada' : 'criada'} com sucesso!`);
       navigate('/admin/modelos');
@@ -56,19 +61,8 @@ export const ModelForm: React.FC = () => {
     <div>
       <h1 className="text-3xl font-bold text-white mb-6">{isEditing ? 'Editar Modelo' : 'Nova Modelo'}</h1>
       
-      {isEditing && (
-        <div className="flex gap-4 mb-6">
-            <Link to={`/admin/modelos/${id}/produtos`} className="bg-privacy-border hover:bg-primary/20 text-white font-semibold py-2 px-4 rounded-lg">
-                Gerenciar Produtos
-            </Link>
-            <Link to={`/admin/modelos/${id}/conteudos`} className="bg-privacy-border hover:bg-primary/20 text-white font-semibold py-2 px-4 rounded-lg">
-                Gerenciar Conteúdos
-            </Link>
-        </div>
-      )}
-
       <form onSubmit={handleSubmit} className="bg-privacy-surface p-8 rounded-lg space-y-6 max-w-2xl">
-        {error && <p className="text-red-400">{error}</p>}
+        {error && <p className="text-red-400 bg-red-500/10 p-3 rounded-md">{error}</p>}
         
         <div>
           <label htmlFor="name" className="block text-sm font-medium text-privacy-text-secondary mb-2">Nome</label>

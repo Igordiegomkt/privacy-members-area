@@ -1,32 +1,24 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { MediaItem, Model } from '../../types';
-
-interface ProductOption {
-    id: string;
-    name: string;
-}
+import { MediaItem, Model, Product } from '../../types';
 
 export const ManageContent: React.FC = () => {
     const { id: modelId } = useParams<{ id: string }>();
     const [model, setModel] = useState<Model | null>(null);
     const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-    const [products, setProducts] = useState<ProductOption[]>([]);
+    const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
 
-    // Manual Form State
+    // Form States
     const [manualUrl, setManualUrl] = useState('');
     const [manualType, setManualType] = useState<'image' | 'video'>('image');
     const [manualIsFree, setManualIsFree] = useState(false);
-    const [manualProductId, setManualProductId] = useState<string>('');
-
-    // Batch Form State
     const [batchBaseUrl, setBatchBaseUrl] = useState('');
     const [batchCount, setBatchCount] = useState(1);
     const [batchType, setBatchType] = useState<'image' | 'video'>('image');
     const [batchExtension, setBatchExtension] = useState('.png');
-    const [batchProductId, setBatchProductId] = useState<string>('');
 
     const fetchData = useCallback(async () => {
         if (!modelId) return;
@@ -46,16 +38,19 @@ export const ManageContent: React.FC = () => {
 
     const handleManualSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
+        console.log('[ManageContent] Submitting manual item:', { manualUrl, manualType, manualIsFree });
         const { error } = await supabase.from('media_items').insert({
             model_id: modelId,
             url: manualUrl,
-            thumbnail: manualUrl, // Simple default
+            thumbnail: manualUrl,
             type: manualType,
             is_free: manualIsFree,
-            product_id: manualProductId || null,
         });
-        if (error) alert(error.message);
-        else {
+        if (error) {
+            console.error('[ManageContent] Manual insert error:', error);
+            setError(error.message);
+        } else {
             alert('Conteúdo adicionado!');
             setManualUrl('');
             fetchData();
@@ -64,18 +59,20 @@ export const ManageContent: React.FC = () => {
 
     const handleBatchSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+        setError(null);
         const newItems = Array.from({ length: batchCount }, (_, i) => ({
             model_id: modelId,
             type: batchType,
             url: `${batchBaseUrl}${i + 1}${batchExtension}`,
             thumbnail: `${batchBaseUrl}${i + 1}${batchExtension}`,
             is_free: true,
-            product_id: batchProductId || null,
         }));
-
+        console.log(`[ManageContent] Submitting ${newItems.length} batch items.`);
         const { error } = await supabase.from('media_items').insert(newItems);
-        if (error) alert(error.message);
-        else {
+        if (error) {
+            console.error('[ManageContent] Batch insert error:', error);
+            setError(error.message);
+        } else {
             alert(`${batchCount} conteúdos adicionados em lote!`);
             fetchData();
         }
@@ -89,7 +86,7 @@ export const ManageContent: React.FC = () => {
     return (
         <div>
             <h1 className="text-3xl font-bold text-white mb-6">Gerenciar Conteúdos de {model.name}</h1>
-            
+            {error && <p className="text-red-400 bg-red-500/10 p-3 rounded-md mb-4">{error}</p>}
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <form onSubmit={handleManualSubmit} className="bg-privacy-surface p-6 rounded-lg space-y-4">
                     <h2 className="text-xl font-bold text-white">Cadastro Manual</h2>
@@ -97,10 +94,6 @@ export const ManageContent: React.FC = () => {
                     <select value={manualType} onChange={e => setManualType(e.target.value as any)} className={inputStyle}>
                         <option value="image">Imagem</option>
                         <option value="video">Vídeo</option>
-                    </select>
-                    <select value={manualProductId} onChange={e => setManualProductId(e.target.value)} className={inputStyle}>
-                        <option value="">Conteúdo Avulso (sem produto)</option>
-                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
                     <label className="flex items-center gap-2 text-white"><input type="checkbox" checked={manualIsFree} onChange={e => setManualIsFree(e.target.checked)} /> Gratuito?</label>
                     <button type="submit" className="bg-primary text-black font-bold py-2 px-4 rounded w-full">Adicionar</button>
@@ -115,10 +108,6 @@ export const ManageContent: React.FC = () => {
                         <option value="video">Vídeo</option>
                     </select>
                     <input value={batchExtension} onChange={e => setBatchExtension(e.target.value)} placeholder="Extensão (ex: .png)" className={inputStyle} required />
-                    <select value={batchProductId} onChange={e => setBatchProductId(e.target.value)} className={inputStyle}>
-                        <option value="">Conteúdo Avulso (sem produto)</option>
-                        {products.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
-                    </select>
                     <button type="submit" className="bg-primary text-black font-bold py-2 px-4 rounded w-full">Gerar em Lote</button>
                 </form>
             </div>

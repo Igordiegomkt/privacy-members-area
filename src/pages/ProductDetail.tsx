@@ -3,7 +3,7 @@ import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
-import { fetchProductById, hasUserPurchased, createPurchase } from '../lib/marketplace';
+import { fetchProductById, hasUserPurchased, createCheckoutSession } from '../lib/marketplace';
 
 const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -34,7 +34,6 @@ export const ProductDetail: React.FC = () => {
         setProduct(fetchedProduct);
 
         if (fetchedProduct) {
-          // A função hasUserPurchased já contém a lógica do produto base
           const purchased = await hasUserPurchased(id);
           setIsPurchased(purchased);
         }
@@ -53,13 +52,11 @@ export const ProductDetail: React.FC = () => {
     setPurchaseError(null);
     setPurchaseLoading(true);
     try {
-      await createPurchase(id);
-      setIsPurchased(true);
-      alert('Compra realizada com sucesso!');
+      const checkoutUrl = await createCheckoutSession(id);
+      window.location.href = checkoutUrl;
     } catch (err: any) {
       console.error(err);
-      setPurchaseError(err.message ?? 'Não foi possível concluir a compra.');
-    } finally {
+      setPurchaseError(err.message ?? 'Não foi possível iniciar a compra. Tente novamente.');
       setPurchaseLoading(false);
     }
   };

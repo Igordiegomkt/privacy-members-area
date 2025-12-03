@@ -50,8 +50,8 @@ serve(async (req: Request) => {
         },
       ],
       back_urls: {
-        success: `${Deno.env.get('SITE_URL')}/minhas-compras`,
-        failure: `${Deno.env.get('SITE_URL')}/produto/${productId}`,
+        success: `${Deno.env.get('SITE_URL')}/compra-sucesso?product_id=${productId}`,
+        failure: `${Deno.env.get('SITE_URL')}/compra-falhou?product_id=${productId}`,
         pending: `${Deno.env.get('SITE_URL')}/produto/${productId}`,
       },
       notification_url: `${Deno.env.get('SUPABASE_URL')}/functions/v1/payment-webhook`,

@@ -21,6 +21,8 @@ import { ModelForm } from './pages/admin/ModelForm';
 import { ManageProducts } from './pages/admin/ManageProducts';
 import { ManageContent } from './pages/admin/ManageContent';
 import { PaymentSettings } from './pages/admin/PaymentSettings';
+import PurchaseSuccess from './pages/PurchaseSuccess';
+import PurchaseFailed from './pages/PurchaseFailed';
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -72,7 +74,8 @@ function App() {
           <Route path="/loja" element={<Marketplace />} />
           <Route path="/produto/:id" element={<ProductDetail />} />
           <Route path="/minhas-compras" element={<MyPurchases />} />
-          {/* Rota legada '/mural' agora aponta para Home, que pode ser refatorada ou usada como base */}
+          <Route path="/compra-sucesso" element={<PurchaseSuccess />} />
+          <Route path="/compra-falhou" element={<PurchaseFailed />} />
           <Route path="/mural" element={<Home />} />
         </Route>
         

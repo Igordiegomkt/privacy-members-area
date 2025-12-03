@@ -1,11 +1,12 @@
 import { supabase } from './supabase';
-import { Product, UserPurchase } from '../types';
+import { Product, UserPurchase, Model } from '../types';
 
 export type UserPurchaseWithProduct = UserPurchase & {
-  product: Product | null;
+  product: (Product & { model: Model | null }) | null;
 };
 
 const PRODUCT_COLUMNS = 'id, name, description, price_cents, type, status, cover_thumbnail, created_at, model_id, is_base_membership';
+const MODEL_COLUMNS = 'id, name, username, avatar_url';
 
 export const fetchProducts = async (): Promise<Product[]> => {
   const { data, error } = await supabase
@@ -35,13 +36,16 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
 
   const { data, error } = await supabase
     .from('user_purchases')
-    .select(`*, products (${PRODUCT_COLUMNS})`)
+    .select(`*, product:products!inner(${PRODUCT_COLUMNS}, model:models(${MODEL_COLUMNS}))`)
     .eq('user_id', user.id)
     .order('created_at', { ascending: false });
 
-  if (error) throw new Error('Não foi possível buscar as compras do usuário.');
+  if (error) {
+    console.error("Error fetching user purchases with model:", error);
+    throw new Error('Não foi possível buscar as compras do usuário.');
+  }
   
-  return (data || []).map(p => ({ ...p, product: p.products as Product | null }));
+  return data as UserPurchaseWithProduct[] || [];
 };
 
 export const hasUserPurchased = async (productId: string): Promise<boolean> => {
@@ -62,11 +66,6 @@ export const hasUserPurchased = async (productId: string): Promise<boolean> => {
   return (count ?? 0) > 0;
 };
 
-/**
- * Chama a Edge Function para criar uma sessão de checkout no Mercado Pago.
- * @param productId O ID do produto a ser comprado.
- * @returns A URL de checkout para redirecionar o usuário.
- */
 export const createCheckoutSession = async (productId: string): Promise<string> => {
   const { data, error } = await supabase.functions.invoke('create-checkout', {
     body: { productId },

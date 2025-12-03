@@ -22,12 +22,21 @@ const PurchaseItem: React.FC<{ purchase: UserPurchaseWithProduct }> = ({ purchas
     );
   }
 
+  const model = product.model;
+  const linkTo = model ? `/modelo/${model.username}` : `/produto/${product.id}`;
+
   return (
-    <Link to={`/produto/${product.id}`} className="flex items-center gap-4 bg-privacy-surface p-4 rounded-lg hover:bg-privacy-border transition-colors">
+    <Link to={linkTo} className="flex items-center gap-4 bg-privacy-surface p-4 rounded-lg hover:bg-privacy-border transition-colors">
       <img src={product.cover_thumbnail} alt={product.name} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
       <div className="flex-1">
         <h3 className="font-semibold text-privacy-text-primary">{product.name}</h3>
-        <p className="text-sm text-privacy-text-secondary">
+        {model && (
+          <div className="flex items-center gap-2 mt-1">
+            <img src={model.avatar_url} alt={model.name} className="w-5 h-5 rounded-full object-cover" />
+            <span className="text-xs text-privacy-text-secondary">{model.name}</span>
+          </div>
+        )}
+        <p className="text-xs text-privacy-text-secondary mt-2">
           Comprado em: {new Date(purchase.created_at).toLocaleDateString('pt-BR')}
         </p>
       </div>

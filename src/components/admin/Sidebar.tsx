@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Logo } from '../Logo';
-import { LayoutDashboard, Users, Settings, LogOut } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, LogOut, Image as ImageIcon } from 'lucide-react';
 
 export function Sidebar(): React.ReactElement {
   const navigate = useNavigate();
@@ -20,14 +20,14 @@ export function Sidebar(): React.ReactElement {
       icon: <LayoutDashboard className="w-5 h-5" />
     },
     {
+      path: '/admin/modelos',
+      label: 'Modelos',
+      icon: <ImageIcon className="w-5 h-5" />
+    },
+    {
       path: '/admin/users',
       label: 'Usuários Admin',
       icon: <Users className="w-5 h-5" />
-    },
-    {
-      path: '/admin/modelos',
-      label: 'Modelos',
-      icon: <Users className="w-5 h-5" /> // Placeholder icon, can be changed
     },
     {
       path: '/admin/configuracoes',

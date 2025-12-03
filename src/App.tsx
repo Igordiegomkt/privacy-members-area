@@ -2,7 +2,6 @@ import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
-import { Trending } from './pages/Trending';
 import { AdminLogin } from './pages/admin/AdminLogin';
 import { AdminDashboard } from './pages/admin/AdminDashboard';
 import { ProtectedRouteAdmin } from './components/admin/ProtectedRouteAdmin';
@@ -14,7 +13,6 @@ import { UserLayout } from './components/UserLayout';
 import { Marketplace } from './pages/Marketplace';
 import { ProductDetail } from './pages/ProductDetail';
 import { MyPurchases } from './pages/MyPurchases';
-import { CarolinaHub } from './pages/CarolinaHub';
 import { ModelProfile } from './pages/ModelProfile';
 import { GlobalFeed } from './pages/GlobalFeed';
 import { TrendingModels } from './pages/TrendingModels';
@@ -69,14 +67,13 @@ function App() {
         <Route path="/login" element={<Login />} />
         <Route element={<ProtectedRouteUser><UserLayout /></ProtectedRouteUser>}>
           <Route path="/modelo/:username" element={<ModelProfile />} />
-          <Route path="/carolina" element={<CarolinaHub />} />
-          <Route path="/mural" element={<Home />} />
           <Route path="/feed" element={<GlobalFeed />} />
           <Route path="/em-alta" element={<TrendingModels />} />
-          <Route path="/trending" element={<Trending />} />
           <Route path="/loja" element={<Marketplace />} />
           <Route path="/produto/:id" element={<ProductDetail />} />
           <Route path="/minhas-compras" element={<MyPurchases />} />
+          {/* Rota legada '/mural' agora aponta para Home, que pode ser refatorada ou usada como base */}
+          <Route path="/mural" element={<Home />} />
         </Route>
         
         {/* Admin Routes */}
@@ -95,9 +92,7 @@ function App() {
           </Route>
         </Route>
 
-        {/* Redirects */}
-        <Route path="/home" element={<Navigate to="/modelo/carolina-andrade" replace />} />
-        <Route path="/profile" element={<Navigate to="/feed" replace />} />
+        {/* Redirects & Root */}
         <Route path="/" element={<RootRedirector />} />
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>

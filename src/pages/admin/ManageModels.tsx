@@ -48,12 +48,21 @@ export const ManageModels: React.FC = () => {
             <tbody>
               {models.map(model => (
                 <tr key={model.id} className="border-b border-privacy-border hover:bg-privacy-border/50">
-                  <td className="px-6 py-4 font-medium text-white">{model.name}</td>
+                  <td className="px-6 py-4 font-medium text-white flex items-center gap-3">
+                    <img src={model.avatar_url} alt={model.name} className="w-10 h-10 rounded-full object-cover" />
+                    {model.name}
+                  </td>
                   <td className="px-6 py-4">@{model.username}</td>
                   <td className="px-6 py-4">{new Date(model.created_at).toLocaleDateString('pt-BR')}</td>
-                  <td className="px-6 py-4">
+                  <td className="px-6 py-4 space-x-4">
                     <Link to={`/admin/modelos/${model.id}`} className="font-medium text-primary hover:underline">
                       Editar
+                    </Link>
+                     <Link to={`/admin/modelos/${model.id}/produtos`} className="font-medium text-blue-400 hover:underline">
+                      Produtos
+                    </Link>
+                     <Link to={`/admin/modelos/${model.id}/conteudos`} className="font-medium text-green-400 hover:underline">
+                      Conteúdos
                     </Link>
                   </td>
                 </tr>

@@ -17,10 +17,10 @@ export const PaymentSettings: React.FC = () => {
     const fetchProviders = useCallback(async () => {
         setLoading(true);
         setError(null);
-        console.log('[PaymentSettings] Fetching providers...');
+        console.log('[PaymentSettings] Carregando provedores...');
         const { data, error } = await supabase.from('payment_providers_config').select('*');
         
-        console.log('[PaymentSettings] Supabase response:', { data, error });
+        console.log('[PaymentSettings] Supabase retorno', { data, error });
         if (error) {
             setError(error.message);
         } else {
@@ -32,26 +32,33 @@ export const PaymentSettings: React.FC = () => {
     useEffect(() => { fetchProviders(); }, [fetchProviders]);
 
     const handleActivate = async (providerId: string) => {
-        console.log(`[PaymentSettings] Activating provider: ${providerId}`);
+        console.log(`[PaymentSettings] Ativando provedor: ${providerId}`);
         setError(null);
+        setLoading(true);
         try {
-            // Deactivate all others in a transaction-like manner
-            const { error: deactivateError } = await supabase.from('payment_providers_config').update({ is_active: false }).neq('id', providerId);
+            // Desativa todos os outros provedores
+            const { error: deactivateError } = await supabase
+                .from('payment_providers_config')
+                .update({ is_active: false })
+                .neq('id', providerId);
             if (deactivateError) throw deactivateError;
 
-            // Activate the selected one
-            const { error: activateError } = await supabase.from('payment_providers_config').update({ is_active: true }).eq('id', providerId);
+            // Ativa o provedor selecionado
+            const { error: activateError } = await supabase
+                .from('payment_providers_config')
+                .update({ is_active: true })
+                .eq('id', providerId);
             if (activateError) throw activateError;
 
             alert('Provedor ativado com sucesso!');
-            fetchProviders(); // Refresh the list
+            await fetchProviders(); // Recarrega a lista para refletir a mudança
         } catch (err: any) {
-            console.error('[PaymentSettings] Activation error:', err);
+            console.error('[PaymentSettings] Erro na ativação:', err);
             setError(err.message);
+        } finally {
+            setLoading(false);
         }
     };
-
-    if (loading) return <p className="text-privacy-text-secondary">Carregando configurações...</p>;
 
     return (
         <div>
@@ -62,26 +69,35 @@ export const PaymentSettings: React.FC = () => {
             
             {error && <p className="text-red-400 bg-red-500/10 p-3 rounded-md mb-4">{error}</p>}
 
-            <div className="space-y-4">
-                {providers.map(provider => (
-                    <div key={provider.id} className="bg-privacy-surface p-6 rounded-lg flex justify-between items-center">
-                        <div>
-                            <h2 className="text-xl font-bold text-white">{provider.display_name}</h2>
-                            <p className="text-sm text-privacy-text-secondary">Provider: {provider.provider}</p>
-                            <p className="text-sm text-privacy-text-secondary">Public Key: {provider.public_key || 'Não configurada'}</p>
+            {loading ? (
+                <p className="text-privacy-text-secondary">Carregando configurações...</p>
+            ) : providers.length === 0 ? (
+                <div className="bg-privacy-surface p-6 rounded-lg text-center">
+                    <p className="text-privacy-text-secondary">Nenhum provedor de pagamento configurado.</p>
+                    <p className="text-xs text-privacy-text-secondary mt-2">Você pode adicionar provedores diretamente no banco de dados Supabase.</p>
+                </div>
+            ) : (
+                <div className="space-y-4">
+                    {providers.map(provider => (
+                        <div key={provider.id} className="bg-privacy-surface p-6 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
+                            <div>
+                                <h2 className="text-xl font-bold text-white">{provider.display_name}</h2>
+                                <p className="text-sm text-privacy-text-secondary">Provider: {provider.provider}</p>
+                                <p className="text-sm text-privacy-text-secondary">Public Key: {provider.public_key || 'Não configurada'}</p>
+                            </div>
+                            <div className="w-full sm:w-auto">
+                                {provider.is_active ? (
+                                    <span className="bg-green-500 text-white font-bold py-2 px-4 rounded block text-center">Ativo</span>
+                                ) : (
+                                    <button onClick={() => handleActivate(provider.id)} className="bg-primary hover:opacity-90 text-black font-bold py-2 px-4 rounded w-full">
+                                        Ativar
+                                    </button>
+                                )}
+                            </div>
                         </div>
-                        <div>
-                            {provider.is_active ? (
-                                <span className="bg-green-500 text-white font-bold py-2 px-4 rounded">Ativo</span>
-                            ) : (
-                                <button onClick={() => handleActivate(provider.id)} className="bg-primary hover:opacity-90 text-black font-bold py-2 px-4 rounded">
-                                    Ativar
-                                </button>
-                            )}
-                        </div>
-                    </div>
-                ))}
-            </div>
+                    ))}
+                </div>
+            )}
         </div>
     );
 }

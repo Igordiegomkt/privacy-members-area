@@ -9,6 +9,7 @@ export const ManageContent: React.FC = () => {
     const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
     // Form States
     const [manualUrl, setManualUrl] = useState('');
@@ -24,7 +25,7 @@ export const ManageContent: React.FC = () => {
         setLoading(true);
         const [modelRes, mediaRes] = await Promise.all([
             supabase.from('models').select('*').eq('id', modelId).single(),
-            supabase.from('media_items').select('*').eq('model_id', modelId).order('created_at'),
+            supabase.from('media_items').select('*').eq('model_id', modelId).order('created_at', { ascending: false }),
         ]);
         if (modelRes.data) setModel(modelRes.data);
         if (mediaRes.data) setMediaItems(mediaRes.data);
@@ -36,16 +37,14 @@ export const ManageContent: React.FC = () => {
     const handleManualSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
-        console.log('[ManageContent] Submitting manual item:', { manualUrl, manualType, manualIsFree });
         const { error } = await supabase.from('media_items').insert({
             model_id: modelId,
             url: manualUrl,
-            thumbnail: manualUrl,
+            thumbnail: manualUrl, // Assuming thumbnail is same as URL for manual entry
             type: manualType,
             is_free: manualIsFree,
         });
         if (error) {
-            console.error('[ManageContent] Manual insert error:', error);
             setError(error.message);
         } else {
             alert('Conteúdo adicionado!');
@@ -62,16 +61,56 @@ export const ManageContent: React.FC = () => {
             type: batchType,
             url: `${batchBaseUrl}${i + 1}${batchExtension}`,
             thumbnail: `${batchBaseUrl}${i + 1}${batchExtension}`,
-            is_free: true,
+            is_free: false, // Defaulting to false as it's premium content
         }));
-        console.log(`[ManageContent] Submitting ${newItems.length} batch items.`);
-        const { error } = await supabase.from('media_items').insert(newItems);
+        
+        console.log('[ManageContent] Inserindo em lote em media_items', newItems);
+        const { data, error } = await supabase.from('media_items').insert(newItems);
+        console.log('[ManageContent] Supabase retorno insert', { data, error });
+
         if (error) {
-            console.error('[ManageContent] Batch insert error:', error);
             setError(error.message);
         } else {
             alert(`${batchCount} conteúdos adicionados em lote!`);
             fetchData();
+        }
+    };
+
+    const handleSelectionChange = (id: string, checked: boolean) => {
+        setSelectedIds(prev => {
+            const newSet = new Set(prev);
+            if (checked) {
+                newSet.add(id);
+            } else {
+                newSet.delete(id);
+            }
+            return newSet;
+        });
+    };
+
+    const handleSelectAll = (checked: boolean) => {
+        if (checked) {
+            setSelectedIds(new Set(mediaItems.map(item => item.id)));
+        } else {
+            setSelectedIds(new Set());
+        }
+    };
+
+    const handleDeleteSelected = async () => {
+        if (selectedIds.size === 0) {
+            alert('Nenhum item selecionado.');
+            return;
+        }
+        if (window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} mídias?`)) {
+            const idsToDelete = Array.from(selectedIds);
+            const { error } = await supabase.from('media_items').delete().in('id', idsToDelete);
+            if (error) {
+                setError(error.message);
+            } else {
+                alert('Mídias excluídas com sucesso.');
+                setMediaItems(prev => prev.filter(item => !selectedIds.has(item.id)));
+                setSelectedIds(new Set());
+            }
         }
     };
 
@@ -110,12 +149,34 @@ export const ManageContent: React.FC = () => {
             </div>
 
             <div className="mt-8 bg-privacy-surface p-6 rounded-lg">
-                <h2 className="text-xl font-bold text-white mb-4">Conteúdos Cadastrados ({mediaItems.length})</h2>
-                <ul className="space-y-2 max-h-96 overflow-y-auto">
-                    {mediaItems.map(item => (
-                        <li key={item.id} className="text-sm text-privacy-text-secondary p-2 bg-privacy-border rounded">{item.url} ({item.type})</li>
-                    ))}
-                </ul>
+                <div className="flex justify-between items-center mb-4">
+                    <h2 className="text-xl font-bold text-white">Conteúdos Cadastrados ({mediaItems.length})</h2>
+                    <button onClick={handleDeleteSelected} className="bg-red-600 hover:bg-red-700 text-white font-bold py-2 px-4 rounded disabled:opacity-50" disabled={selectedIds.size === 0}>
+                        Excluir Selecionados ({selectedIds.size})
+                    </button>
+                </div>
+                <div className="max-h-96 overflow-y-auto">
+                    <table className="w-full text-sm text-left text-privacy-text-secondary">
+                        <thead className="text-xs uppercase bg-privacy-border sticky top-0">
+                            <tr>
+                                <th className="px-4 py-2 w-10"><input type="checkbox" onChange={e => handleSelectAll(e.target.checked)} checked={selectedIds.size === mediaItems.length && mediaItems.length > 0} /></th>
+                                <th className="px-4 py-2">URL</th>
+                                <th className="px-4 py-2">Tipo</th>
+                                <th className="px-4 py-2">Gratuito</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {mediaItems.map(item => (
+                                <tr key={item.id} className="border-b border-privacy-border">
+                                    <td className="px-4 py-2"><input type="checkbox" checked={selectedIds.has(item.id)} onChange={e => handleSelectionChange(item.id, e.target.checked)} /></td>
+                                    <td className="px-4 py-2 truncate max-w-xs">{item.url}</td>
+                                    <td className="px-4 py-2">{item.type}</td>
+                                    <td className="px-4 py-2">{item.is_free ? 'Sim' : 'Não'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                </div>
             </div>
              <Link to="/admin/modelos" className="text-primary mt-4 inline-block">Voltar para Modelos</Link>
         </div>

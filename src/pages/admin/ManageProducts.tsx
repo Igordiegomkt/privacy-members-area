@@ -87,7 +87,6 @@ export const ManageProducts: React.FC = () => {
     const fetchData = useCallback(async () => {
       if (!modelId) return;
       setLoading(true);
-      console.log('[ManageProducts] Fetching data for model:', modelId);
       const [modelRes, productsRes] = await Promise.all([
         supabase.from('models').select('*').eq('id', modelId).single(),
         supabase.from('products').select('*').eq('model_id', modelId).order('created_at')
@@ -104,6 +103,18 @@ export const ManageProducts: React.FC = () => {
     const handleSave = () => {
       setIsModalOpen(false);
       fetchData();
+    };
+
+    const handleDelete = async (productId: string) => {
+        if (window.confirm('Tem certeza que deseja excluir este produto?')) {
+            const { error } = await supabase.from('products').delete().eq('id', productId);
+            if (error) {
+                alert(`Erro ao excluir: ${error.message}`);
+            } else {
+                alert('Produto excluído com sucesso.');
+                setProducts(prev => prev.filter(p => p.id !== productId));
+            }
+        }
     };
 
     if (loading) return <p>Carregando...</p>;
@@ -134,6 +145,7 @@ export const ManageProducts: React.FC = () => {
                     <th className="px-6 py-3">Preço</th>
                     <th className="px-6 py-3">Tipo</th>
                     <th className="px-6 py-3">Assinatura Base</th>
+                    <th className="px-6 py-3">Ações</th>
                   </tr>
                 </thead>
                 <tbody>
@@ -143,6 +155,11 @@ export const ManageProducts: React.FC = () => {
                       <td className="px-6 py-4">{formatPrice(product.price_cents)}</td>
                       <td className="px-6 py-4 capitalize">{product.type}</td>
                       <td className="px-6 py-4">{product.is_base_membership ? 'Sim' : 'Não'}</td>
+                      <td className="px-6 py-4">
+                        <button onClick={() => handleDelete(product.id)} className="text-red-500 hover:text-red-400 font-medium">
+                            Excluir
+                        </button>
+                      </td>
                     </tr>
                   ))}
                 </tbody>

@@ -64,24 +64,24 @@ export const ModelProfile: React.FC = () => {
     const [isModalOpen, setIsModalOpen] = useState(false);
 
     useEffect(() => {
-        if (!username) return;
+        if (!username) {
+            setLoading(false);
+            return;
+        }
+        console.log('[ModelProfile] username param =', username);
 
         const loadProfileData = async () => {
             setLoading(true);
-            const [fetchedModel, purchases] = await Promise.all([
-                fetchModelByUsername(username),
-                fetchUserPurchases()
-            ]);
+            const fetchedModel = await fetchModelByUsername(username);
             
-            setUserPurchases(purchases);
-
             if (fetchedModel) {
                 setModel(fetchedModel);
-                const isBase = fetchedModel.username === BASE_MODEL_USERNAME;
-                const [fetchedMedia, fetchedProducts] = await Promise.all([
-                    fetchMediaForModel(fetchedModel.id, isBase),
+                const [purchases, fetchedMedia, fetchedProducts] = await Promise.all([
+                    fetchUserPurchases(),
+                    fetchMediaForModel(fetchedModel.id, fetchedModel.username === BASE_MODEL_USERNAME),
                     fetchProductsForModel(fetchedModel.id)
                 ]);
+                setUserPurchases(purchases);
                 setMedia(fetchedMedia);
                 setProducts(fetchedProducts);
             }

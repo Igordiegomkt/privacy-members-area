@@ -14,6 +14,8 @@ export interface ModelWithStats extends Model {
  * Busca uma modelo pelo seu username.
  */
 export const fetchModelByUsername = async (username: string): Promise<Model | null> => {
+  console.log('[fetchModelByUsername] Fetching model for username:', username);
+
   const { data, error } = await supabase
     .from('models')
     .select('*')
@@ -21,9 +23,11 @@ export const fetchModelByUsername = async (username: string): Promise<Model | nu
     .single();
 
   if (error) {
-    console.error('Error fetching model by username:', error);
+    console.error('[fetchModelByUsername] Supabase error:', error);
     return null;
   }
+
+  console.log('[fetchModelByUsername] Fetched data:', data);
   return data;
 };
 

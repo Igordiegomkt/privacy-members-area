@@ -1,13 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { MediaItem, Model, Product } from '../../types';
+import { MediaItem, Model } from '../../types';
 
 export const ManageContent: React.FC = () => {
     const { id: modelId } = useParams<{ id: string }>();
     const [model, setModel] = useState<Model | null>(null);
     const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
-    const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
 
@@ -23,14 +22,12 @@ export const ManageContent: React.FC = () => {
     const fetchData = useCallback(async () => {
         if (!modelId) return;
         setLoading(true);
-        const [modelRes, mediaRes, productsRes] = await Promise.all([
+        const [modelRes, mediaRes] = await Promise.all([
             supabase.from('models').select('*').eq('id', modelId).single(),
             supabase.from('media_items').select('*').eq('model_id', modelId).order('created_at'),
-            supabase.from('products').select('id, name').eq('model_id', modelId)
         ]);
         if (modelRes.data) setModel(modelRes.data);
         if (mediaRes.data) setMediaItems(mediaRes.data);
-        if (productsRes.data) setProducts(productsRes.data);
         setLoading(false);
     }, [modelId]);
 

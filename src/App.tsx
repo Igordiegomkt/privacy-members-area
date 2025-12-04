@@ -71,23 +71,37 @@ const RootRedirector: React.FC = () => {
         const { data, error } = await supabase.auth.getUser();
         console.log('[RootRedirector] getUser result:', { data, error });
 
+        // 1) Se NÃO houver usuário do Supabase, usa fallback em localStorage
         if (error || !data?.user) {
-          console.log('[RootRedirector] Sem usuário autenticado, indo para /login');
-          navigate('/login', { replace: true });
+          console.log('[RootRedirector] Nenhum usuário do Supabase encontrado. Usando fallback com localStorage.');
+
+          const hasVisitedOnce = localStorage.getItem('hasVisitedOnce') === 'true';
+          console.log('[RootRedirector] hasVisitedOnce (localStorage) =', hasVisitedOnce);
+
+          if (!hasVisitedOnce) {
+            localStorage.setItem('hasVisitedOnce', 'true');
+            console.log('[RootRedirector] Primeiro acesso (fallback) → /minhas-compras');
+            navigate('/minhas-compras', { replace: true });
+          } else {
+            console.log('[RootRedirector] Acesso recorrente (fallback) → /feed');
+            navigate('/feed', { replace: true });
+          }
+
           return;
         }
 
+        // 2) Se houver usuário do Supabase, usa a lógica da tabela user_first_access
         const user = data.user;
-        console.log('[RootRedirector] Usuário autenticado:', user.id);
+        console.log('[RootRedirector] Usuário autenticado (Supabase):', user.id);
 
         const { isFirstAccess } = await ensureFirstAccess(supabase, user.id);
-        console.log('[RootRedirector] isFirstAccess =', isFirstAccess);
+        console.log('[RootRedirector] isFirstAccess (Supabase) =', isFirstAccess);
 
         if (isFirstAccess) {
-          console.log('[RootRedirector] Primeiro acesso → /minhas-compras');
+          console.log('[RootRedirector] Primeiro acesso (Supabase) → /minhas-compras');
           navigate('/minhas-compras', { replace: true });
         } else {
-          console.log('[RootRedirector] Acesso recorrente → /feed');
+          console.log('[RootRedirector] Acesso recorrente (Supabase) → /feed');
           navigate('/feed', { replace: true });
         }
       } catch (err) {

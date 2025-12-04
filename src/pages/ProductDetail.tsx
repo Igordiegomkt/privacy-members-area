@@ -5,6 +5,7 @@ import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { fetchProductById, hasUserPurchased, createCheckoutSession, PixCheckoutData } from '../lib/marketplace';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
+import { supabase } from '../lib/supabase';
 
 const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -110,11 +111,18 @@ export const ProductDetail: React.FC = () => {
     setPurchaseError(null);
     setPurchaseLoading(true);
     try {
+      const { data: { user } } = await supabase.auth.getUser();
+      console.log('[ProductDetail] User data on checkout attempt:', user);
+      if (!user) {
+        throw new Error("Sessão inválida. Por favor, faça login novamente.");
+      }
+
       const pixCheckoutData = await createCheckoutSession(id);
+      console.log('[ProductDetail] Pix data received:', pixCheckoutData);
       setPixData(pixCheckoutData);
       setIsPixModalOpen(true);
     } catch (err: any) {
-      console.error(err);
+      console.error('[ProductDetail] Error creating Pix checkout:', err);
       setPurchaseError(err.message ?? 'Não foi possível iniciar a compra. Tente novamente.');
     } finally {
       setPurchaseLoading(false);

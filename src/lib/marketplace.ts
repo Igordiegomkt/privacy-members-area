@@ -74,17 +74,24 @@ export const hasUserPurchased = async (productId: string): Promise<boolean> => {
 };
 
 export const createCheckoutSession = async (productId: string): Promise<PixCheckoutData> => {
+  console.log('[createCheckoutSession] Invoking Edge Function with productId:', productId);
+  
   const { data, error } = await supabase.functions.invoke('create-checkout', {
     body: { productId },
   });
 
   if (error) {
-    throw new Error(error.message);
+    console.error('[createCheckoutSession] Error from Edge Function invocation:', error);
+    // O erro pode vir com um objeto 'context' com mais detalhes
+    const errorMessage = (error as any).context?.error_description || error.message;
+    throw new Error(errorMessage || 'Erro ao iniciar pagamento Pix');
   }
 
   if (data.error) {
+    console.error('[createCheckoutSession] Business logic error from Edge Function:', data.error);
     throw new Error(data.error);
   }
 
+  console.log('[createCheckoutSession] Response data:', data);
   return data as PixCheckoutData;
 };

@@ -67,13 +67,17 @@ serve(async (req: Request) => {
     console.log("[create-checkout] Mercado Pago access token loaded.");
 
     // 4. Authenticate the user
+    const authHeader = req.headers.get("Authorization")!;
+    console.log('[create-checkout] Authorization header received:', authHeader ? 'Bearer ***' : 'none');
+
     const supabaseClient = createClient(
       SUPABASE_URL,
       Deno.env.get("SUPABASE_ANON_KEY")!,
-      { global: { headers: { Authorization: req.headers.get("Authorization") || "" } } },
+      { global: { headers: { Authorization: authHeader } } },
     );
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
+      console.error('[create-checkout] User not authenticated:', userError);
       return createErrorResponse("User not authenticated.", 401, userError);
     }
     console.log("[create-checkout] User authenticated:", user.id);

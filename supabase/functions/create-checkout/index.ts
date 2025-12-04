@@ -1,9 +1,10 @@
-// @ts-ignore: Ignoring module resolution for Deno-specific URL imports
+// @ts-ignore: This directive is necessary because the local TypeScript compiler
+// cannot resolve Deno's URL-based imports, but the Deno runtime can.
 import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// @ts-ignore: Ignoring module resolution for Deno-specific URL imports
+// @ts-ignore: Same reason as above for Deno-specific imports.
 import { createClient, SupabaseClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Declaração para o ambiente Deno
+// Declare the Deno global to satisfy the TypeScript compiler in a non-Deno environment.
 declare const Deno: any;
 
 const corsHeaders = {
@@ -12,7 +13,7 @@ const corsHeaders = {
 };
 
 /**
- * Cria uma resposta de erro padronizada em JSON.
+ * Creates a standardized JSON error response.
  */
 const createErrorResponse = (message: string, status: number, details?: any) => {
   console.error("[create-checkout] Error:", message, details || "");
@@ -26,7 +27,7 @@ const createErrorResponse = (message: string, status: number, details?: any) => 
 };
 
 serve(async (req: Request) => {
-  // Tratamento de preflight request para CORS
+  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
@@ -34,23 +35,23 @@ serve(async (req: Request) => {
   try {
     console.log("[create-checkout] Function invoked.");
 
-    // 1. Validar variáveis de ambiente essenciais
+    // 1. Validate essential environment variables
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
     const SITE_URL = Deno.env.get("SITE_URL");
 
     if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SITE_URL) {
       return createErrorResponse(
-        "Internal server configuration error: missing required environment variables.",
+        "Internal server configuration error: Missing required environment variables.",
         500,
       );
     }
     console.log("[create-checkout] Environment variables loaded.");
 
-    // 2. Criar cliente Supabase com privilégios de administrador
+    // 2. Create Supabase admin client
     const supabaseAdmin: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-    // 3. Buscar o provedor de pagamento ativo
+    // 3. Find the active payment provider
     const { data: activeProvider, error: providerError } = await supabaseAdmin
       .from("payment_providers_config")
       .select("*")
@@ -62,9 +63,9 @@ serve(async (req: Request) => {
     }
     console.log("[create-checkout] Active provider found:", activeProvider.provider);
 
-    // 4. Lógica específica para o provedor 'mercado_pago'
+    // 4. Handle Mercado Pago specific logic
     if (activeProvider.provider !== "mercado_pago") {
-      return createErrorResponse("Unsupported payment provider.", 400, activeProvider.provider);
+      return createErrorResponse("Unsupported payment provider.", 400, { provider: activeProvider.provider });
     }
 
     const MERCADO_PAGO_ACCESS_TOKEN = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN");
@@ -73,7 +74,7 @@ serve(async (req: Request) => {
     }
     console.log("[create-checkout] Mercado Pago access token loaded.");
 
-    // 5. Autenticar o usuário que fez a requisição
+    // 5. Authenticate the user making the request
     const supabaseClient = createClient(
       SUPABASE_URL,
       Deno.env.get("SUPABASE_ANON_KEY")!,
@@ -86,7 +87,7 @@ serve(async (req: Request) => {
     }
     console.log("[create-checkout] User authenticated:", user.id);
 
-    // 6. Validar o corpo da requisição e o produto
+    // 6. Validate the request body and the product
     const { productId } = await req.json();
     console.log("[create-checkout] Requested productId:", productId);
     if (!productId) {
@@ -110,7 +111,7 @@ serve(async (req: Request) => {
     }
     console.log("[create-checkout] Product validated:", { name: product.name, price: product.price_cents });
 
-    // 7. Criar a preferência de pagamento no Mercado Pago
+    // 7. Create the payment preference in Mercado Pago
     const preferencePayload = {
       items: [{
         title: product.name,
@@ -147,7 +148,7 @@ serve(async (req: Request) => {
     const checkoutUrl = responseData.init_point;
     console.log("[create-checkout] Checkout URL created successfully:", checkoutUrl);
 
-    // 8. Retornar a URL de checkout para o frontend
+    // 8. Return the checkout URL to the frontend
     return new Response(
       JSON.stringify({ checkoutUrl }),
       {

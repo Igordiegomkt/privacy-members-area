@@ -5,6 +5,13 @@ export type UserPurchaseWithProduct = UserPurchase & {
   product: (Product & { model: Model | null }) | null;
 };
 
+export type PixCheckoutData = {
+  paymentId: string;
+  qrCode: string;
+  qrCodeBase64: string;
+  expiresAt?: string;
+};
+
 const PRODUCT_COLUMNS = 'id, name, description, price_cents, type, status, cover_thumbnail, created_at, model_id, is_base_membership';
 const MODEL_COLUMNS = 'id, name, username, avatar_url';
 
@@ -66,7 +73,7 @@ export const hasUserPurchased = async (productId: string): Promise<boolean> => {
   return (count ?? 0) > 0;
 };
 
-export const createCheckoutSession = async (productId: string): Promise<string> => {
+export const createCheckoutSession = async (productId: string): Promise<PixCheckoutData> => {
   const { data, error } = await supabase.functions.invoke('create-checkout', {
     body: { productId },
   });
@@ -79,5 +86,5 @@ export const createCheckoutSession = async (productId: string): Promise<string> 
     throw new Error(data.error);
   }
 
-  return data.checkoutUrl;
+  return data as PixCheckoutData;
 };

@@ -27,31 +27,23 @@ const createErrorResponse = (message: string, status: number, details?: any) => 
 };
 
 serve(async (req: Request) => {
-  // Handle CORS preflight requests
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
   try {
-    console.log("[create-checkout] Function invoked.");
+    console.log("[create-checkout] PIX checkout function invoked.");
 
     // 1. Validate essential environment variables
     const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
     const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-    const SITE_URL = Deno.env.get("SITE_URL");
-
-    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY || !SITE_URL) {
-      return createErrorResponse(
-        "Internal server configuration error: Missing required environment variables.",
-        500,
-      );
+    if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
+      return createErrorResponse("Internal server configuration error.", 500);
     }
     console.log("[create-checkout] Environment variables loaded.");
 
-    // 2. Create Supabase admin client
+    // 2. Create Supabase admin client and find active payment provider
     const supabaseAdmin: SupabaseClient = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
-
-    // 3. Find the active payment provider
     const { data: activeProvider, error: providerError } = await supabaseAdmin
       .from("payment_providers_config")
       .select("*")
@@ -63,7 +55,7 @@ serve(async (req: Request) => {
     }
     console.log("[create-checkout] Active provider found:", activeProvider.provider);
 
-    // 4. Handle Mercado Pago specific logic
+    // 3. Handle Mercado Pago specific logic
     if (activeProvider.provider !== "mercado_pago") {
       return createErrorResponse("Unsupported payment provider.", 400, { provider: activeProvider.provider });
     }
@@ -74,22 +66,20 @@ serve(async (req: Request) => {
     }
     console.log("[create-checkout] Mercado Pago access token loaded.");
 
-    // 5. Authenticate the user making the request
+    // 4. Authenticate the user
     const supabaseClient = createClient(
       SUPABASE_URL,
       Deno.env.get("SUPABASE_ANON_KEY")!,
       { global: { headers: { Authorization: req.headers.get("Authorization") || "" } } },
     );
-
     const { data: { user }, error: userError } = await supabaseClient.auth.getUser();
     if (userError || !user) {
       return createErrorResponse("User not authenticated.", 401, userError);
     }
     console.log("[create-checkout] User authenticated:", user.id);
 
-    // 6. Validate the request body and the product
+    // 5. Validate the request body and the product
     const { productId } = await req.json();
-    console.log("[create-checkout] Requested productId:", productId);
     if (!productId) {
       return createErrorResponse("Missing productId in request body.", 400);
     }
@@ -103,59 +93,57 @@ serve(async (req: Request) => {
     if (productError || !product) {
       return createErrorResponse("Product not found.", 404, productError);
     }
-    if (product.status !== 'active') {
-      return createErrorResponse("This product is no longer available.", 400);
-    }
-    if (!product.price_cents || product.price_cents <= 0) {
-      return createErrorResponse("Product has an invalid price.", 400, { price: product.price_cents });
+    if (product.status !== 'active' || !product.price_cents || product.price_cents <= 0) {
+      return createErrorResponse("Product is invalid or unavailable.", 400);
     }
     console.log("[create-checkout] Product validated:", { name: product.name, price: product.price_cents });
 
-    // 7. Create the payment preference in Mercado Pago
-    const preferencePayload = {
-      items: [{
-        title: product.name,
-        quantity: 1,
-        unit_price: product.price_cents / 100,
-        currency_id: "BRL",
-      }],
-      back_urls: {
-        success: `${SITE_URL}/compra-sucesso?product_id=${productId}`,
-        failure: `${SITE_URL}/compra-falhou?product_id=${productId}`,
-        pending: `${SITE_URL}/produto/${productId}`,
+    // 6. Create the PIX payment using Mercado Pago Payments API
+    const paymentPayload = {
+      transaction_amount: product.price_cents / 100,
+      description: product.name,
+      payment_method_id: "pix",
+      payer: {
+        email: user.email || `user-${user.id}@placeholder.com`,
       },
-      notification_url: `${SUPABASE_URL}/functions/v1/payment-webhook`,
       external_reference: `${user.id}|${productId}`,
+      notification_url: `${SUPABASE_URL}/functions/v1/payment-webhook`,
     };
 
-    console.log("[create-checkout] Creating Mercado Pago preference...");
-    const mpResponse = await fetch("https://api.mercadopago.com/checkout/preferences", {
+    console.log("[create-checkout] Creating Mercado Pago PIX payment...");
+    const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
       },
-      body: JSON.stringify(preferencePayload),
+      body: JSON.stringify(paymentPayload),
     });
 
-    const responseData = await mpResponse.json();
-    console.log(`[create-checkout] Mercado Pago API response status: ${mpResponse.status}`);
-
+    const paymentData = await mpResponse.json();
     if (!mpResponse.ok) {
-      return createErrorResponse("Mercado Pago API error.", 502, responseData);
+      return createErrorResponse("Mercado Pago API error.", mpResponse.status, paymentData);
     }
 
-    const checkoutUrl = responseData.init_point;
-    console.log("[create-checkout] Checkout URL created successfully:", checkoutUrl);
+    const transactionData = paymentData.point_of_interaction?.transaction_data;
+    if (!transactionData) {
+        return createErrorResponse("Mercado Pago did not return PIX data.", 500, paymentData);
+    }
 
-    // 8. Return the checkout URL to the frontend
-    return new Response(
-      JSON.stringify({ checkoutUrl }),
-      {
-        status: 200,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      },
-    );
+    const pixResponse = {
+        paymentId: paymentData.id,
+        qrCode: transactionData.qr_code,
+        qrCodeBase64: transactionData.qr_code_base64,
+        expiresAt: paymentData.date_of_expiration,
+    };
+
+    console.log("[create-checkout] PIX data generated successfully for payment ID:", pixResponse.paymentId);
+
+    // 7. Return PIX data to the frontend
+    return new Response(JSON.stringify(pixResponse), {
+      status: 200,
+      headers: { ...corsHeaders, "Content-Type": "application/json" },
+    });
 
   } catch (error: unknown) {
     const err = error as Error;

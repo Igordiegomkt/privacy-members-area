@@ -114,12 +114,16 @@ serve(async (req: Request) => {
       notification_url: `${SUPABASE_URL}/functions/v1/payment-webhook`,
     };
 
+    const idempotencyKey = crypto.randomUUID();
+    console.log(`[create-checkout] Using Idempotency Key: ${idempotencyKey}`);
+
     console.log("[create-checkout] Creating Mercado Pago PIX payment...");
     const mpResponse = await fetch("https://api.mercadopago.com/v1/payments", {
       method: "POST",
       headers: {
         "Content-Type": "application/json",
         "Authorization": `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
+        "X-Idempotency-Key": idempotencyKey,
       },
       body: JSON.stringify(paymentPayload),
     });

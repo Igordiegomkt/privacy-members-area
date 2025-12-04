@@ -1,4 +1,4 @@
-import React, { useEffect } from 'react';
+import React, { useEffect, useRef } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
@@ -23,6 +23,7 @@ import { ManageContent } from './pages/admin/ManageContent';
 import { PaymentSettings } from './pages/admin/PaymentSettings';
 import PurchaseSuccess from './pages/PurchaseSuccess';
 import PurchaseFailed from './pages/PurchaseFailed';
+import { ensureFirstAccess } from './lib/firstAccess';
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -56,8 +57,50 @@ const AuthHandler: React.FC = () => {
 
 // Componente para redirecionamento inteligente da raiz
 const RootRedirector: React.FC = () => {
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-  return <Navigate to={isAuthenticated ? "/modelo/carolina-andrade" : "/login"} replace />;
+  const navigate = useNavigate();
+  const hasChecked = useRef(false);
+
+  useEffect(() => {
+    // Garante que a verificação rode apenas uma vez
+    if (hasChecked.current) return;
+    hasChecked.current = true;
+
+    const checkAccessAndRedirect = async () => {
+      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+      
+      if (!isAuthenticated) {
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      const { data: { user } } = await supabase.auth.getUser();
+      if (!user) {
+        // Se o localStorage estiver dessincronizado com a sessão do Supabase, força o login
+        navigate('/login', { replace: true });
+        return;
+      }
+
+      // Lógica de verificação de primeiro acesso
+      const { isFirstAccess } = await ensureFirstAccess(supabase, user.id);
+      
+      if (isFirstAccess) {
+        // No primeiro acesso, o usuário vai para a página de compras para ver o conteúdo inicial
+        navigate('/minhas-compras', { replace: true });
+      } else {
+        // Nos acessos seguintes, vai para o feed principal
+        navigate('/feed', { replace: true });
+      }
+    };
+
+    checkAccessAndRedirect();
+  }, [navigate]);
+
+  // Exibe um loader enquanto a verificação assíncrona acontece
+  return (
+    <div className="min-h-screen bg-privacy-black flex items-center justify-center">
+      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
+    </div>
+  );
 };
 
 function App() {

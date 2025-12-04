@@ -6,8 +6,77 @@ interface PaymentProvider {
   provider: 'mercado_pago' | 'pushinpay';
   display_name: string;
   public_key?: string;
+  client_id?: string;
   is_active: boolean;
 }
+
+const ProviderCard: React.FC<{ provider: PaymentProvider; onUpdate: () => void }> = ({ provider, onUpdate }) => {
+    const [isEditing, setIsEditing] = useState(false);
+    const [formData, setFormData] = useState({ ...provider });
+    const [loading, setLoading] = useState(false);
+
+    const handleSave = async () => {
+        setLoading(true);
+        const { error } = await supabase.from('payment_providers_config').update({
+            public_key: formData.public_key,
+            client_id: formData.client_id
+        }).eq('id', provider.id);
+        if (error) alert(error.message);
+        else {
+            setIsEditing(false);
+            onUpdate();
+        }
+        setLoading(false);
+    };
+
+    const handleActivate = async () => {
+        setLoading(true);
+        try {
+            await supabase.from('payment_providers_config').update({ is_active: false }).neq('id', provider.id);
+            await supabase.from('payment_providers_config').update({ is_active: true }).eq('id', provider.id);
+            onUpdate();
+        } catch (err: any) {
+            alert(err.message);
+        }
+        setLoading(false);
+    };
+
+    const inputStyle = "w-full px-4 py-2 bg-privacy-black border border-privacy-border rounded-lg text-privacy-text-primary focus:outline-none focus:border-primary";
+
+    return (
+        <div className={`bg-privacy-surface p-6 rounded-lg border-2 ${provider.is_active ? 'border-primary' : 'border-transparent'}`}>
+            <div className="flex justify-between items-start">
+                <div>
+                    <h2 className="text-xl font-bold text-white">{provider.display_name}</h2>
+                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${provider.is_active ? 'bg-primary/20 text-primary' : 'bg-privacy-border text-privacy-text-secondary'}`}>
+                        {provider.is_active ? 'Ativo' : 'Inativo'}
+                    </span>
+                </div>
+                {!provider.is_active && <button onClick={handleActivate} disabled={loading} className="bg-primary text-black font-bold py-2 px-4 rounded">Ativar</button>}
+            </div>
+            <div className="mt-4 space-y-4">
+                <div>
+                    <label className="text-sm text-privacy-text-secondary">Public Key</label>
+                    <input value={formData.public_key || ''} onChange={e => setFormData({...formData, public_key: e.target.value})} className={inputStyle} readOnly={!isEditing} />
+                </div>
+                <div>
+                    <label className="text-sm text-privacy-text-secondary">Client ID</label>
+                    <input value={formData.client_id || ''} onChange={e => setFormData({...formData, client_id: e.target.value})} className={inputStyle} readOnly={!isEditing} />
+                </div>
+            </div>
+            <div className="mt-4 flex justify-end gap-2">
+                {isEditing ? (
+                    <>
+                        <button onClick={() => setIsEditing(false)} className="text-sm text-privacy-text-secondary">Cancelar</button>
+                        <button onClick={handleSave} disabled={loading} className="bg-primary text-black font-bold py-1 px-3 rounded">{loading ? '...' : 'Salvar'}</button>
+                    </>
+                ) : (
+                    <button onClick={() => setIsEditing(true)} className="text-sm text-primary">Editar</button>
+                )}
+            </div>
+        </div>
+    );
+};
 
 export const PaymentSettings: React.FC = () => {
     const [providers, setProviders] = useState<PaymentProvider[]>([]);
@@ -16,49 +85,13 @@ export const PaymentSettings: React.FC = () => {
 
     const fetchProviders = useCallback(async () => {
         setLoading(true);
-        setError(null);
-        console.log('[PaymentSettings] Carregando provedores...');
         const { data, error } = await supabase.from('payment_providers_config').select('*');
-        
-        console.log('[PaymentSettings] Supabase retorno', { data, error });
-        if (error) {
-            setError(error.message);
-        } else {
-            setProviders(data as PaymentProvider[]);
-        }
+        if (error) setError(error.message);
+        else setProviders(data as PaymentProvider[]);
         setLoading(false);
     }, []);
 
     useEffect(() => { fetchProviders(); }, [fetchProviders]);
-
-    const handleActivate = async (providerId: string) => {
-        console.log(`[PaymentSettings] Ativando provedor: ${providerId}`);
-        setError(null);
-        setLoading(true);
-        try {
-            // Desativa todos os outros provedores
-            const { error: deactivateError } = await supabase
-                .from('payment_providers_config')
-                .update({ is_active: false })
-                .neq('id', providerId);
-            if (deactivateError) throw deactivateError;
-
-            // Ativa o provedor selecionado
-            const { error: activateError } = await supabase
-                .from('payment_providers_config')
-                .update({ is_active: true })
-                .eq('id', providerId);
-            if (activateError) throw activateError;
-
-            alert('Provedor ativado com sucesso!');
-            await fetchProviders(); // Recarrega a lista para refletir a mudança
-        } catch (err: any) {
-            console.error('[PaymentSettings] Erro na ativação:', err);
-            setError(err.message);
-        } finally {
-            setLoading(false);
-        }
-    };
 
     return (
         <div>
@@ -70,31 +103,11 @@ export const PaymentSettings: React.FC = () => {
             {error && <p className="text-red-400 bg-red-500/10 p-3 rounded-md mb-4">{error}</p>}
 
             {loading ? (
-                <p className="text-privacy-text-secondary">Carregando configurações...</p>
-            ) : providers.length === 0 ? (
-                <div className="bg-privacy-surface p-6 rounded-lg text-center">
-                    <p className="text-privacy-text-secondary">Nenhum provedor de pagamento configurado.</p>
-                    <p className="text-xs text-privacy-text-secondary mt-2">Você pode adicionar provedores diretamente no banco de dados Supabase.</p>
-                </div>
+                <p className="text-privacy-text-secondary">Carregando...</p>
             ) : (
-                <div className="space-y-4">
+                <div className="space-y-4 max-w-2xl">
                     {providers.map(provider => (
-                        <div key={provider.id} className="bg-privacy-surface p-6 rounded-lg flex flex-col sm:flex-row justify-between items-start sm:items-center gap-4">
-                            <div>
-                                <h2 className="text-xl font-bold text-white">{provider.display_name}</h2>
-                                <p className="text-sm text-privacy-text-secondary">Provider: {provider.provider}</p>
-                                <p className="text-sm text-privacy-text-secondary">Public Key: {provider.public_key || 'Não configurada'}</p>
-                            </div>
-                            <div className="w-full sm:w-auto">
-                                {provider.is_active ? (
-                                    <span className="bg-green-500 text-white font-bold py-2 px-4 rounded block text-center">Ativo</span>
-                                ) : (
-                                    <button onClick={() => handleActivate(provider.id)} className="bg-primary hover:opacity-90 text-black font-bold py-2 px-4 rounded w-full">
-                                        Ativar
-                                    </button>
-                                )}
-                            </div>
-                        </div>
+                        <ProviderCard key={provider.id} provider={provider} onUpdate={fetchProviders} />
                     ))}
                 </div>
             )}

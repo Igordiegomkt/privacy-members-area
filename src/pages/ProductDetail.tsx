@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { Header } from '../components/Header';
@@ -72,11 +72,40 @@ export const ProductDetail: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
   const [isPurchased, setIsPurchased] = useState(false);
   
-  // PIX Modal State
   const [pixData, setPixData] = useState<PixCheckoutData | null>(null);
   const [isPixModalOpen, setIsPixModalOpen] = useState(false);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
+  const [isAwaitingPurchase, setIsAwaitingPurchase] = useState(false);
+  const pollingRef = useRef<number | null>(null);
+
+  const checkPurchaseStatus = async () => {
+    if (!id) return;
+    const purchased = await hasUserPurchased(id);
+    if (purchased) {
+      setIsPurchased(true);
+    }
+  };
+
+  useEffect(() => {
+    if (isAwaitingPurchase && !isPurchased) {
+      pollingRef.current = setInterval(checkPurchaseStatus, 5000); // Poll every 5 seconds
+    }
+    return () => {
+      if (pollingRef.current) {
+        clearInterval(pollingRef.current);
+      }
+    };
+  }, [isAwaitingPurchase, isPurchased, id]);
+
+  useEffect(() => {
+    if (isPurchased && isAwaitingPurchase) {
+      if (pollingRef.current) clearInterval(pollingRef.current);
+      setIsAwaitingPurchase(false);
+      setIsPixModalOpen(false);
+      navigate(`/minhas-compras?highlight=${id}`);
+    }
+  }, [isPurchased, isAwaitingPurchase, id, navigate]);
 
   useEffect(() => {
     if (!id) {
@@ -93,8 +122,7 @@ export const ProductDetail: React.FC = () => {
         setProduct(fetchedProduct);
 
         if (fetchedProduct) {
-          const purchased = await hasUserPurchased(id);
-          setIsPurchased(purchased);
+          await checkPurchaseStatus();
         }
       } catch (e) {
         setError('Não foi possível carregar o produto.');
@@ -112,17 +140,13 @@ export const ProductDetail: React.FC = () => {
     setPurchaseLoading(true);
     try {
       const { data: { user } } = await supabase.auth.getUser();
-      console.log('[ProductDetail] User data on checkout attempt:', user);
-      if (!user) {
-        throw new Error("Sessão inválida. Por favor, faça login novamente.");
-      }
+      if (!user) throw new Error("Sessão inválida. Por favor, faça login novamente.");
 
       const pixCheckoutData = await createCheckoutSession(id);
-      console.log('[ProductDetail] Pix data received:', pixCheckoutData);
       setPixData(pixCheckoutData);
       setIsPixModalOpen(true);
+      setIsAwaitingPurchase(true);
     } catch (err: any) {
-      console.error('[ProductDetail] Error creating Pix checkout:', err);
       setPurchaseError(err.message ?? 'Não foi possível iniciar a compra. Tente novamente.');
     } finally {
       setPurchaseLoading(false);

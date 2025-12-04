@@ -1,4 +1,5 @@
 import React from 'react';
+import { Link } from 'react-router-dom';
 
 interface LogoProps {
   className?: string;
@@ -10,10 +11,10 @@ export const Logo: React.FC<LogoProps> = ({
   textSize = 'text-2xl' 
 }) => {
   return (
-    <div className={`flex items-center ${className}`}>
+    <Link to="/" className={`flex items-center ${className}`}>
       <h1 className={`${textSize} font-bold tracking-tighter text-privacy-text-primary`}>
         <span className="text-primary">M</span>eu Privacy
       </h1>
-    </div>
+    </Link>
   );
 };

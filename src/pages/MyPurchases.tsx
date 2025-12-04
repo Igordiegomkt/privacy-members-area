@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
+import { Link, useSearchParams } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { useProtection } from '../hooks/useProtection';
 import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
 
-const PurchaseItem: React.FC<{ purchase: UserPurchaseWithProduct }> = ({ purchase }) => {
+const PurchaseItem: React.FC<{ purchase: UserPurchaseWithProduct; isHighlighted: boolean }> = ({ purchase, isHighlighted }) => {
   const product = purchase.product;
 
   if (!product) {
@@ -26,10 +26,16 @@ const PurchaseItem: React.FC<{ purchase: UserPurchaseWithProduct }> = ({ purchas
   const linkTo = model ? `/modelo/${model.username}` : `/produto/${product.id}`;
 
   return (
-    <Link to={linkTo} className="flex items-center gap-4 bg-privacy-surface p-4 rounded-lg hover:bg-privacy-border transition-colors">
+    <Link 
+      to={linkTo} 
+      className={`flex items-center gap-4 bg-privacy-surface p-4 rounded-lg hover:bg-privacy-border transition-all duration-300 ${isHighlighted ? 'ring-2 ring-primary shadow-lg' : ''}`}
+    >
       <img src={product.cover_thumbnail} alt={product.name} className="w-16 h-16 object-cover rounded-md flex-shrink-0" />
       <div className="flex-1">
-        <h3 className="font-semibold text-privacy-text-primary">{product.name}</h3>
+        <div className="flex items-center gap-2">
+          <h3 className="font-semibold text-privacy-text-primary">{product.name}</h3>
+          {isHighlighted && <span className="text-xs font-semibold bg-primary/20 text-primary px-2 py-1 rounded-full">Novo!</span>}
+        </div>
         {model && (
           <div className="flex items-center gap-2 mt-1">
             <img src={model.avatar_url} alt={model.name} className="w-5 h-5 rounded-full object-cover" />
@@ -51,6 +57,8 @@ const MyPurchasesContent: React.FC = () => {
   const [purchases, setPurchases] = useState<UserPurchaseWithProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
+  const [searchParams] = useSearchParams();
+  const highlightedProductId = searchParams.get('highlight');
 
   useEffect(() => {
     const loadPurchases = async () => {
@@ -88,7 +96,11 @@ const MyPurchasesContent: React.FC = () => {
   return (
     <div className="space-y-4">
       {purchases.map(purchase => (
-        <PurchaseItem key={purchase.id} purchase={purchase} />
+        <PurchaseItem 
+          key={purchase.id} 
+          purchase={purchase} 
+          isHighlighted={purchase.product_id === highlightedProductId} 
+        />
       ))}
     </div>
   );

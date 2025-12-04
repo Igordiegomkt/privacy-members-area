@@ -19,8 +19,17 @@ export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick, onLoad }) 
     const observer = new IntersectionObserver(
       (entries) => {
         if (entries[0].isIntersecting) {
-          setIsLoaded(true);
-          observer.disconnect();
+          const img = new Image();
+          img.src = media.thumbnail;
+          img.onload = () => {
+            setIsLoaded(true);
+            if (onLoad) onLoad();
+            observer.disconnect();
+          };
+          img.onerror = () => {
+            setHasError(true);
+            observer.disconnect();
+          };
         }
       },
       { rootMargin: '100px' }
@@ -28,7 +37,7 @@ export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick, onLoad }) 
 
     observer.observe(containerRef.current);
     return () => observer.disconnect();
-  }, [isLoaded]);
+  }, [isLoaded, media.thumbnail, onLoad]);
 
   return (
     <div
@@ -38,7 +47,7 @@ export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick, onLoad }) 
     >
       {hasError ? (
         <div className="w-full h-full flex items-center justify-center text-privacy-text-secondary text-xs p-2">
-          Erro ao carregar
+          <svg className="w-8 h-8 text-red-500/50" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 8v4m0 4h.01M21 12a9 9 0 11-18 0 9 9 0 0118 0z" /></svg>
         </div>
       ) : (
         <>
@@ -47,8 +56,6 @@ export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick, onLoad }) 
               src={media.thumbnail}
               alt={media.title || 'Media thumbnail'}
               className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${isLocked ? 'blur-md' : ''}`}
-              onLoad={onLoad}
-              onError={() => setHasError(true)}
               loading="lazy"
               draggable={false}
             />
@@ -68,8 +75,8 @@ export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick, onLoad }) 
 
           {isLocked && (
             <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-center p-2">
-                <p className="font-semibold text-white text-lg">🔒 Conteúdo Premium</p>
-                <p className="text-xs text-privacy-text-secondary mt-1">Desbloqueie esse pack na Loja.</p>
+                <svg className="w-8 h-8 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
+                <p className="font-semibold text-white text-sm mt-2">Conteúdo Bloqueado</p>
             </div>
           )}
 

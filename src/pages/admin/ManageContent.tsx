@@ -1,11 +1,12 @@
 import React, { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
-import { MediaItem, Model } from '../../types';
+import { MediaItem, Model, Product } from '../../types';
 
 export const ManageContent: React.FC = () => {
     const { id: modelId } = useParams<{ id: string }>();
     const [model, setModel] = useState<Model | null>(null);
+    const [modelProducts, setModelProducts] = useState<Product[]>([]);
     const [mediaItems, setMediaItems] = useState<MediaItem[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
@@ -15,100 +16,112 @@ export const ManageContent: React.FC = () => {
     const [manualUrl, setManualUrl] = useState('');
     const [manualType, setManualType] = useState<'image' | 'video'>('image');
     const [manualIsFree, setManualIsFree] = useState(false);
+    const [manualProductId, setManualProductId] = useState<string>('');
+    
     const [batchBaseUrl, setBatchBaseUrl] = useState('');
     const [batchCount, setBatchCount] = useState(1);
     const [batchType, setBatchType] = useState<'image' | 'video'>('image');
     const [batchExtension, setBatchExtension] = useState('.png');
+    const [batchProductId, setBatchProductId] = useState<string>('');
 
     const fetchData = useCallback(async () => {
         if (!modelId) return;
         setLoading(true);
-        const [modelRes, mediaRes] = await Promise.all([
+        const [modelRes, mediaRes, productsRes] = await Promise.all([
             supabase.from('models').select('*').eq('id', modelId).single(),
             supabase.from('media_items').select('*').eq('model_id', modelId).order('created_at', { ascending: false }),
+            supabase.from('products').select('*').eq('model_id', modelId),
         ]);
         if (modelRes.data) setModel(modelRes.data);
         if (mediaRes.data) setMediaItems(mediaRes.data);
+        if (productsRes.data) setModelProducts(productsRes.data);
         setLoading(false);
     }, [modelId]);
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
+    const linkMediaToProduct = async (mediaIds: string[], productId: string) => {
+        if (!productId) return;
+        const links = mediaIds.map(media_id => ({ product_id: productId, media_id }));
+        const { error } = await supabase.from('product_media').insert(links);
+        if (error) {
+            throw new Error(`Erro ao vincular mídia ao produto: ${error.message}`);
+        }
+    };
+
     const handleManualSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
-        const { error } = await supabase.from('media_items').insert({
-            model_id: modelId,
-            url: manualUrl,
-            thumbnail: manualUrl, // Assuming thumbnail is same as URL for manual entry
-            type: manualType,
-            is_free: manualIsFree,
-        });
-        if (error) {
-            setError(error.message);
-        } else {
+        try {
+            const { data, error } = await supabase.from('media_items').insert({
+                model_id: modelId,
+                url: manualUrl,
+                thumbnail: manualUrl,
+                type: manualType,
+                is_free: manualIsFree,
+            }).select('id').single();
+
+            if (error) throw error;
+            if (data && manualProductId) {
+                await linkMediaToProduct([data.id], manualProductId);
+            }
+
             alert('Conteúdo adicionado!');
             setManualUrl('');
             fetchData();
+        } catch (err: any) {
+            setError(err.message);
         }
     };
 
     const handleBatchSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setError(null);
-        const newItems = Array.from({ length: batchCount }, (_, i) => ({
-            model_id: modelId,
-            type: batchType,
-            url: `${batchBaseUrl}${i + 1}${batchExtension}`,
-            thumbnail: `${batchBaseUrl}${i + 1}${batchExtension}`,
-            is_free: false, // Defaulting to false as it's premium content
-        }));
-        
-        console.log('[ManageContent] Inserindo em lote em media_items', newItems);
-        const { data, error } = await supabase.from('media_items').insert(newItems);
-        console.log('[ManageContent] Supabase retorno insert', { data, error });
+        try {
+            const newItems = Array.from({ length: batchCount }, (_, i) => ({
+                model_id: modelId,
+                type: batchType,
+                url: `${batchBaseUrl}${i + 1}${batchExtension}`,
+                thumbnail: `${batchBaseUrl}${i + 1}${batchExtension}`,
+                is_free: false,
+            }));
+            
+            const { data, error } = await supabase.from('media_items').insert(newItems).select('id');
+            if (error) throw error;
 
-        if (error) {
-            setError(error.message);
-        } else {
+            if (data && batchProductId) {
+                const newMediaIds = data.map(item => item.id);
+                await linkMediaToProduct(newMediaIds, batchProductId);
+            }
+
             alert(`${batchCount} conteúdos adicionados em lote!`);
             fetchData();
+        } catch (err: any) {
+            setError(err.message);
         }
     };
 
     const handleSelectionChange = (id: string, checked: boolean) => {
         setSelectedIds(prev => {
             const newSet = new Set(prev);
-            if (checked) {
-                newSet.add(id);
-            } else {
-                newSet.delete(id);
-            }
+            if (checked) newSet.add(id);
+            else newSet.delete(id);
             return newSet;
         });
     };
 
     const handleSelectAll = (checked: boolean) => {
-        if (checked) {
-            setSelectedIds(new Set(mediaItems.map(item => item.id)));
-        } else {
-            setSelectedIds(new Set());
-        }
+        setSelectedIds(checked ? new Set(mediaItems.map(item => item.id)) : new Set());
     };
 
     const handleDeleteSelected = async () => {
-        if (selectedIds.size === 0) {
-            alert('Nenhum item selecionado.');
-            return;
-        }
+        if (selectedIds.size === 0) return;
         if (window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} mídias?`)) {
-            const idsToDelete = Array.from(selectedIds);
-            const { error } = await supabase.from('media_items').delete().in('id', idsToDelete);
-            if (error) {
-                setError(error.message);
-            } else {
-                alert('Mídias excluídas com sucesso.');
-                setMediaItems(prev => prev.filter(item => !selectedIds.has(item.id)));
+            const { error } = await supabase.from('media_items').delete().in('id', Array.from(selectedIds));
+            if (error) setError(error.message);
+            else {
+                alert('Mídias excluídas.');
+                fetchData();
                 setSelectedIds(new Set());
             }
         }
@@ -131,6 +144,10 @@ export const ManageContent: React.FC = () => {
                         <option value="image">Imagem</option>
                         <option value="video">Vídeo</option>
                     </select>
+                    <select value={manualProductId} onChange={e => setManualProductId(e.target.value)} className={inputStyle}>
+                        <option value="">Vincular a um produto (Opcional)</option>
+                        {modelProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
                     <label className="flex items-center gap-2 text-white"><input type="checkbox" checked={manualIsFree} onChange={e => setManualIsFree(e.target.checked)} /> Gratuito?</label>
                     <button type="submit" className="bg-primary text-black font-bold py-2 px-4 rounded w-full">Adicionar</button>
                 </form>
@@ -144,6 +161,10 @@ export const ManageContent: React.FC = () => {
                         <option value="video">Vídeo</option>
                     </select>
                     <input value={batchExtension} onChange={e => setBatchExtension(e.target.value)} placeholder="Extensão (ex: .png)" className={inputStyle} required />
+                    <select value={batchProductId} onChange={e => setBatchProductId(e.target.value)} className={inputStyle}>
+                        <option value="">Vincular a um produto (Opcional)</option>
+                        {modelProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
+                    </select>
                     <button type="submit" className="bg-primary text-black font-bold py-2 px-4 rounded w-full">Gerar em Lote</button>
                 </form>
             </div>

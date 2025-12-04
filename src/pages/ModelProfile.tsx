@@ -10,6 +10,7 @@ import { MediaGrid } from '../components/MediaGrid';
 import { MediaModal } from '../components/MediaModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useProtection } from '../hooks/useProtection';
+import { ArrowLeft } from 'lucide-react';
 
 const BASE_MODEL_USERNAME = 'carolina-andrade';
 
@@ -82,7 +83,7 @@ export const ModelProfile: React.FC = () => {
                     fetchProductsForModel(fetchedModel.id)
                 ]);
                 setUserPurchases(purchases);
-                setMedia(fetchedMedia);
+                setMedia([...fetchedMedia].sort(() => Math.random() - 0.5)); // Shuffle media
                 setProducts(fetchedProducts);
             }
             setLoading(false);
@@ -123,6 +124,9 @@ export const ModelProfile: React.FC = () => {
         <div className="min-h-screen bg-privacy-black text-white pb-24">
             <Header />
             <main className="max-w-4xl mx-auto">
+                <button onClick={() => navigate(-1)} className="absolute top-5 left-4 z-50 text-white bg-black/30 rounded-full p-2 hover:bg-black/50">
+                    <ArrowLeft size={20} />
+                </button>
                 {/* Profile Header */}
                 <div className="relative">
                     <div className="h-40 sm:h-56 bg-privacy-surface">

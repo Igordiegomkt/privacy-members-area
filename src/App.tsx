@@ -61,33 +61,38 @@ const RootRedirector: React.FC = () => {
   const hasChecked = useRef(false);
 
   useEffect(() => {
-    // Garante que a verificação rode apenas uma vez
     if (hasChecked.current) return;
     hasChecked.current = true;
 
     const checkAccessAndRedirect = async () => {
-      const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
-      
-      if (!isAuthenticated) {
-        navigate('/login', { replace: true });
-        return;
-      }
+      try {
+        console.log('[RootRedirector] Iniciando verificação de primeiro acesso...');
 
-      const { data: { user } } = await supabase.auth.getUser();
-      if (!user) {
-        // Se o localStorage estiver dessincronizado com a sessão do Supabase, força o login
-        navigate('/login', { replace: true });
-        return;
-      }
+        const { data, error } = await supabase.auth.getUser();
+        console.log('[RootRedirector] getUser result:', { data, error });
 
-      // Lógica de verificação de primeiro acesso
-      const { isFirstAccess } = await ensureFirstAccess(supabase, user.id);
-      
-      if (isFirstAccess) {
-        // No primeiro acesso, o usuário vai para a página de compras para ver o conteúdo inicial
-        navigate('/minhas-compras', { replace: true });
-      } else {
-        // Nos acessos seguintes, vai para o feed principal
+        if (error || !data?.user) {
+          console.log('[RootRedirector] Sem usuário autenticado, indo para /login');
+          navigate('/login', { replace: true });
+          return;
+        }
+
+        const user = data.user;
+        console.log('[RootRedirector] Usuário autenticado:', user.id);
+
+        const { isFirstAccess } = await ensureFirstAccess(supabase, user.id);
+        console.log('[RootRedirector] isFirstAccess =', isFirstAccess);
+
+        if (isFirstAccess) {
+          console.log('[RootRedirector] Primeiro acesso → /minhas-compras');
+          navigate('/minhas-compras', { replace: true });
+        } else {
+          console.log('[RootRedirector] Acesso recorrente → /feed');
+          navigate('/feed', { replace: true });
+        }
+      } catch (err) {
+        console.error('[RootRedirector] Erro ao verificar primeiro acesso:', err);
+        // fallback seguro
         navigate('/feed', { replace: true });
       }
     };
@@ -95,7 +100,6 @@ const RootRedirector: React.FC = () => {
     checkAccessAndRedirect();
   }, [navigate]);
 
-  // Exibe um loader enquanto a verificação assíncrona acontece
   return (
     <div className="min-h-screen bg-privacy-black flex items-center justify-center">
       <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>

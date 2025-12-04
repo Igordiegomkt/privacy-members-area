@@ -53,7 +53,7 @@ export const Login: React.FC = () => {
     } finally {
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userName', name.trim());
-      navigate('/modelo/carolina-andrade');
+      navigate('/', { replace: true });
     }
   };
 

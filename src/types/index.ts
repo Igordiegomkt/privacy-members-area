@@ -62,6 +62,7 @@ export interface Model {
   avatar_url?: string;
   cover_url?: string;
   created_at: string;
+  is_verified?: boolean;
 }
 
 export type ProductType = 'pack' | 'single_media' | 'subscription';

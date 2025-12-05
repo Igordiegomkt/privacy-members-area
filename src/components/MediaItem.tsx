@@ -12,18 +12,17 @@ export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick }) => {
   const isLocked = media.accessStatus === 'locked';
 
   const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const [thumbError, setThumbError] = useState(false);
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   const openPreview = () => {
     if (isLocked) {
-      // Se estiver bloqueado, o clique deve levar ao perfil/produto
       onClick?.();
       return;
     }
     if (isVideo) {
       setIsPreviewOpen(true);
     } else {
-      // Para imagens, o onClick pode abrir um modal de imagem maior
       onClick?.();
     }
   };
@@ -43,11 +42,13 @@ export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick }) => {
     }
   }, [isPreviewOpen]);
 
-  const posterUrl = media.thumbnail || '/fallback-poster.jpg';
+  const posterUrl = !thumbError && media.thumbnail
+    ? media.thumbnail
+    : '/video-fallback.svg';
 
   return (
     <>
-      {/* CARD NO FEED / MURAL */}
+      {/* CARD NO FEED / MURAL – MOBILE FIRST */}
       <div
         className="relative w-full overflow-hidden rounded-xl bg-privacy-surface cursor-pointer group aspect-[3/4]"
         onClick={openPreview}
@@ -60,6 +61,7 @@ export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick }) => {
           }`}
           loading="lazy"
           draggable={false}
+          onError={() => setThumbError(true)}
         />
 
         <div className="absolute bottom-2 left-2 flex items-center gap-2 text-xs text-white/90">
@@ -83,7 +85,10 @@ export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick }) => {
           className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
           onClick={closePreview}
         >
-          <div className="relative w-full max-w-md mx-auto" onClick={(e) => e.stopPropagation()}>
+          <div
+            className="relative w-full max-w-md mx-auto"
+            onClick={(e) => e.stopPropagation()}
+          >
             <video
               ref={videoRef}
               src={media.url}

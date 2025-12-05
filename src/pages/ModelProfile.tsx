@@ -143,8 +143,11 @@ export const ModelProfile: React.FC = () => {
                         </div>
                         <div className="flex items-center gap-1.5 mt-2">
                             <h1 className="text-xl font-bold text-white">{model.name}</h1>
-                            {/* Adicionar 'is_verified' ao schema do model para habilitar */}
-                            {/* {model.is_verified && <CheckCircle size={18} className="text-blue-500" />} */}
+                            {model.is_verified && (
+                                <span className="inline-flex items-center justify-center rounded-full bg-blue-500 w-4 h-4 text-[10px] text-white">
+                                ✓
+                                </span>
+                            )}
                         </div>
                         <p className="text-sm text-privacy-text-secondary">@{model.username}</p>
                         {model.bio && <p className="mt-3 px-6 text-center text-sm text-privacy-text-secondary max-w-lg">{model.bio}</p>}

@@ -33,11 +33,13 @@ export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ media, isOpe
         <video
           ref={videoRef}
           src={media.url}
+          poster={media.thumbnail || '/video-fallback.svg'}
           className="w-full h-auto max-h-[90vh] rounded-lg"
           controls
           autoPlay
           playsInline
           controlsList="nodownload"
+          preload="metadata"
         />
         <button
           type="button"

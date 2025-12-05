@@ -5,7 +5,6 @@ import { fetchModelByUsername, fetchMediaForModel, fetchProductsForModel, MediaI
 import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
-import { Avatar } from '../components/Avatar';
 import { MediaGrid } from '../components/MediaGrid';
 import { MediaModal } from '../components/MediaModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
@@ -70,7 +69,6 @@ export const ModelProfile: React.FC = () => {
             setLoading(false);
             return;
         }
-        console.log('[ModelProfile] username param =', username);
 
         const loadProfileData = async () => {
             setLoading(true);
@@ -89,7 +87,7 @@ export const ModelProfile: React.FC = () => {
                 
                 setHasAccess(userHasAccess);
                 setUserPurchases(purchases);
-                setMedia([...fetchedMedia].sort(() => Math.random() - 0.5)); // Shuffle media
+                setMedia([...fetchedMedia].sort(() => Math.random() - 0.5));
                 setProducts(fetchedProducts);
             }
             setLoading(false);
@@ -104,7 +102,7 @@ export const ModelProfile: React.FC = () => {
             if (mainProduct) {
                 navigate(`/produto/${mainProduct.id}`);
             }
-        } else {
+        } else if (mediaItem.type === 'image') {
             setSelectedMedia(mediaItem);
             setIsModalOpen(true);
         }
@@ -133,52 +131,46 @@ export const ModelProfile: React.FC = () => {
                 <button onClick={() => navigate(-1)} className="absolute top-5 left-4 z-50 text-white bg-black/30 rounded-full p-2 hover:bg-black/50">
                     <ArrowLeft size={20} />
                 </button>
+                
                 {/* Profile Header */}
-                <div className="relative">
-                    <div className="h-40 sm:h-56 bg-privacy-surface">
+                <div className="relative w-full">
+                    <div className="h-40 sm:h-56 w-full overflow-hidden bg-privacy-surface">
                         {model.cover_url && <img src={model.cover_url} alt={`${model.name}'s cover`} className="w-full h-full object-cover" />}
                     </div>
-                    <div className="absolute bottom-0 left-1/2 -translate-x-1/2 translate-y-1/2">
-                        <Avatar src={model.avatar_url || ''} alt={model.name} size="xl" className="border-4 border-privacy-black" />
+                    <div className="flex flex-col items-center -mt-12">
+                        <div className="w-24 h-24 rounded-full border-4 border-privacy-black overflow-hidden bg-privacy-surface">
+                            {model.avatar_url && <img src={model.avatar_url} alt={model.name} className="w-full h-full object-cover" />}
+                        </div>
+                        <div className="flex items-center gap-1.5 mt-2">
+                            <h1 className="text-xl font-bold text-white">{model.name}</h1>
+                            {/* Adicionar 'is_verified' ao schema do model para habilitar */}
+                            {/* {model.is_verified && <CheckCircle size={18} className="text-blue-500" />} */}
+                        </div>
+                        <p className="text-sm text-privacy-text-secondary">@{model.username}</p>
+                        {model.bio && <p className="mt-3 px-6 text-center text-sm text-privacy-text-secondary max-w-lg">{model.bio}</p>}
+                        <div className="mt-4 flex items-center justify-center gap-6 text-sm text-privacy-text-secondary">
+                            <span><strong className="text-white">{stats.posts}</strong> posts</span>
+                            <span><strong className="text-white">{stats.photos}</strong> fotos</span>
+                            <span><strong className="text-white">{stats.videos}</strong> vídeos</span>
+                        </div>
                     </div>
                 </div>
 
-                {/* Bio Section */}
-                <div className="pt-20 px-4 text-center">
-                    <h1 className="text-2xl font-bold">{model.name}</h1>
-                    <p className="text-sm text-privacy-text-secondary">@{model.username}</p>
-                    <p className="mt-4 text-sm max-w-xl mx-auto">{model.bio}</p>
-                </div>
-
-                {/* Stats */}
-                <div className="flex justify-center gap-6 my-6">
-                    <div><span className="font-bold">{stats.posts}</span> <span className="text-sm text-privacy-text-secondary">posts</span></div>
-                    <div><span className="font-bold">{stats.photos}</span> <span className="text-sm text-privacy-text-secondary">fotos</span></div>
-                    <div><span className="font-bold">{stats.videos}</span> <span className="text-sm text-privacy-text-secondary">vídeos</span></div>
-                </div>
-
-                {/* Access Banner */}
                 {hasAccess && (
-                    <div className="px-4 sm:px-6 mb-6">
+                    <div className="px-4 sm:px-6 my-6">
                         <div className="text-center bg-primary/10 border border-primary/30 rounded-lg p-4 text-sm">
                             <p className="font-semibold text-primary">💎 Você já tem acesso ao conteúdo de {model.name}.</p>
-                            <p className="text-privacy-text-secondary mt-1">Aproveite todos os conteúdos liberados no mural e descubra packs extras na aba Loja.</p>
                         </div>
                     </div>
                 )}
 
-                {/* Tabs */}
-                <Tabs defaultValue="mural" className="w-full">
+                <Tabs defaultValue="mural" className="w-full mt-6">
                     <TabsList className="grid w-full grid-cols-3">
                         <TabsTrigger value="mural">Mural</TabsTrigger>
                         <TabsTrigger value="feed">Feed</TabsTrigger>
                         <TabsTrigger value="loja">Loja</TabsTrigger>
                     </TabsList>
                     <TabsContent value="mural" className="mt-6">
-                        <div className="px-4 sm:px-6 mb-4">
-                            <h2 className="text-xl font-bold">Mural VIP</h2>
-                            <p className="text-sm text-privacy-text-secondary">Todas as fotos e vídeos exclusivos de {model.name} em um lugar só.</p>
-                        </div>
                         <MediaGrid media={media} onMediaClick={handleMediaClick} />
                     </TabsContent>
                     <TabsContent value="feed" className="mt-6 px-4">

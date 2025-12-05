@@ -1,116 +1,109 @@
-import React, { useState, useEffect, useRef } from 'react';
+import React, { useRef, useState, useEffect } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
+import { Lock, Camera, Video } from 'lucide-react';
 
 interface MediaItemProps {
   media: MediaItemWithAccess;
-  onClick: () => void;
-  onLoad?: () => void;
+  onClick?: () => void;
 }
 
-export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick, onLoad }) => {
-  const [isLoaded, setIsLoaded] = useState(false);
-  const [isPreviewing, setIsPreviewing] = useState(false);
-  const containerRef = useRef<HTMLDivElement>(null);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const isLocked = media.accessStatus === 'locked';
+export const MediaItem: React.FC<MediaItemProps> = ({ media, onClick }) => {
   const isVideo = media.type === 'video';
+  const isLocked = media.accessStatus === 'locked';
 
-  // IntersectionObserver para lazy loading
-  useEffect(() => {
-    if (!containerRef.current || isLoaded) return;
-    const observer = new IntersectionObserver(
-      (entries) => {
-        if (entries[0].isIntersecting) {
-          setIsLoaded(true);
-          if (onLoad) onLoad();
-          observer.disconnect();
-        }
-      },
-      { rootMargin: '100px' }
-    );
-    observer.observe(containerRef.current);
-    return () => observer.disconnect();
-  }, [isLoaded, onLoad]);
+  const [isPreviewOpen, setIsPreviewOpen] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // Efeito para tocar o vídeo quando a prévia é ativada
-  useEffect(() => {
-    if (isPreviewing && videoRef.current) {
-      videoRef.current.play().catch(() => {});
+  const openPreview = () => {
+    if (isLocked) {
+      // Se estiver bloqueado, o clique deve levar ao perfil/produto
+      onClick?.();
+      return;
     }
-  }, [isPreviewing]);
-
-  const startPreview = () => !isLocked && setIsPreviewing(true);
-  const stopPreview = () => !isLocked && setIsPreviewing(false);
-
-  const posterUrl = media.thumbnail || '/fallback-poster.jpg';
-
-  const renderContent = () => {
-    if (!isLoaded) {
-      return <div className="w-full h-full bg-privacy-surface animate-pulse" />;
-    }
-
-    if (!isVideo) {
-      return (
-        <img
-          src={media.thumbnail}
-          alt={media.title || 'Media thumbnail'}
-          className={`w-full h-full object-cover transition-transform duration-300 group-hover:scale-105 ${isLocked ? 'blur-md' : ''}`}
-          loading="lazy"
-          draggable={false}
-        />
-      );
-    }
-
-    // É um vídeo: renderiza <video> ou <img> condicionalmente
-    if (isPreviewing) {
-      return (
-        <video
-          ref={videoRef}
-          src={media.url}
-          className="w-full h-full object-cover"
-          autoPlay
-          muted
-          loop
-          playsInline
-          draggable={false}
-        />
-      );
+    if (isVideo) {
+      setIsPreviewOpen(true);
     } else {
-      return (
-        <>
-          <img
-            src={posterUrl}
-            alt="Video poster"
-            className={`w-full h-full object-cover ${isLocked ? 'blur-md' : ''}`}
-            loading="lazy"
-          />
-          {!isLocked && (
-            <div className="absolute inset-0 flex items-center justify-center bg-black/20 opacity-0 group-hover:opacity-100 transition-opacity duration-300">
-              <svg className="w-10 h-10 text-white/90" fill="currentColor" viewBox="0 0 24 24"><path d="M8 5v14l11-7z" /></svg>
-            </div>
-          )}
-        </>
-      );
+      // Para imagens, o onClick pode abrir um modal de imagem maior
+      onClick?.();
     }
   };
 
+  const closePreview = (e?: React.MouseEvent) => {
+    e?.stopPropagation();
+    if (videoRef.current) {
+      videoRef.current.pause();
+      videoRef.current.currentTime = 0;
+    }
+    setIsPreviewOpen(false);
+  };
+
+  useEffect(() => {
+    if (isPreviewOpen && videoRef.current) {
+      videoRef.current.play().catch(() => {});
+    }
+  }, [isPreviewOpen]);
+
+  const posterUrl = media.thumbnail || '/fallback-poster.jpg';
+
   return (
-    <div
-      ref={containerRef}
-      className="relative aspect-square cursor-pointer group overflow-hidden bg-privacy-surface"
-      onClick={onClick}
-      onMouseEnter={startPreview}
-      onMouseLeave={stopPreview}
-      onTouchStart={startPreview}
-      onTouchEnd={stopPreview}
-    >
-      {renderContent()}
-      {isLocked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-center p-2 z-10">
-          <svg className="w-8 h-8 text-white/80" fill="none" stroke="currentColor" viewBox="0 0 24 24"><path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M12 15v2m-6 4h12a2 2 0 002-2v-6a2 2 0 00-2-2H6a2 2 0 00-2 2v6a2 2 0 002 2zm10-10V7a4 4 0 00-8 0v4h8z" /></svg>
-          <p className="font-semibold text-white text-sm mt-2">Conteúdo Bloqueado</p>
+    <>
+      {/* CARD NO FEED / MURAL */}
+      <div
+        className="relative w-full overflow-hidden rounded-xl bg-privacy-surface cursor-pointer group aspect-[3/4]"
+        onClick={openPreview}
+      >
+        <img
+          src={posterUrl}
+          alt={media.title || 'Conteúdo'}
+          className={`w-full h-full object-cover transition-all duration-300 ${
+            isLocked ? 'blur-md grayscale' : 'group-hover:scale-105'
+          }`}
+          loading="lazy"
+          draggable={false}
+        />
+
+        <div className="absolute bottom-2 left-2 flex items-center gap-2 text-xs text-white/90">
+          <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5">
+            {isVideo ? <Video size={12} /> : <Camera size={12} />}
+            {isVideo ? 'Vídeo' : 'Foto'}
+          </span>
+        </div>
+
+        {isLocked && (
+          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-center px-3">
+            <Lock className="w-8 h-8 text-white/80 mb-2" />
+            <p className="text-sm text-white font-semibold">Conteúdo bloqueado</p>
+          </div>
+        )}
+      </div>
+
+      {/* OVERLAY DO PLAYER DE VÍDEO */}
+      {isVideo && !isLocked && isPreviewOpen && (
+        <div
+          className="fixed inset-0 z-50 flex items-center justify-center bg-black/90 backdrop-blur-sm"
+          onClick={closePreview}
+        >
+          <div className="relative w-full max-w-md mx-auto" onClick={(e) => e.stopPropagation()}>
+            <video
+              ref={videoRef}
+              src={media.url}
+              className="w-full h-auto max-h-[90vh] rounded-lg"
+              controls
+              autoPlay
+              playsInline
+              controlsList="nodownload"
+            />
+            <button
+              type="button"
+              onClick={closePreview}
+              className="absolute -top-2 -right-2 text-white bg-black/50 rounded-full p-2"
+              aria-label="Fechar player"
+            >
+              ✕
+            </button>
+          </div>
         </div>
       )}
-    </div>
+    </>
   );
 };

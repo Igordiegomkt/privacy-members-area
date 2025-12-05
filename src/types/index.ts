@@ -1,7 +1,7 @@
 export interface MediaItem {
   id: string;
   type: 'image' | 'video';
-  thumbnail: string;
+  thumbnail: string; // ✅ URL da thumbnail (gerada pela Edge Function para vídeos)
   url: string;
   title?: string;
   model_id?: string;

@@ -5,10 +5,9 @@ import { MediaItemWithAccess } from '../lib/models';
 interface MediaGridProps {
   media: MediaItemWithAccess[];
   onMediaClick: (media: MediaItemWithAccess) => void;
-  onMediaLoad?: () => void;
 }
 
-export const MediaGrid: React.FC<MediaGridProps> = ({ media, onMediaClick, onMediaLoad }) => {
+export const MediaGrid: React.FC<MediaGridProps> = ({ media, onMediaClick }) => {
   if (media.length === 0) {
     return (
       <div className="w-full px-4 py-12 text-center text-gray-400">
@@ -19,13 +18,12 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ media, onMediaClick, onMed
 
   return (
     <div className="w-full px-2 sm:px-4 pb-8">
-      <div className="grid grid-cols-3 gap-0.5 sm:gap-1">
+      <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
         {media.map((item) => (
           <MediaItem
             key={item.id}
             media={item}
             onClick={() => onMediaClick(item)}
-            onLoad={onMediaLoad}
           />
         ))}
       </div>

@@ -11,12 +11,13 @@ import { useCheckout } from '../contexts/CheckoutContext';
 interface ModelWithAccess extends Model {
   isUnlocked: boolean;
   mainProductId?: string;
+  mainProductPriceCents?: number;
 }
 
 const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
   const navigate = useNavigate();
   const { openCheckoutModal } = useCheckout();
-  
+
   const handleCardClick = () => {
     if (!model.isUnlocked && model.mainProductId) {
       openCheckoutModal(model.mainProductId);
@@ -34,8 +35,17 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
       
       <div className="absolute bottom-0 left-0 p-4 w-full">
-        <h3 className="font-bold text-white text-lg">{model.name}</h3>
+        <h3 className="font-bold text-white text-lg truncate">{model.name}</h3>
         <p className="text-sm text-privacy-text-secondary">@{model.username}</p>
+        {model.mainProductPriceCents != null && !model.isUnlocked && (
+          <p className="mt-1 text-sm text-primary font-semibold">
+            Acesso VIP a partir de{' '}
+            {(model.mainProductPriceCents / 100).toLocaleString('pt-BR', {
+              style: 'currency',
+              currency: 'BRL',
+            })}
+          </p>
+        )}
       </div>
 
       {!model.isUnlocked && (
@@ -44,16 +54,31 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
             <Lock size={14} />
             <span>Bloqueado</span>
           </div>
-          <p className="text-white font-semibold mb-4">Desbloqueie o VIP da {model.name.split(' ')[0]}</p>
-          <button
-            onClick={(e) => {
-              e.stopPropagation();
-              handleCardClick();
-            }}
-            className="bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg text-sm shadow-lg hover:opacity-90 transition"
-          >
-            🔓 Desbloquear perfil VIP
-          </button>
+          <p className="text-white font-semibold mb-2">
+            Desbloqueie o VIP da {model.name?.split(' ')[0] ?? 'modelo'}
+          </p>
+
+          {model.mainProductId ? (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                openCheckoutModal(model.mainProductId!);
+              }}
+              className="bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg text-sm shadow-lg hover:opacity-90 transition"
+            >
+              🔓 Desbloquear perfil VIP
+            </button>
+          ) : (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                navigate(`/modelo/${model.username}`);
+              }}
+              className="bg-privacy-surface text-privacy-text-secondary font-semibold py-2 px-4 rounded-lg text-xs shadow hover:bg-privacy-surface/80 transition"
+            >
+              Ver perfil
+            </button>
+          )}
         </div>
       )}
     </div>
@@ -73,7 +98,7 @@ export const Home: React.FC = () => {
       const [modelsRes, purchasesRes, productsRes] = await Promise.all([
         supabase.from('models').select('*'),
         fetchUserPurchases(),
-        supabase.from('products').select('id, model_id, is_base_membership')
+        supabase.from('products').select('id, model_id, is_base_membership, price_cents')
       ]);
 
       if (modelsRes.error) {
@@ -92,7 +117,12 @@ export const Home: React.FC = () => {
         const modelProducts = products.filter(p => p.model_id === model.id);
         const mainProduct = modelProducts.find(p => p.is_base_membership) || modelProducts[0];
 
-        return { ...model, isUnlocked, mainProductId: mainProduct?.id };
+        return { 
+          ...model, 
+          isUnlocked, 
+          mainProductId: mainProduct?.id,
+          mainProductPriceCents: mainProduct?.price_cents
+        };
       });
 
       modelsWithAccess.sort((a, b) => {

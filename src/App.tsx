@@ -1,5 +1,5 @@
 import React, { useEffect } from 'react';
-import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
+import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
 import { AdminLogin } from './pages/admin/AdminLogin';
@@ -57,7 +57,7 @@ const AuthHandler: React.FC = () => {
 
 function App() {
   return (
-    <BrowserRouter>
+    <>
       <AuthHandler />
       <Routes>
         {/* User Routes */}
@@ -92,11 +92,11 @@ function App() {
           </Route>
         </Route>
 
-        {/* Redirects & Root - O RootRedirector agora lida com a rota "/" */}
+        {/* Redirects & Root */}
         <Route path="/home" element={<Navigate to="/" replace />} />
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>
-    </BrowserRouter>
+    </>
   );
 }
 

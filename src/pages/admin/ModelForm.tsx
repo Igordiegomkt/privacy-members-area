@@ -7,26 +7,42 @@ export const ModelForm: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const [model, setModel] = useState<Partial<Model>>({ name: '', username: '', bio: '', avatar_url: '', cover_url: '' });
+  const [basePrice, setBasePrice] = useState<string>('');
+  const [baseProductName, setBaseProductName] = useState<string>('');
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
   const [isSuggesting, setIsSuggesting] = useState(false);
   const isEditing = !!id;
 
   useEffect(() => {
-    if (isEditing) {
-      const fetchModel = async () => {
-        setLoading(true);
-        const { data, error } = await supabase.from('models').select('*').eq('id', id).single();
-        
-        if (error) {
-          setError(`Erro ao carregar modelo: ${error.message}`);
-        } else if (data) {
-          setModel(data);
-        }
+    const fetchModelData = async () => {
+      if (!isEditing) return;
+      setLoading(true);
+      
+      const { data, error } = await supabase.from('models').select('*').eq('id', id).single();
+      if (error) {
+        setError(`Erro ao carregar modelo: ${error.message}`);
         setLoading(false);
-      };
-      fetchModel();
-    }
+        return;
+      }
+      if (data) {
+        setModel(data);
+        const { data: baseProducts } = await supabase
+          .from('products')
+          .select('*')
+          .eq('model_id', id)
+          .eq('is_base_membership', true)
+          .limit(1);
+
+        if (baseProducts && baseProducts.length > 0) {
+          const base = baseProducts[0];
+          setBaseProductName(base.name || '');
+          setBasePrice((base.price_cents / 100).toFixed(2));
+        }
+      }
+      setLoading(false);
+    };
+    fetchModelData();
   }, [id, isEditing]);
 
   const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
@@ -66,13 +82,48 @@ export const ModelForm: React.FC = () => {
     setLoading(true);
     setError(null);
 
-    const { error: submissionError } = isEditing
-      ? await supabase.from('models').update(model).eq('id', id)
-      : await supabase.from('models').insert(model);
-
-    if (submissionError) {
-      setError(`Erro ao salvar: ${submissionError.message}`);
+    let modelId = id;
+    if (isEditing) {
+      const { error: submissionError } = await supabase.from('models').update(model).eq('id', id);
+      if (submissionError) {
+        setError(`Erro ao salvar: ${submissionError.message}`);
+        setLoading(false);
+        return;
+      }
     } else {
+      const { data: inserted, error: submissionError } = await supabase.from('models').insert(model).select().single();
+      if (submissionError) {
+        setError(`Erro ao salvar: ${submissionError.message}`);
+        setLoading(false);
+        return;
+      }
+      modelId = inserted?.id;
+    }
+
+    const numericPrice = parseFloat(basePrice.replace(',', '.'));
+    const shouldManageBaseProduct = !isNaN(numericPrice) && numericPrice > 0;
+
+    if (shouldManageBaseProduct && modelId) {
+      const priceCents = Math.round(numericPrice * 100);
+      const productName = baseProductName.trim() || `VIP completo de ${model.name || ''}`.trim() || 'VIP da modelo';
+
+      const { data: existingProducts } = await supabase
+        .from('products')
+        .select('id')
+        .eq('model_id', modelId)
+        .eq('is_base_membership', true)
+        .limit(1);
+
+      if (existingProducts && existingProducts.length > 0) {
+        const { error: updateError } = await supabase.from('products').update({ name: productName, price_cents: priceCents, status: 'active' }).eq('id', existingProducts[0].id);
+        if (updateError) setError(`Erro ao atualizar produto base: ${updateError.message}`);
+      } else {
+        const { error: insertError } = await supabase.from('products').insert({ model_id: modelId, name: productName, price_cents: priceCents, is_base_membership: true, status: 'active' });
+        if (insertError) setError(`Erro ao criar produto base: ${insertError.message}`);
+      }
+    }
+
+    if (!error) {
       alert(`Modelo ${isEditing ? 'atualizada' : 'criada'} com sucesso!`);
       navigate('/admin/modelos');
     }
@@ -105,6 +156,19 @@ export const ModelForm: React.FC = () => {
           </div>
           <textarea name="bio" value={model.bio || ''} onChange={handleChange} className={inputStyle} rows={4}></textarea>
         </div>
+        
+        <div className="grid grid-cols-1 sm:grid-cols-2 gap-4">
+          <div>
+            <label className="block text-sm font-medium text-privacy-text-secondary mb-2">Nome do produto VIP (opcional)</label>
+            <input type="text" value={baseProductName} onChange={(e) => setBaseProductName(e.target.value)} placeholder={`Ex: VIP completo de ${model.name || '...'}`} className={inputStyle} />
+          </div>
+          <div>
+            <label className="block text-sm font-medium text-privacy-text-secondary mb-2">Preço base do VIP (R$)</label>
+            <input type="number" step="0.01" min="0" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} placeholder="Ex: 49.90" className={inputStyle} />
+            <p className="mt-1 text-xs text-privacy-text-secondary">Esse valor será usado no produto base (PIX) desta modelo.</p>
+          </div>
+        </div>
+
         <div>
           <label htmlFor="avatar_url" className="block text-sm font-medium text-privacy-text-secondary mb-2">URL do Avatar</label>
           <input type="url" name="avatar_url" value={model.avatar_url || ''} onChange={handleChange} className={inputStyle} />

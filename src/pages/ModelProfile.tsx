@@ -108,6 +108,7 @@ export const ModelProfile: React.FC = () => {
     };
     const feedMedia = media.filter(m => m.accessStatus === 'free' || m.accessStatus === 'unlocked');
     const purchasedProductIds = new Set(purchases.map((p: UserPurchaseWithProduct) => p.product_id));
+    const mainProduct = products.find(p => p.is_base_membership) || products[0];
 
     return (
         <div className="min-h-screen bg-privacy-black text-white pb-24">
@@ -155,6 +156,14 @@ export const ModelProfile: React.FC = () => {
                         <p className="text-privacy-text-secondary mt-1">
                           Desbloqueie vídeos privados, mural VIP e conteúdos completos.
                         </p>
+                        {mainProduct && (
+                          <p className="text-privacy-text-secondary mt-1">
+                            Acesso VIP por{' '}
+                            <span className="text-primary font-semibold">
+                              {formatPrice(mainProduct.price_cents)}
+                            </span>
+                          </p>
+                        )}
                       </div>
 
                       {products.length > 0 && (

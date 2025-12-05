@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Model } from '../types';
+import { Model, Product } from '../types';
 import { fetchUserPurchases } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
@@ -9,16 +9,26 @@ import { Lock, CheckCircle } from 'lucide-react';
 
 interface ModelWithAccess extends Model {
   isUnlocked: boolean;
+  mainProductId?: string;
 }
 
 const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
   const navigate = useNavigate();
+  
+  const handleCardClick = () => {
+    if (!model.isUnlocked && model.mainProductId) {
+      navigate(`/produto/${model.mainProductId}`);
+    } else {
+      navigate(`/modelo/${model.username}`);
+    }
+  };
+
   return (
     <div 
-      className="relative rounded-lg overflow-hidden group cursor-pointer"
-      onClick={() => navigate(`/modelo/${model.username}`)}
+      className="relative rounded-lg overflow-hidden group cursor-pointer aspect-[3/4]"
+      onClick={handleCardClick}
     >
-      <img src={model.avatar_url ?? ''} alt={model.name} className={`w-full h-full object-cover aspect-[3/4] transition-all duration-300 ${!model.isUnlocked ? 'grayscale group-hover:grayscale-0' : ''}`} />
+      <img src={model.avatar_url ?? ''} alt={model.name} className={`w-full h-full object-cover transition-all duration-300 ${!model.isUnlocked ? 'grayscale' : ''}`} />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
       
       <div className="absolute bottom-0 left-0 p-4 w-full">
@@ -26,19 +36,24 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
         <p className="text-sm text-privacy-text-secondary">@{model.username}</p>
       </div>
 
-      <div className="absolute top-3 right-3">
-        {model.isUnlocked ? (
-          <div className="flex items-center gap-1.5 bg-green-500/20 text-green-400 px-2 py-1 rounded-full text-xs font-semibold">
-            <CheckCircle size={14} />
-            <span>Liberado</span>
-          </div>
-        ) : (
-          <div className="flex items-center gap-1.5 bg-red-500/20 text-red-400 px-2 py-1 rounded-full text-xs font-semibold">
+      {!model.isUnlocked && (
+        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4 text-center">
+          <div className="flex items-center gap-1.5 bg-red-500/20 text-red-400 px-2 py-1 rounded-full text-xs font-semibold mb-3">
             <Lock size={14} />
             <span>Bloqueado</span>
           </div>
-        )}
-      </div>
+          <p className="text-white font-semibold mb-4">Desbloqueie o VIP da {model.name.split(' ')[0]}</p>
+          <button
+            onClick={(e) => {
+              e.stopPropagation();
+              handleCardClick();
+            }}
+            className="bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg text-sm shadow-lg hover:opacity-90 transition"
+          >
+            🔓 Desbloquear perfil VIP
+          </button>
+        </div>
+      )}
     </div>
   );
 };
@@ -53,9 +68,10 @@ export const Home: React.FC = () => {
       
       const hasWelcomeCarolina = localStorage.getItem('welcomePurchaseCarolina') === 'true';
 
-      const [modelsRes, purchasesRes] = await Promise.all([
+      const [modelsRes, purchasesRes, productsRes] = await Promise.all([
         supabase.from('models').select('*'),
-        fetchUserPurchases()
+        fetchUserPurchases(),
+        supabase.from('products').select('id, model_id, is_base_membership')
       ]);
 
       if (modelsRes.error) {
@@ -64,15 +80,19 @@ export const Home: React.FC = () => {
         return;
       }
 
+      const products = productsRes.data || [];
       const purchasedModelIds = new Set(purchasesRes.map(p => p.product?.model_id).filter(Boolean));
 
       const modelsWithAccess = modelsRes.data.map(model => {
         const isCarolina = model.username === 'carolina-andrade';
         const isUnlocked = (isCarolina && hasWelcomeCarolina) || purchasedModelIds.has(model.id);
-        return { ...model, isUnlocked };
+        
+        const modelProducts = products.filter(p => p.model_id === model.id);
+        const mainProduct = modelProducts.find(p => p.is_base_membership) || modelProducts[0];
+
+        return { ...model, isUnlocked, mainProductId: mainProduct?.id };
       });
 
-      // Coloca a Carolina no topo se ela estiver desbloqueada
       modelsWithAccess.sort((a, b) => {
         if (a.isUnlocked && !b.isUnlocked) return -1;
         if (!a.isUnlocked && b.isUnlocked) return 1;

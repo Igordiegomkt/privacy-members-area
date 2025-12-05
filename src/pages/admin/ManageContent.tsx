@@ -40,13 +40,40 @@ export const ManageContent: React.FC = () => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
+    const generateAndSaveMetadata = async (newMedia: { id: string, type: 'image' | 'video' }[]) => {
+        if (!model) return;
+        try {
+            const { data, error } = await supabase.functions.invoke('gemini-media-metadata', {
+                body: {
+                    modelName: model.name,
+                    items: newMedia.map(m => ({ mediaId: m.id, type: m.type, context: '' }))
+                }
+            });
+            if (error) throw error;
+            
+            const updates = data.results
+                .filter((r: any) => r.title || r.description)
+                .map((r: any) => ({
+                    id: r.mediaId,
+                    title: r.title,
+                    description: r.description
+                }));
+
+            if (updates.length > 0) {
+                const { error: updateError } = await supabase.from('media_items').upsert(updates);
+                if (updateError) console.error("Error updating metadata:", updateError);
+                else console.log("Metadata generated and saved for", updates.length, "items.");
+            }
+        } catch (e) {
+            console.error("Failed to generate AI metadata:", e);
+        }
+    };
+
     const linkMediaToProduct = async (mediaIds: string[], productId: string) => {
         if (!productId) return;
         const links = mediaIds.map(media_id => ({ product_id: productId, media_id }));
         const { error } = await supabase.from('product_media').insert(links);
-        if (error) {
-            throw new Error(`Erro ao vincular mídia ao produto: ${error.message}`);
-        }
+        if (error) throw new Error(`Erro ao vincular mídia ao produto: ${error.message}`);
     };
 
     const handleManualSubmit = async (e: React.FormEvent) => {
@@ -59,16 +86,15 @@ export const ManageContent: React.FC = () => {
                 thumbnail: manualUrl,
                 type: manualType,
                 is_free: manualIsFree,
-            }).select('id').single();
+            }).select('id, type').single();
 
             if (error) throw error;
-            if (data && manualProductId) {
-                await linkMediaToProduct([data.id], manualProductId);
-            }
-
+            if (data && manualProductId) await linkMediaToProduct([data.id], manualProductId);
+            
             alert('Conteúdo adicionado!');
             setManualUrl('');
             fetchData();
+            generateAndSaveMetadata([data]);
         } catch (err: any) {
             setError(err.message);
         }
@@ -86,16 +112,14 @@ export const ManageContent: React.FC = () => {
                 is_free: false,
             }));
             
-            const { data, error } = await supabase.from('media_items').insert(newItems).select('id');
+            const { data, error } = await supabase.from('media_items').insert(newItems).select('id, type');
             if (error) throw error;
 
-            if (data && batchProductId) {
-                const newMediaIds = data.map(item => item.id);
-                await linkMediaToProduct(newMediaIds, batchProductId);
-            }
+            if (data && batchProductId) await linkMediaToProduct(data.map(item => item.id), batchProductId);
 
             alert(`${batchCount} conteúdos adicionados em lote!`);
             fetchData();
+            generateAndSaveMetadata(data);
         } catch (err: any) {
             setError(err.message);
         }
@@ -202,4 +226,4 @@ export const ManageContent: React.FC = () => {
              <Link to="/admin/modelos" className="text-primary mt-4 inline-block">Voltar para Modelos</Link>
         </div>
     );
-}
+};

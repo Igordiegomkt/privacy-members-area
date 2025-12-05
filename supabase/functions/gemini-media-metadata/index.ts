@@ -36,6 +36,11 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 interface IncomingItem {
   mediaId: string;
   type: "image" | "video";
@@ -161,16 +166,8 @@ Responda APENAS em JSON VÁLIDO, no formato:
 }
 
 serve(async (req: Request) => {
-  // This is needed if you're planning to invoke your function from a browser.
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    } })
-  }
-
-  if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -182,7 +179,7 @@ serve(async (req: Request) => {
           error:
             "Campos obrigatórios: 'modelName', 'modelUsername' e 'items' (array)",
         }),
-        { status: 400 },
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -230,22 +227,14 @@ serve(async (req: Request) => {
 
     return new Response(
       JSON.stringify({ results }),
-      { headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        'Content-Type': 'application/json'
-      }, status: 200 },
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (err) {
     const e = err as Error;
     console.error("[gemini-media-metadata] Error:", e.message);
     return new Response(
       JSON.stringify({ error: e.message }),
-      { headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        'Content-Type': 'application/json'
-      }, status: 500 },
+      { status: 500, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });

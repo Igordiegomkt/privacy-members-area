@@ -11,6 +11,11 @@ const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const GEMINI_MODEL =
   "models/gemini-1.5-pro"; // caminho padrão da API REST Generative Language
 
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
 async function callGemini(prompt: string): Promise<string> {
   if (!GEMINI_API_KEY) {
     throw new Error("Missing GEMINI_API_KEY");
@@ -60,16 +65,8 @@ async function callGemini(prompt: string): Promise<string> {
 }
 
 serve(async (req: Request) => {
-  // This is needed if you're planning to invoke your function from a browser.
   if (req.method === 'OPTIONS') {
-    return new Response('ok', { headers: {
-      'Access-Control-Allow-Origin': '*',
-      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-    } })
-  }
-  
-  if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405 });
+    return new Response('ok', { headers: corsHeaders });
   }
 
   try {
@@ -78,7 +75,7 @@ serve(async (req: Request) => {
     if (!prompt || typeof prompt !== "string") {
       return new Response(
         JSON.stringify({ error: "Missing or invalid 'prompt' field" }),
-        { status: 400 },
+        { status: 400, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -102,11 +99,7 @@ ${prompt}
 
     return new Response(
       JSON.stringify({ generatedText }),
-      { headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        'Content-Type': 'application/json'
-      }, status: 200 },
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (err) {
     const e = err as Error;
@@ -114,11 +107,7 @@ ${prompt}
     const status = e.message === "Missing GEMINI_API_KEY" ? 500 : 500;
     return new Response(
       JSON.stringify({ error: e.message }),
-      { headers: {
-        'Access-Control-Allow-Origin': '*',
-        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-        'Content-Type': 'application/json'
-      }, status },
+      { status, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });

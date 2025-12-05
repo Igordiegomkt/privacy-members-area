@@ -13,6 +13,7 @@ import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs'
 import { useProtection } from '../hooks/useProtection';
 import { ArrowLeft, MessageCircle, Gift } from 'lucide-react';
 import { usePurchases } from '../contexts/PurchaseContext';
+import { useCheckout } from '../contexts/CheckoutContext';
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -55,6 +56,7 @@ export const ModelProfile: React.FC = () => {
     useProtection();
     const { username } = useParams<{ username: string }>();
     const navigate = useNavigate();
+    const { openCheckoutModal } = useCheckout();
     const [model, setModel] = useState<Model | null>(null);
     const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
@@ -91,7 +93,9 @@ export const ModelProfile: React.FC = () => {
 
     const handleLockedClick = () => {
         const mainProduct = products.find(p => p.is_base_membership) || products[0];
-        if (mainProduct) navigate(`/produto/${mainProduct.id}`);
+        if (mainProduct) {
+            openCheckoutModal(mainProduct.id);
+        }
     };
 
     if (loading) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Carregando perfil...</div>;

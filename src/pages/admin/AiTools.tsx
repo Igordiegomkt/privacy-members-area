@@ -40,14 +40,22 @@ export const AiTools: React.FC = () => {
         setError('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
         return;
       }
-      if (data.error) throw new Error(data.error);
+      if (data.error === 'GEMINI_API_ERROR') {
+        setError(`Erro na IA: ${data.details || 'Verifique sua chave GEMINI_API_KEY e billing.'}`);
+        return;
+      }
+      if (data.error) {
+        setError(`Erro na IA: ${data.error}`);
+        return;
+      }
 
       setResult(data.generatedText);
     } catch (err: any) {
-      if (err.message.includes('LIMIT_EXCEEDED')) {
+      console.error('[AiTools] invoke error', err);
+      if (err?.message?.includes('LIMIT_EXCEEDED')) {
         setError('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
       } else {
-        setError(`Erro ao gerar conteúdo: ${err.message}`);
+        setError(`Erro ao gerar conteúdo: ${err.message || 'Falha desconhecida na IA.'}`);
       }
     } finally {
       setIsLoading(false);

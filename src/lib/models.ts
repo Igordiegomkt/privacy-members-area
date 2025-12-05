@@ -37,7 +37,6 @@ export function computeMediaAccessStatus(
     return 'unlocked';
   }
   
-  // Lógica expandida: se qualquer produto da modelo foi comprado, libera o acesso.
   const hasAnyProductFromModel = ctx.productsForModel.some(p => purchasedIds.has(p.id));
   if (hasAnyProductFromModel) return 'unlocked';
 
@@ -92,10 +91,16 @@ export const fetchMediaForModel = async (modelId: string): Promise<MediaItemWith
   const productsForModel = await fetchProductsForModel(modelId);
   const accessContext: AccessContext = { purchases, productsForModel, model };
 
-  return mediaItems.map(media => ({
-    ...media,
-    accessStatus: computeMediaAccessStatus(media, accessContext),
-  }));
+  return mediaItems.map(media => {
+    const rawThumb = media.thumbnail;
+    const isVideoThumb = typeof rawThumb === 'string' && rawThumb.endsWith('.mp4');
+    
+    return {
+      ...media,
+      thumbnail: !isVideoThumb ? rawThumb : null, // Garante que thumbnail de vídeo não seja usada
+      accessStatus: computeMediaAccessStatus(media, accessContext),
+    };
+  });
 };
 
 export const fetchTrendingModels = async (): Promise<ModelWithStats[]> => {

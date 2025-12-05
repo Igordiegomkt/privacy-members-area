@@ -6,6 +6,7 @@ import { fetchUserPurchases } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { Lock } from 'lucide-react';
+import { useCheckout } from '../contexts/CheckoutContext';
 
 interface ModelWithAccess extends Model {
   isUnlocked: boolean;
@@ -14,12 +15,11 @@ interface ModelWithAccess extends Model {
 
 const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
   const navigate = useNavigate();
+  const { openCheckoutModal } = useCheckout();
   
   const handleCardClick = () => {
-    // Se estiver bloqueado, leva direto para a página do produto principal para compra.
-    // Se estiver desbloqueado, leva para o perfil da modelo.
     if (!model.isUnlocked && model.mainProductId) {
-      navigate(`/produto/${model.mainProductId}`);
+      openCheckoutModal(model.mainProductId);
     } else {
       navigate(`/modelo/${model.username}`);
     }

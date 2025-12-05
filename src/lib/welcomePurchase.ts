@@ -6,7 +6,7 @@ import { SupabaseClient } from '@supabase/supabase-js';
  *
  * Regras:
  * - Procura a modelo "carolina-andrade" na tabela models.
- * - Procura um produto dessa modelo na tabela products (creator_id = id da modelo).
+ * - Procura um produto dessa modelo na tabela products (model_id = id da modelo).
  *   Se existir um produto de assinatura base (is_base_membership = true),
  *   prioriza ele. Senão, usa o primeiro produto encontrado.
  * - Cria um registro em user_purchases (user_id, product_id) se ainda não existir.

@@ -15,6 +15,7 @@ export const Login: React.FC = () => {
   useEffect(() => {
     const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
     if (isAuthenticated) {
+      // Mantém o comportamento atual para quem já está autenticado
       navigate('/modelo/carolina-andrade', { replace: true });
       return;
     }
@@ -51,8 +52,15 @@ export const Login: React.FC = () => {
     } catch (err) {
       console.error('Falha ao registrar no Supabase, mas continuando:', err);
     } finally {
+      // Autenticação "light" que você já usava
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userName', name.trim());
+
+      // 🔥 NOVO: marcar que este usuário ganhou o conteúdo da Carolina
+      // Isso será usado em "Minhas Compras" e no perfil dela.
+      localStorage.setItem('welcomePurchaseCarolina', 'true');
+
+      // Mantém o fluxo atual: deixa o RootRedirector decidir o destino
       navigate('/', { replace: true });
     }
   };

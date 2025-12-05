@@ -1,125 +1,207 @@
-import React, { useEffect, useState, useRef } from 'react';
-import { Link, useSearchParams, useNavigate } from 'react-router-dom';
+import React, { useEffect, useState } from 'react';
+import { useLocation, useNavigate } from 'react-router-dom';
+import { supabase } from '../lib/supabase';
+import { fetchUserPurchases } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
-import { useProtection } from '../hooks/useProtection';
-import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
 
-const PurchaseItem: React.FC<{ purchase: UserPurchaseWithProduct; isHighlighted: boolean }> = ({ purchase, isHighlighted }) => {
+type PurchaseItem = any;
+
+export const MyPurchases: React.FC = () => {
+  const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
+  const [isLoading, setIsLoading] = useState(true);
   const navigate = useNavigate();
-  const cardRef = useRef<HTMLDivElement>(null);
-  const product = purchase.product;
+  const location = useLocation();
 
-  useEffect(() => {
-    if (isHighlighted && cardRef.current) {
-      cardRef.current.scrollIntoView({ behavior: 'smooth', block: 'center' });
-    }
-  }, [isHighlighted]);
-
-  if (!product) return null; // Não renderiza nada se o produto não existir mais
-
-  const model = product.model;
-  const handleNavigate = () => {
-    if (model) {
-      navigate(`/modelo/${model.username}`);
-    }
-  };
-
-  return (
-    <div
-      ref={cardRef}
-      className={`bg-privacy-surface p-4 rounded-lg transition-all duration-500 ${isHighlighted ? 'ring-2 ring-primary shadow-lg shadow-primary/20' : ''}`}
-    >
-      <div className="flex items-start gap-4">
-        <img src={product.cover_thumbnail || model?.avatar_url} alt={product.name} className="w-24 h-24 object-cover rounded-md flex-shrink-0" />
-        <div className="flex-1">
-          <h3 className="font-semibold text-privacy-text-primary text-lg">{product.name}</h3>
-          {model && <p className="text-sm text-privacy-text-secondary mt-1">Conteúdo de {model.name}</p>}
-          <div className="mt-2 flex items-center gap-2">
-            <span className="text-xs font-semibold bg-green-500/20 text-green-400 px-2 py-1 rounded-full">
-              ✔ Já é seu
-            </span>
-          </div>
-        </div>
-      </div>
-      <button
-        onClick={handleNavigate}
-        className="w-full mt-4 bg-primary hover:opacity-90 text-privacy-black font-semibold py-2 rounded-lg transition-opacity"
-      >
-        Ver conteúdo
-      </button>
-    </div>
-  );
-};
-
-const MyPurchasesContent: React.FC = () => {
-  const [purchases, setPurchases] = useState<UserPurchaseWithProduct[]>([]);
-  const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
-  const [searchParams] = useSearchParams();
-  const highlightedProductId = searchParams.get('highlight');
+  const highlightId = new URLSearchParams(location.search).get('highlight');
 
   useEffect(() => {
     const loadPurchases = async () => {
+      setIsLoading(true);
+
+      let list: PurchaseItem[] = [];
+
       try {
-        setLoading(true);
-        setError(null);
-        const userPurchases = await fetchUserPurchases();
-        setPurchases(userPurchases);
-      } catch (e) {
-        setError('Não foi possível carregar suas compras.');
-      } finally {
-        setLoading(false);
+        // 1) Tenta pegar o usuário do Supabase (caso seja uma compra via Pix normal)
+        const { data, error } = await supabase.auth.getUser();
+
+        if (!error && data?.user) {
+          const backendPurchases = await fetchUserPurchases();
+          if (backendPurchases) {
+            list = backendPurchases;
+          }
+        }
+      } catch (err) {
+        console.error('[MyPurchases] Erro ao buscar compras no Supabase:', err);
       }
+
+      // 2) Verifica se existe compra de boas-vindas da Carolina via localStorage
+      const hasWelcomeCarolina =
+        typeof window !== 'undefined' &&
+        localStorage.getItem('welcomePurchaseCarolina') === 'true';
+
+      if (hasWelcomeCarolina) {
+        const alreadyHasCarolina = list.some((p) => {
+          const model =
+            (p as any).product?.model ||
+            (p as any).model ||
+            (p as any).models ||
+            (p as any).creator ||
+            null;
+
+          const username =
+            model?.username ||
+            model?.slug ||
+            '';
+
+          return username === 'carolina-andrade';
+        });
+
+        // Se ainda não existir nenhuma compra da Carolina vinda do back-end,
+        // adiciona um card sintético de boas-vindas.
+        if (!alreadyHasCarolina) {
+          const welcomePurchase: PurchaseItem = {
+            id: 'welcome-carolina',
+            created_at: new Date().toISOString(),
+            isSyntheticWelcome: true,
+            product: {
+              id: 'welcome-carolina',
+              name: 'Conteúdo VIP da Carolina Andrade',
+              type: 'welcome',
+              price_cents: 0,
+              model: {
+                id: 'carolina-andrade',
+                name: 'Carolina Andrade',
+                username: 'carolina-andrade',
+                avatar_url: null,
+              }
+            },
+          };
+
+          list = [welcomePurchase, ...list];
+        }
+      }
+
+      setPurchases(list);
+      setIsLoading(false);
     };
+
     loadPurchases();
   }, []);
 
-  if (loading) {
-    return <div className="text-center py-16 text-privacy-text-secondary">Carregando suas compras...</div>;
-  }
+  const handleOpenPurchase = (purchase: PurchaseItem) => {
+    const model =
+      (purchase as any).product?.model ||
+      (purchase as any).model ||
+      (purchase as any).models ||
+      (purchase as any).creator ||
+      {};
 
-  if (error) {
-    return <div className="text-center py-16 text-red-400">{error}</div>;
-  }
+    const modelUsername = model.username || 'carolina-andrade';
 
-  if (purchases.length === 0) {
+    // Por enquanto, levar sempre para o perfil da modelo.
+    navigate(`/modelo/${modelUsername}`);
+  };
+
+  if (isLoading) {
     return (
-      <div className="text-center py-16 bg-privacy-surface rounded-lg">
-        <h2 className="text-lg font-semibold text-privacy-text-primary">Nada por aqui ainda</h2>
-        <p className="text-sm text-privacy-text-secondary mt-2">Você ainda não comprou nenhum conteúdo.</p>
-        <Link to="/loja" className="mt-4 inline-block bg-primary text-privacy-black font-semibold py-2 px-6 rounded-lg">
-          Explorar a Loja
-        </Link>
+      <div className="min-h-screen bg-privacy-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
       </div>
     );
   }
 
-  return (
-    <div className="space-y-4">
-      {purchases.map(purchase => (
-        <PurchaseItem 
-          key={purchase.id} 
-          purchase={purchase} 
-          isHighlighted={purchase.product_id === highlightedProductId} 
-        />
-      ))}
-    </div>
-  );
-};
-
-export const MyPurchases: React.FC = () => {
-  useProtection();
+  const hasPurchases = purchases.length > 0;
 
   return (
-    <div className="min-h-screen bg-privacy-black text-white pb-24">
+    <div className="min-h-screen bg-privacy-black text-privacy-text-primary pb-20">
       <Header />
-      <main className="mx-auto w-full max-w-2xl px-4 py-6">
-        <div className="mb-6">
-          <h1 className="text-2xl font-bold text-white mb-1">Minhas Compras</h1>
-          <p className="text-sm text-privacy-text-secondary">Todo o conteúdo que você já desbloqueou.</p>
-        </div>
-        <MyPurchasesContent />
+      <main className="max-w-5xl mx-auto pt-8 px-4">
+        <h1 className="text-2xl md:text-3xl font-bold mb-2">Minhas Compras</h1>
+        <p className="text-privacy-text-secondary mb-8">
+          Todo o conteúdo que você já desbloqueou.
+        </p>
+
+        {!hasPurchases && (
+          <div className="bg-privacy-surface border border-privacy-border rounded-2xl px-6 py-10 text-center">
+            <p className="text-lg font-semibold mb-2">Nada por aqui ainda</p>
+            <p className="text-privacy-text-secondary mb-6">
+              Você ainda não comprou nenhum conteúdo.
+            </p>
+            <button
+              onClick={() => navigate('/loja')}
+              className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-primary text-privacy-black font-semibold hover:opacity-90 transition-opacity"
+            >
+              Explorar a Loja
+            </button>
+          </div>
+        )}
+
+        {hasPurchases && (
+          <div className="grid gap-4 md:gap-6 md:grid-cols-2">
+            {purchases.map((purchase: PurchaseItem) => {
+              const product =
+                (purchase as any).product ||
+                (purchase as any).products ||
+                purchase;
+
+              const model =
+                (purchase as any).product?.model ||
+                (purchase as any).model ||
+                (purchase as any).models ||
+                (purchase as any).creator ||
+                {};
+
+              const isHighlighted = highlightId && highlightId === String(purchase.id);
+
+              const productName = product?.name || 'Conteúdo adquirido';
+              const modelName = model?.name || 'Criadora';
+              const isWelcome = (purchase as any).isSyntheticWelcome === true;
+
+              return (
+                <button
+                  key={purchase.id}
+                  onClick={() => handleOpenPurchase(purchase)}
+                  className={`flex items-center gap-4 bg-privacy-surface border rounded-2xl w-full text-left px-4 py-4 md:px-5 md:py-5 hover:border-primary/70 transition-colors ${
+                    isHighlighted ? 'border-primary shadow-lg shadow-primary/20' : 'border-privacy-border'
+                  }`}
+                >
+                  <div className="w-16 h-16 rounded-xl bg-privacy-border flex items-center justify-center overflow-hidden flex-shrink-0">
+                    {model?.avatar_url ? (
+                      <img
+                        src={model.avatar_url}
+                        alt={modelName}
+                        className="w-full h-full object-cover"
+                      />
+                    ) : (
+                      <span className="text-xl font-semibold">
+                        {modelName.charAt(0)}
+                      </span>
+                    )}
+                  </div>
+
+                  <div className="flex-1">
+                    <p className="text-xs uppercase text-primary font-semibold mb-1">
+                      {isWelcome ? 'Desbloqueado na entrada' : 'Conteúdo adquirido'}
+                    </p>
+                    <p className="font-semibold text-sm md:text-base">
+                      {productName}
+                    </p>
+                    <p className="text-xs text-privacy-text-secondary mt-1">
+                      por {modelName}
+                    </p>
+                  </div>
+
+                  <div className="text-right">
+                    <span className="text-xs md:text-sm text-primary font-semibold">
+                      Ver conteúdo
+                    </span>
+                  </div>
+                </button>
+              );
+            })}
+          </div>
+        )}
       </main>
       <BottomNavigation />
     </div>

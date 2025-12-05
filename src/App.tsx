@@ -1,4 +1,4 @@
-import React, { useEffect, useRef } from 'react';
+import React, { useEffect } from 'react';
 import { BrowserRouter, Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
@@ -23,8 +23,6 @@ import { ManageContent } from './pages/admin/ManageContent';
 import { PaymentSettings } from './pages/admin/PaymentSettings';
 import PurchaseSuccess from './pages/PurchaseSuccess';
 import PurchaseFailed from './pages/PurchaseFailed';
-import { ensureFirstAccess } from './lib/firstAccess';
-import { ensureWelcomePurchaseForCarolina } from './lib/welcomePurchase';
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -56,76 +54,6 @@ const AuthHandler: React.FC = () => {
   return null;
 };
 
-// Componente para redirecionamento inteligente da raiz
-const RootRedirector: React.FC = () => {
-  const navigate = useNavigate();
-  const hasChecked = useRef(false);
-
-  useEffect(() => {
-    if (hasChecked.current) return;
-    hasChecked.current = true;
-
-    const checkAccessAndRedirect = async () => {
-      try {
-        console.log('[RootRedirector] Iniciando verificação de primeiro acesso...');
-
-        const { data, error } = await supabase.auth.getUser();
-        console.log('[RootRedirector] getUser result:', { data, error });
-
-        // 1) Se NÃO houver usuário do Supabase, usa fallback em localStorage
-        if (error || !data?.user) {
-          console.log('[RootRedirector] Nenhum usuário do Supabase encontrado. Usando fallback com localStorage.');
-
-          const hasVisitedOnce = localStorage.getItem('hasVisitedOnce') === 'true';
-          console.log('[RootRedirector] hasVisitedOnce (localStorage) =', hasVisitedOnce);
-
-          if (!hasVisitedOnce) {
-            localStorage.setItem('hasVisitedOnce', 'true');
-            console.log('[RootRedirector] Primeiro acesso (fallback) → /minhas-compras');
-            navigate('/minhas-compras', { replace: true });
-          } else {
-            console.log('[RootRedirector] Acesso recorrente (fallback) → /feed');
-            navigate('/feed', { replace: true });
-          }
-
-          return;
-        }
-
-        // 2) Se houver usuário do Supabase, usa a lógica da tabela user_first_access
-        const user = data.user;
-        console.log('[RootRedirector] Usuário autenticado (Supabase):', user.id);
-
-        const { isFirstAccess } = await ensureFirstAccess(supabase, user.id);
-        console.log('[RootRedirector] isFirstAccess (Supabase) =', isFirstAccess);
-
-        if (isFirstAccess) {
-          console.log('[RootRedirector] Primeiro acesso (Supabase) → concedendo compra da Carolina + /minhas-compras');
-
-          // >>> NOVO: garante compra de boas-vindas da Carolina <<<
-          await ensureWelcomePurchaseForCarolina(supabase, user.id);
-
-          navigate('/minhas-compras', { replace: true });
-        } else {
-          console.log('[RootRedirector] Acesso recorrente (Supabase) → /feed');
-          navigate('/feed', { replace: true });
-        }
-      } catch (err) {
-        console.error('[RootRedirector] Erro ao verificar primeiro acesso:', err);
-        // fallback seguro
-        navigate('/feed', { replace: true });
-      }
-    };
-
-    checkAccessAndRedirect();
-  }, [navigate]);
-
-  return (
-    <div className="min-h-screen bg-privacy-black flex items-center justify-center">
-      <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
-    </div>
-  );
-};
-
 function App() {
   return (
     <BrowserRouter>
@@ -133,7 +61,9 @@ function App() {
       <Routes>
         {/* User Routes */}
         <Route path="/login" element={<Login />} />
+        
         <Route element={<ProtectedRouteUser><UserLayout /></ProtectedRouteUser>}>
+          <Route path="/" element={<Home />} /> {/* Nova Home de Modelos */}
           <Route path="/modelo/:username" element={<ModelProfile />} />
           <Route path="/feed" element={<GlobalFeed />} />
           <Route path="/em-alta" element={<TrendingModels />} />
@@ -142,7 +72,6 @@ function App() {
           <Route path="/minhas-compras" element={<MyPurchases />} />
           <Route path="/compra-sucesso" element={<PurchaseSuccess />} />
           <Route path="/compra-falhou" element={<PurchaseFailed />} />
-          <Route path="/mural" element={<Home />} />
         </Route>
         
         {/* Admin Routes */}
@@ -161,8 +90,8 @@ function App() {
           </Route>
         </Route>
 
-        {/* Redirects & Root */}
-        <Route path="/" element={<RootRedirector />} />
+        {/* Redirects & Root - O RootRedirector agora lida com a rota "/" */}
+        <Route path="/home" element={<Navigate to="/" replace />} />
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>
     </BrowserRouter>

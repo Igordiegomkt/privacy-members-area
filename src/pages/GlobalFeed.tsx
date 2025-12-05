@@ -4,14 +4,13 @@ import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { MediaModal } from '../components/MediaModal';
 import { useProtection } from '../hooks/useProtection';
-import { fetchGlobalFeedItems, GlobalFeedItem } from '../lib/feedGlobal';
+import { GlobalFeedItem, fetchGlobalFeedItems } from '../lib/feedGlobal';
 import { MediaItemWithAccess } from '../lib/models';
 
 const GlobalFeedCard: React.FC<{ item: GlobalFeedItem; onMediaClick: (media: MediaItemWithAccess) => void }> = ({ item, onMediaClick }) => {
   const navigate = useNavigate();
   const { media, model } = item;
   const isLocked = media.accessStatus === 'locked';
-  const isUnlockedModel = media.accessStatus === 'unlocked';
 
   const handleCardClick = () => {
     if (isLocked) {
@@ -32,7 +31,7 @@ const GlobalFeedCard: React.FC<{ item: GlobalFeedItem; onMediaClick: (media: Med
             <p className="text-xs text-privacy-text-secondary">@{model.username}</p>
           </div>
         </div>
-        {isUnlockedModel ? (
+        {media.accessStatus === 'unlocked' ? (
             <span className="text-xs font-semibold bg-green-500/20 text-green-400 px-2 py-1 rounded-full">✔ Você já tem acesso</span>
         ) : (
             <span className="text-xs font-semibold bg-purple-500/20 text-purple-400 px-2 py-1 rounded-full">💘 Sugestão pra você</span>

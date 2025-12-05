@@ -43,14 +43,9 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // ANÁLISE: O fluxo antigo criava um registro no banco a cada login.
-      // O fluxo restaurado agora verifica se já existe um ID de usuário da plataforma.
-      // Se não existir, ele cria o registro e salva o ID. Se já existir, ele o reutiliza.
-      // Isso garante um identificador estável para todo o tracking.
       let appUserId = localStorage.getItem('appUserId');
 
       if (!appUserId) {
-        console.log('[Login.handleSubmit] Nenhum appUserId encontrado. Registrando novo acesso...');
         const newAccessId = await registerFirstAccess({
           name: name.trim(),
           isAdult,
@@ -60,26 +55,14 @@ export const Login: React.FC = () => {
         if (newAccessId) {
           appUserId = newAccessId;
           localStorage.setItem('appUserId', appUserId);
-          console.log('[Login.handleSubmit] Novo acesso registrado. appUserId salvo:', appUserId);
-        } else {
-          // Fallback: se o registro falhar, não bloqueamos o usuário, mas o tracking fica limitado.
-          console.warn('[Login.handleSubmit] Falha ao obter newAccessId do Supabase.');
         }
-      } else {
-        console.log('[Login.handleSubmit] appUserId reutilizado do localStorage:', appUserId);
       }
 
-      // LÓGICA DE COMPATIBILIDADE: Mantém os flags antigos para garantir
-      // que rotas protegidas e outros componentes não quebrem.
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userName', name.trim());
-
-      // LÓGICA DE BOAS-VINDAS (SINTÉTICA): Conforme o plano, mantemos a flag
-      // da Carolina no localStorage, pois o appUserId não é compatível com a
-      // tabela de compras reais (user_purchases).
       localStorage.setItem('welcomePurchaseCarolina', 'true');
 
-      // Redireciona para a raiz, onde o RootRedirector cuidará do destino final.
+      // Redireciona para a raiz, que agora é a Home de Modelos.
       navigate('/', { replace: true });
 
     } catch (err) {

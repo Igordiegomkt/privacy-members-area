@@ -12,17 +12,8 @@ export interface GlobalFeedItem {
 export const fetchGlobalFeedItems = async (): Promise<GlobalFeedItem[]> => {
   // 1. Identificar modelos que o usuário já tem acesso
   const userPurchases = await fetchUserPurchases();
-  const baseProduct = (await supabase.from('products').select('id, model_id').eq('is_base_membership', true).single()).data;
-  
-  const unlockedModelIds = new Set<string>();
-  if (baseProduct?.model_id) {
-    unlockedModelIds.add(baseProduct.model_id);
-  }
-  userPurchases.forEach(p => {
-    if (p.product?.model_id) {
-      unlockedModelIds.add(p.product.model_id);
-    }
-  });
+  const purchasedModelIds = new Set(userPurchases.map(p => p.product?.model_id).filter(Boolean));
+  const hasWelcomeCarolina = localStorage.getItem('welcomePurchaseCarolina') === 'true';
 
   // 2. Buscar todas as mídias com os dados de suas modelos
   const { data: mediaWithModels, error } = await supabase
@@ -44,11 +35,12 @@ export const fetchGlobalFeedItems = async (): Promise<GlobalFeedItem[]> => {
       const model = media.model as Model;
       
       let accessStatus: 'unlocked' | 'free' | 'locked' = 'locked';
+      const isCarolina = model.username === 'carolina-andrade';
 
-      if (unlockedModelIds.has(model.id)) {
-        accessStatus = 'unlocked';
-      } else if (media.is_free) {
+      if (media.is_free) {
         accessStatus = 'free';
+      } else if ((isCarolina && hasWelcomeCarolina) || purchasedModelIds.has(model.id)) {
+        accessStatus = 'unlocked';
       }
 
       return {
@@ -57,11 +49,10 @@ export const fetchGlobalFeedItems = async (): Promise<GlobalFeedItem[]> => {
           accessStatus,
         },
         model: model,
-        // Futuramente, podemos associar um produto principal aqui para o CTA de compra
         mainProductId: null, 
       };
     });
 
-  // Embaralhar para uma experiência mais dinâmica (opcional)
+  // Embaralhar para uma experiência mais dinâmica
   return feedItems.sort(() => Math.random() - 0.5);
 };

@@ -11,7 +11,7 @@ export const BottomNavigation: React.FC = () => {
       id: 'mural',
       label: 'Início',
       icon: <Home size={28} />,
-      path: '/modelo/carolina-andrade',
+      path: '/', // ✅ Rota corrigida para a Home de Modelos
     },
     {
       id: 'feed',
@@ -34,9 +34,10 @@ export const BottomNavigation: React.FC = () => {
   ];
 
   const isActive = (path: string) => {
-    // A rota de início é especial, pois é a raiz do perfil da modelo principal
-    if (path === '/modelo/carolina-andrade') {
-      return location.pathname.startsWith('/modelo/') || location.pathname === '/';
+    // ✅ Lógica de estado ativo corrigida
+    // Mantém "Início" ativo na Home de Modelos (/) e em qualquer perfil de modelo (/modelo/*)
+    if (path === '/') {
+      return location.pathname === '/' || location.pathname.startsWith('/modelo/');
     }
     return location.pathname === path;
   };

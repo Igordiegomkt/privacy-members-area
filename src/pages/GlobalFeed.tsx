@@ -60,7 +60,7 @@ export const GlobalFeed: React.FC = () => {
           {feedItems.map(item => (
             <PostCard
               key={item.media.id}
-              media={item.media}
+              media={{ ...item.media, model: item.model }}
               onLockedClick={() => handleLockedClick(item.media)}
               onOpenVideo={() => setOpenVideo(item.media)}
               onOpenImage={() => setOpenImage(item.media)}

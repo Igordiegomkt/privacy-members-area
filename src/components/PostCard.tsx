@@ -40,11 +40,9 @@ export const PostCard: React.FC<PostCardProps> = ({
       <div className="px-2 pb-2">
         <MediaCard
           media={media}
-          onClick={() => {
-            if (media.accessStatus === 'locked') onLockedClick();
-            else if (media.type === 'image') onOpenImage();
-          }}
+          onLockedClick={onLockedClick}
           onOpenVideo={onOpenVideo}
+          onOpenImage={onOpenImage}
         />
       </div>
 

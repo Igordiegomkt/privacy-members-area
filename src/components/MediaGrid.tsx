@@ -29,14 +29,9 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ media, onLockedClick }) =>
             <MediaCard
               key={item.id}
               media={item}
-              onClick={() => {
-                if (item.accessStatus === 'locked') {
-                  onLockedClick(item);
-                } else if (item.type === 'image') {
-                  setOpenImage(item);
-                }
-              }}
+              onLockedClick={() => onLockedClick(item)}
               onOpenVideo={() => setOpenVideo(item)}
+              onOpenImage={() => setOpenImage(item)}
             />
           ))}
         </div>

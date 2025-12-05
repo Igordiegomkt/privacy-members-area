@@ -1,101 +1,104 @@
-import React, { useState, useRef } from 'react';
+import React, { useRef } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
-import { Lock, Camera, Video as VideoIcon } from 'lucide-react';
+import { Lock, Video, Camera } from 'lucide-react';
 
 interface MediaCardProps {
   media: MediaItemWithAccess;
-  onClick?: () => void;
+  onLockedClick?: () => void;
   onOpenVideo?: () => void;
+  onOpenImage?: () => void;
 }
 
-export const MediaCard: React.FC<MediaCardProps> = ({ media, onClick, onOpenVideo }) => {
+export const MediaCard: React.FC<MediaCardProps> = ({
+  media,
+  onLockedClick,
+  onOpenVideo,
+  onOpenImage,
+}) => {
   const isVideo = media.type === 'video';
   const isLocked = media.accessStatus === 'locked';
-  
-  const [thumbError, setThumbError] = useState(false);
-  const [isHovering, setIsHovering] = useState(false);
-  const videoRef = useRef<HTMLVideoElement>(null);
-  const hoverTimeout = useRef<number | null>(null);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  const posterUrl = !thumbError && media.thumbnail ? media.thumbnail : '/video-fallback.svg';
+  const posterSrc = media.thumbnail || '/video-fallback.svg';
 
-  const handleMouseEnter = () => {
+  const startPreview = () => {
     if (!isVideo || isLocked) return;
-    hoverTimeout.current = setTimeout(() => {
-      setIsHovering(true);
-      videoRef.current?.play().catch(() => {});
-    }, 300); // Delay to avoid accidental plays
+    const v = videoRef.current;
+    if (!v) return;
+    v.muted = true;
+    v.playsInline = true;
+    v.play().catch(() => {});
   };
 
-  const handleMouseLeave = () => {
-    if (hoverTimeout.current) clearTimeout(hoverTimeout.current);
+  const stopPreview = () => {
     if (!isVideo || isLocked) return;
-    setIsHovering(false);
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-    }
+    const v = videoRef.current;
+    if (!v) return;
+    v.pause();
+    v.currentTime = 0;
   };
 
   const handleClick = () => {
-    if (isLocked) {
-      onClick?.();
-      return;
-    }
-    if (isVideo) {
-      onOpenVideo?.();
-      return;
-    }
-    onClick?.();
+    if (isLocked) return onLockedClick?.();
+    if (isVideo) return onOpenVideo?.();
+    return onOpenImage?.();
   };
 
   return (
     <div
       className="relative w-full overflow-hidden rounded-xl bg-privacy-surface cursor-pointer group aspect-[3/4]"
-      onMouseEnter={handleMouseEnter}
-      onMouseLeave={handleMouseLeave}
-      onTouchStart={handleMouseEnter}
-      onTouchEnd={handleMouseLeave}
       onClick={handleClick}
+      onMouseEnter={startPreview}
+      onMouseLeave={stopPreview}
+      onTouchStart={startPreview}
+      onTouchEnd={stopPreview}
     >
-      {/* Thumbnail Image - always present */}
-      <img
-        src={isVideo ? posterUrl : media.thumbnail || media.url}
-        alt={media.title || 'Conteúdo'}
-        className={`w-full h-full object-cover transition-opacity duration-300 ${
-          isLocked ? 'blur-md grayscale' : ''
-        } ${isHovering ? 'opacity-0' : 'opacity-100'}`}
-        loading="lazy"
-        draggable={false}
-        onError={() => setThumbError(true)}
-      />
-
-      {/* Video for Preview - positioned behind the thumbnail */}
-      {isVideo && !isLocked && (
+      {isVideo ? (
         <video
           ref={videoRef}
           src={media.url}
-          className="absolute top-0 left-0 w-full h-full object-cover transition-opacity duration-300"
-          style={{ opacity: isHovering ? 1 : 0 }}
+          poster={posterSrc}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          preload="metadata"
           playsInline
-          muted
           loop
+        />
+      ) : (
+        <img
+          src={posterSrc}
+          alt={media.title || 'Conteúdo'}
+          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          loading="lazy"
+          draggable={false}
         />
       )}
 
-      {/* Badge tipo de mídia */}
-      <div className="absolute bottom-2 left-2 flex items-center gap-2 text-xs text-white/90 z-10">
+      {/* badge foto/vídeo */}
+      <div className="absolute bottom-2 left-2 flex items-center gap-2 text-xs text-white/90">
         <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5">
-          {isVideo ? <VideoIcon size={12} /> : <Camera size={12} />}
+          {isVideo ? <Video size={12} /> : <Camera size={12} />}
           {isVideo ? 'Vídeo' : 'Foto'}
         </span>
       </div>
 
-      {/* Lock overlay */}
+      {/* overlay de bloqueado */}
       {isLocked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-center px-3 z-10">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-center px-3 z-10">
           <Lock className="w-8 h-8 text-white/80 mb-2" />
-          <p className="text-sm text-white font-semibold">Conteúdo bloqueado</p>
+          <p className="text-sm text-white font-semibold mb-3">
+            Conteúdo bloqueado
+          </p>
+          {onLockedClick && (
+            <button
+              onClick={(e) => {
+                e.stopPropagation();
+                onLockedClick();
+              }}
+              className="bg-primary text-privacy-black font-semibold text-sm px-4 py-2 rounded-full hover:opacity-90 transition-opacity"
+            >
+              🔓 Desbloquear conteúdo VIP
+            </button>
+          )}
         </div>
       )}
     </div>

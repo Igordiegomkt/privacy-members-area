@@ -2,7 +2,7 @@ import React from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Logo } from '../Logo';
-import { LayoutDashboard, Users, Settings, LogOut, Image as ImageIcon } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, LogOut, Image as ImageIcon, Sparkles } from 'lucide-react';
 
 export function Sidebar(): React.ReactElement {
   const navigate = useNavigate();
@@ -23,6 +23,11 @@ export function Sidebar(): React.ReactElement {
       path: '/admin/modelos',
       label: 'Modelos',
       icon: <ImageIcon className="w-5 h-5" />
+    },
+    {
+      path: '/admin/ia',
+      label: 'IA Tools',
+      icon: <Sparkles className="w-5 h-5" />
     },
     {
       path: '/admin/users',

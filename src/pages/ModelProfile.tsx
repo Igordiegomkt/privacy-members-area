@@ -61,6 +61,7 @@ export const ModelProfile: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [openVideo, setOpenVideo] = useState<MediaItemWithAccess | null>(null);
     const [openImage, setOpenImage] = useState<MediaItemWithAccess | null>(null);
+    const [hasAccess, setHasAccess] = useState(false);
 
     useEffect(() => {
         if (!username) { setLoading(false); return; }
@@ -77,6 +78,11 @@ export const ModelProfile: React.FC = () => {
                 setUserPurchases(purchases);
                 setMedia(fetchedMedia);
                 setProducts(fetchedProducts);
+
+                const modelProductIds = new Set(fetchedProducts.map(p => p.id));
+                const userHasAnyProduct = purchases.some(p => modelProductIds.has(p.product_id));
+                const isCarolinaWelcome = fetchedModel.username === 'carolina-andrade' && localStorage.getItem('welcomePurchaseCarolina') === 'true';
+                setHasAccess(userHasAnyProduct || isCarolinaWelcome);
             }
             setLoading(false);
         };
@@ -128,6 +134,34 @@ export const ModelProfile: React.FC = () => {
                         </div>
                     </div>
                 </div>
+
+                {!hasAccess && (
+                  <div className="px-4 sm:px-6 my-6">
+                    <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+                      <div className="text-center sm:text-left">
+                        <p className="font-semibold text-primary">
+                          Você ainda não tem acesso ao conteúdo exclusivo de {model.name}.
+                        </p>
+                        <p className="text-privacy-text-secondary mt-1">
+                          Desbloqueie vídeos privados, mural VIP e conteúdos completos.
+                        </p>
+                      </div>
+
+                      {products.length > 0 && (
+                        <button
+                          onClick={() => {
+                            const mainProduct =
+                              products.find(p => p.is_base_membership) || products[0];
+                            if (mainProduct) navigate(`/produto/${mainProduct.id}`);
+                          }}
+                          className="w-full sm:w-auto bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg hover:opacity-90"
+                        >
+                          🔓 Desbloquear conteúdo VIP
+                        </button>
+                      )}
+                    </div>
+                  </div>
+                )}
 
                 <Tabs defaultValue="mural" className="w-full mt-6">
                     <TabsList className="grid w-full grid-cols-3">

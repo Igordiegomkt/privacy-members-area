@@ -23,6 +23,7 @@ import { ManageContent } from './pages/admin/ManageContent';
 import { PaymentSettings } from './pages/admin/PaymentSettings';
 import PurchaseSuccess from './pages/PurchaseSuccess';
 import PurchaseFailed from './pages/PurchaseFailed';
+import { AiTools } from './pages/admin/AiTools';
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -87,6 +88,7 @@ function App() {
             <Route path="/admin/modelos/:id/produtos" element={<ManageProducts />} />
             <Route path="/admin/modelos/:id/conteudos" element={<ManageContent />} />
             <Route path="/admin/configuracoes" element={<PaymentSettings />} />
+            <Route path="/admin/ia" element={<AiTools />} />
           </Route>
         </Route>
 

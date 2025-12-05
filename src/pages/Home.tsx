@@ -1,11 +1,11 @@
 import React, { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Model, Product } from '../types';
+import { Model } from '../types';
 import { fetchUserPurchases } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
-import { Lock, CheckCircle } from 'lucide-react';
+import { Lock } from 'lucide-react';
 
 interface ModelWithAccess extends Model {
   isUnlocked: boolean;

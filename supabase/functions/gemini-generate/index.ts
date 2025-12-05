@@ -13,9 +13,11 @@ const corsHeaders = {
 };
 
 async function getApiKey() {
+  // 1. Prioritize the environment variable (secret)
   let apiKey = Deno.env.get("GEMINI_API_KEY");
   if (apiKey) return apiKey;
 
+  // 2. Fallback to database settings if secret is not found
   console.log("GEMINI_API_KEY secret not found, trying database fallback...");
   const supabaseAdmin = createClient(
     Deno.env.get('SUPABASE_URL')!,

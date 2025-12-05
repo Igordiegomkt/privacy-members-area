@@ -53,25 +53,27 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       onTouchStart={startPreview}
       onTouchEnd={stopPreview}
     >
-      {isVideo ? (
-        <video
-          ref={videoRef}
-          src={media.url}
-          poster={posterSrc}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          preload="metadata"
-          playsInline
-          loop
-        />
-      ) : (
-        <img
-          src={posterSrc}
-          alt={media.title || 'Conteúdo'}
-          className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
-          loading="lazy"
-          draggable={false}
-        />
-      )}
+      <div className={`w-full h-full transition-transform duration-300 ${isLocked ? 'blur-md brightness-50 scale-105' : 'group-hover:scale-105'}`}>
+        {isVideo ? (
+          <video
+            ref={videoRef}
+            src={media.url}
+            poster={posterSrc}
+            className="w-full h-full object-cover"
+            preload="metadata"
+            playsInline
+            loop
+          />
+        ) : (
+          <img
+            src={posterSrc}
+            alt={media.title || 'Conteúdo'}
+            className="w-full h-full object-cover"
+            loading="lazy"
+            draggable={false}
+          />
+        )}
+      </div>
 
       {/* badge foto/vídeo */}
       <div className="absolute bottom-2 left-2 flex items-center gap-2 text-xs text-white/90">
@@ -83,7 +85,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
 
       {/* overlay de bloqueado */}
       {isLocked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-center px-3 z-10">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-center px-3 z-10">
           <Lock className="w-8 h-8 text-white/80 mb-2" />
           <p className="text-sm text-white font-semibold mb-3">
             Conteúdo bloqueado

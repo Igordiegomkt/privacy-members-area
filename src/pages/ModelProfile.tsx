@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Model, Product } from '../types';
 import { fetchModelByUsername, fetchMediaForModel, fetchProductsForModel, MediaItemWithAccess } from '../lib/models';
-import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
+import { UserPurchaseWithProduct } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { MediaGrid } from '../components/MediaGrid';
@@ -11,7 +11,8 @@ import { VideoPlayerModal } from '../components/VideoPlayerModal';
 import { MediaModal } from '../components/MediaModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useProtection } from '../hooks/useProtection';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Gift } from 'lucide-react';
+import { usePurchases } from '../contexts/PurchaseContext';
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -57,11 +58,11 @@ export const ModelProfile: React.FC = () => {
     const [model, setModel] = useState<Model | null>(null);
     const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
-    const [userPurchases, setUserPurchases] = useState<UserPurchaseWithProduct[]>([]);
     const [loading, setLoading] = useState(true);
     const [openVideo, setOpenVideo] = useState<MediaItemWithAccess | null>(null);
     const [openImage, setOpenImage] = useState<MediaItemWithAccess | null>(null);
     const [hasAccess, setHasAccess] = useState(false);
+    const { purchases } = usePurchases();
 
     useEffect(() => {
         if (!username) { setLoading(false); return; }
@@ -70,24 +71,23 @@ export const ModelProfile: React.FC = () => {
             const fetchedModel = await fetchModelByUsername(username);
             if (fetchedModel) {
                 setModel(fetchedModel);
-                const [purchases, fetchedMedia, fetchedProducts] = await Promise.all([
-                    fetchUserPurchases(),
+                const [fetchedMedia, fetchedProducts] = await Promise.all([
                     fetchMediaForModel(fetchedModel.id),
                     fetchProductsForModel(fetchedModel.id)
                 ]);
-                setUserPurchases(purchases);
+                
                 setMedia(fetchedMedia);
                 setProducts(fetchedProducts);
 
                 const modelProductIds = new Set(fetchedProducts.map(p => p.id));
-                const userHasAnyProduct = purchases.some(p => modelProductIds.has(p.product_id));
+                const userHasAnyProduct = purchases.some((p: UserPurchaseWithProduct) => modelProductIds.has(p.product_id));
                 const isCarolinaWelcome = fetchedModel.username === 'carolina-andrade' && localStorage.getItem('welcomePurchaseCarolina') === 'true';
                 setHasAccess(userHasAnyProduct || isCarolinaWelcome);
             }
             setLoading(false);
         };
         loadProfileData();
-    }, [username]);
+    }, [username, purchases]);
 
     const handleLockedClick = () => {
         const mainProduct = products.find(p => p.is_base_membership) || products[0];
@@ -103,7 +103,7 @@ export const ModelProfile: React.FC = () => {
         videos: media.filter(m => m.type === 'video').length,
     };
     const feedMedia = media.filter(m => m.accessStatus === 'free' || m.accessStatus === 'unlocked');
-    const purchasedProductIds = new Set(userPurchases.map(p => p.product_id));
+    const purchasedProductIds = new Set(purchases.map((p: UserPurchaseWithProduct) => p.product_id));
 
     return (
         <div className="min-h-screen bg-privacy-black text-white pb-24">
@@ -117,16 +117,22 @@ export const ModelProfile: React.FC = () => {
                     <div className="h-40 sm:h-56 w-full overflow-hidden bg-privacy-surface">
                         {model.cover_url && <img src={model.cover_url} alt={`${model.name} cover`} className="w-full h-full object-cover" />}
                     </div>
-                    <div className="flex flex-col items-center -mt-12">
-                        <div className="w-24 h-24 rounded-full border-4 border-privacy-black overflow-hidden bg-privacy-surface">
+                    <div className="flex flex-col items-center -mt-12 sm:-mt-16">
+                        <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-privacy-black overflow-hidden bg-privacy-surface">
                             {model.avatar_url && <img src={model.avatar_url} alt={model.name} className="w-full h-full object-cover" />}
                         </div>
                         <div className="flex items-center gap-1.5 mt-2">
-                            <h1 className="text-xl font-bold text-white">{model.name}</h1>
+                            <h1 className="text-xl sm:text-2xl font-bold text-white">{model.name}</h1>
                             {model.is_verified && <span className="inline-flex items-center justify-center rounded-full bg-blue-500 w-4 h-4 text-[10px] text-white">✓</span>}
                         </div>
                         <p className="text-sm text-privacy-text-secondary">@{model.username}</p>
                         {model.bio && <p className="mt-3 px-6 text-center text-sm text-privacy-text-secondary max-w-lg">{model.bio}</p>}
+                        
+                        <div className="mt-4 flex items-center justify-center gap-4">
+                            <button className="bg-privacy-surface border border-privacy-border rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2"><MessageCircle size={16}/> Chat</button>
+                            <button className="bg-privacy-surface border border-privacy-border rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2"><Gift size={16}/> Mimo</button>
+                        </div>
+
                         <div className="mt-4 flex items-center justify-center gap-6 text-sm text-privacy-text-secondary">
                             <span><strong className="text-white">{stats.posts}</strong> posts</span>
                             <span><strong className="text-white">{stats.photos}</strong> fotos</span>
@@ -149,11 +155,7 @@ export const ModelProfile: React.FC = () => {
 
                       {products.length > 0 && (
                         <button
-                          onClick={() => {
-                            const mainProduct =
-                              products.find(p => p.is_base_membership) || products[0];
-                            if (mainProduct) navigate(`/produto/${mainProduct.id}`);
-                          }}
+                          onClick={handleLockedClick}
                           className="w-full sm:w-auto bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg hover:opacity-90"
                         >
                           🔓 Desbloquear conteúdo VIP

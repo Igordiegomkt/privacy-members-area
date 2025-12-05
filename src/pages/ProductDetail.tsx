@@ -1,12 +1,13 @@
-import React, { useEffect, useState, useRef } from 'react';
+import React, { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
-import { fetchProductById, hasUserPurchased, createCheckoutSession, PixCheckoutData } from '../lib/marketplace';
+import { fetchProductById, createCheckoutSession, PixCheckoutData } from '../lib/marketplace';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft } from 'lucide-react';
+import { usePurchases } from '../contexts/PurchaseContext';
 
 const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -71,42 +72,21 @@ export const ProductDetail: React.FC = () => {
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPurchased, setIsPurchased] = useState(false);
+  
+  const { hasPurchase } = usePurchases();
+  const isPurchased = id ? hasPurchase(id) : false;
   
   const [pixData, setPixData] = useState<PixCheckoutData | null>(null);
   const [isPixModalOpen, setIsPixModalOpen] = useState(false);
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
-  const [isAwaitingPurchase, setIsAwaitingPurchase] = useState(false);
-  const pollingRef = useRef<number | null>(null);
-
-  const checkPurchaseStatus = async () => {
-    if (!id) return;
-    const purchased = await hasUserPurchased(id);
-    if (purchased) {
-      setIsPurchased(true);
-    }
-  };
 
   useEffect(() => {
-    if (isAwaitingPurchase && !isPurchased) {
-      pollingRef.current = setInterval(checkPurchaseStatus, 5000); // Poll every 5 seconds
-    }
-    return () => {
-      if (pollingRef.current) {
-        clearInterval(pollingRef.current);
-      }
-    };
-  }, [isAwaitingPurchase, isPurchased, id]);
-
-  useEffect(() => {
-    if (isPurchased && isAwaitingPurchase) {
-      if (pollingRef.current) clearInterval(pollingRef.current);
-      setIsAwaitingPurchase(false);
+    if (isPurchased && isPixModalOpen) {
       setIsPixModalOpen(false);
       navigate(`/minhas-compras?highlight=${id}`);
     }
-  }, [isPurchased, isAwaitingPurchase, id, navigate]);
+  }, [isPurchased, isPixModalOpen, id, navigate]);
 
   useEffect(() => {
     if (!id) {
@@ -121,10 +101,6 @@ export const ProductDetail: React.FC = () => {
         setError(null);
         const fetchedProduct = await fetchProductById(id);
         setProduct(fetchedProduct);
-
-        if (fetchedProduct) {
-          await checkPurchaseStatus();
-        }
       } catch (e) {
         setError('Não foi possível carregar o produto.');
       } finally {
@@ -146,7 +122,6 @@ export const ProductDetail: React.FC = () => {
       const pixCheckoutData = await createCheckoutSession(id);
       setPixData(pixCheckoutData);
       setIsPixModalOpen(true);
-      setIsAwaitingPurchase(true);
     } catch (err: any) {
       setPurchaseError(err.message ?? 'Não foi possível iniciar a compra. Tente novamente.');
     } finally {

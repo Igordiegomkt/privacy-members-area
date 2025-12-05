@@ -57,6 +57,7 @@ export const ModelProfile: React.FC = () => {
     const [model, setModel] = useState<Model | null>(null);
     const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
+    const [userPurchases, setUserPurchases] = useState<UserPurchaseWithProduct[]>([]);
     const [loading, setLoading] = useState(true);
     const [openVideo, setOpenVideo] = useState<MediaItemWithAccess | null>(null);
     const [openImage, setOpenImage] = useState<MediaItemWithAccess | null>(null);
@@ -68,10 +69,12 @@ export const ModelProfile: React.FC = () => {
             const fetchedModel = await fetchModelByUsername(username);
             if (fetchedModel) {
                 setModel(fetchedModel);
-                const [fetchedMedia, fetchedProducts] = await Promise.all([
+                const [purchases, fetchedMedia, fetchedProducts] = await Promise.all([
+                    fetchUserPurchases(),
                     fetchMediaForModel(fetchedModel.id),
                     fetchProductsForModel(fetchedModel.id)
                 ]);
+                setUserPurchases(purchases);
                 setMedia(fetchedMedia);
                 setProducts(fetchedProducts);
             }
@@ -94,6 +97,7 @@ export const ModelProfile: React.FC = () => {
         videos: media.filter(m => m.type === 'video').length,
     };
     const feedMedia = media.filter(m => m.accessStatus === 'free' || m.accessStatus === 'unlocked');
+    const purchasedProductIds = new Set(userPurchases.map(p => p.product_id));
 
     return (
         <div className="min-h-screen bg-privacy-black text-white pb-24">
@@ -152,7 +156,21 @@ export const ModelProfile: React.FC = () => {
                         )}
                     </TabsContent>
                     <TabsContent value="loja" className="mt-6 px-4">
-                        {/* Lógica da loja permanece a mesma */}
+                        {products.length > 0 ? (
+                            <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                                {products.map((p, index) => (
+                                    <ProductCard 
+                                        key={p.id} 
+                                        product={p} 
+                                        isPurchased={purchasedProductIds.has(p.id) || !!p.is_base_membership}
+                                        modelName={model.name}
+                                        isFirst={index === 0}
+                                    />
+                                ))}
+                            </div>
+                        ) : (
+                            <p className="text-center text-privacy-text-secondary py-10">Nenhum produto na loja desta modelo.</p>
+                        )}
                     </TabsContent>
                 </Tabs>
             </main>

@@ -25,7 +25,7 @@ const TrendingModelCard: React.FC<{ model: ModelWithStats; rank: number; isVip: 
         <div className="bg-privacy-surface p-4 rounded-lg flex flex-col sm:flex-row items-start sm:items-center gap-4">
             <div className="flex items-center gap-4 flex-1 w-full">
                 <div className="text-xl font-bold text-privacy-text-secondary w-8 text-center">{rank}</div>
-                <img src={model.avatar_url} alt={model.name} className="w-14 h-14 rounded-full object-cover" />
+                <img src={model.avatar_url ?? ''} alt={model.name} className="w-14 h-14 rounded-full object-cover" />
                 <div className="flex-1">
                     <div className="flex items-center gap-2 mb-1 flex-wrap">
                         <h3 className="font-semibold text-privacy-text-primary">{model.name}</h3>

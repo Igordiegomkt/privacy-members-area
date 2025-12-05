@@ -6,10 +6,10 @@ import { PostCard } from '../components/PostCard';
 import { VideoPlayerModal } from '../components/VideoPlayerModal';
 import { MediaModal } from '../components/MediaModal';
 import { MediaItemWithAccess } from '../lib/models';
-import { fetchGlobalFeedItems } from '../lib/feedGlobal';
+import { fetchGlobalFeedItems, GlobalFeedItem } from '../lib/feedGlobal';
 
 export const GlobalFeed: React.FC = () => {
-  const [feedItems, setFeedItems] = useState<MediaItemWithAccess[]>([]);
+  const [feedItems, setFeedItems] = useState<GlobalFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   const [openVideo, setOpenVideo] = useState<MediaItemWithAccess | null>(null);
@@ -59,11 +59,11 @@ export const GlobalFeed: React.FC = () => {
         <div className="flex flex-col items-center">
           {feedItems.map(item => (
             <PostCard
-              key={item.id}
-              media={item}
-              onLockedClick={() => handleLockedClick(item)}
-              onOpenVideo={() => setOpenVideo(item)}
-              onOpenImage={() => setOpenImage(item)}
+              key={item.media.id}
+              media={item.media}
+              onLockedClick={() => handleLockedClick(item.media)}
+              onOpenVideo={() => setOpenVideo(item.media)}
+              onOpenImage={() => setOpenImage(item.media)}
             />
           ))}
         </div>

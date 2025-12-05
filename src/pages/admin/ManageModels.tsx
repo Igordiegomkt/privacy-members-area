@@ -49,7 +49,7 @@ export const ManageModels: React.FC = () => {
               {models.map(model => (
                 <tr key={model.id} className="border-b border-privacy-border hover:bg-privacy-border/50">
                   <td className="px-6 py-4 font-medium text-white flex items-center gap-3">
-                    <img src={model.avatar_url} alt={model.name} className="w-10 h-10 rounded-full object-cover" />
+                    <img src={model.avatar_url ?? ''} alt={model.name} className="w-10 h-10 rounded-full object-cover" />
                     {model.name}
                   </td>
                   <td className="px-6 py-4">@{model.username}</td>

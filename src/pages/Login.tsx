@@ -15,8 +15,7 @@ export const Login: React.FC = () => {
   useEffect(() => {
     const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
     if (isAuthenticated) {
-      // Mantém o comportamento atual para quem já está autenticado
-      navigate('/modelo/carolina-andrade', { replace: true });
+      navigate('/', { replace: true });
       return;
     }
     saveUTMsToLocalStorage();
@@ -44,24 +43,49 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      await registerFirstAccess({
-        name: name.trim(),
-        isAdult,
-        landingPage: window.location.href,
-      });
-    } catch (err) {
-      console.error('Falha ao registrar no Supabase, mas continuando:', err);
-    } finally {
-      // Autenticação "light" que você já usava
+      // ANÁLISE: O fluxo antigo criava um registro no banco a cada login.
+      // O fluxo restaurado agora verifica se já existe um ID de usuário da plataforma.
+      // Se não existir, ele cria o registro e salva o ID. Se já existir, ele o reutiliza.
+      // Isso garante um identificador estável para todo o tracking.
+      let appUserId = localStorage.getItem('appUserId');
+
+      if (!appUserId) {
+        console.log('[Login.handleSubmit] Nenhum appUserId encontrado. Registrando novo acesso...');
+        const newAccessId = await registerFirstAccess({
+          name: name.trim(),
+          isAdult,
+          landingPage: window.location.href,
+        });
+
+        if (newAccessId) {
+          appUserId = newAccessId;
+          localStorage.setItem('appUserId', appUserId);
+          console.log('[Login.handleSubmit] Novo acesso registrado. appUserId salvo:', appUserId);
+        } else {
+          // Fallback: se o registro falhar, não bloqueamos o usuário, mas o tracking fica limitado.
+          console.warn('[Login.handleSubmit] Falha ao obter newAccessId do Supabase.');
+        }
+      } else {
+        console.log('[Login.handleSubmit] appUserId reutilizado do localStorage:', appUserId);
+      }
+
+      // LÓGICA DE COMPATIBILIDADE: Mantém os flags antigos para garantir
+      // que rotas protegidas e outros componentes não quebrem.
       localStorage.setItem('isAuthenticated', 'true');
       localStorage.setItem('userName', name.trim());
 
-      // 🔥 NOVO: marcar que este usuário ganhou o conteúdo da Carolina
-      // Isso será usado em "Minhas Compras" e no perfil dela.
+      // LÓGICA DE BOAS-VINDAS (SINTÉTICA): Conforme o plano, mantemos a flag
+      // da Carolina no localStorage, pois o appUserId não é compatível com a
+      // tabela de compras reais (user_purchases).
       localStorage.setItem('welcomePurchaseCarolina', 'true');
 
-      // Mantém o fluxo atual: deixa o RootRedirector decidir o destino
+      // Redireciona para a raiz, onde o RootRedirector cuidará do destino final.
       navigate('/', { replace: true });
+
+    } catch (err) {
+      console.error('Falha crítica no processo de login:', err);
+      setError('Ocorreu um erro inesperado. Tente novamente.');
+      setIsLoading(false);
     }
   };
 

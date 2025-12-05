@@ -1,81 +1,124 @@
-// @ts-ignore: Deno-specific import
-import { serve } from "https://deno.land/std@0.168.0/http/server.ts";
-// @ts-ignore: Deno-specific import
-import { GoogleGenerativeAI } from "https://esm.sh/@google/generative-ai@0.1.3";
-// @ts-ignore: Deno-specific import
-import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+// supabase/functions/gemini-generate/index.ts
+// Edge Function responsável por chamar o Gemini a partir de um prompt de texto
+// Entrada esperada (POST JSON): { "prompt": "..." }
+// Saída: { "generatedText": "..." } ou { "error": "..." }
 
-declare const Deno: any;
+import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-const corsHeaders = {
-  "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
-};
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 
-async function getApiKey() {
-  // 1. Prioritize the environment variable (secret)
-  let apiKey = Deno.env.get("GEMINI_API_KEY");
-  if (apiKey) return apiKey;
+// Modelo pode ser ajustado se você quiser outra variante
+const GEMINI_MODEL =
+  "models/gemini-1.5-pro"; // caminho padrão da API REST Generative Language
 
-  // 2. Fallback to database settings if secret is not found
-  console.log("GEMINI_API_KEY secret not found, trying database fallback...");
-  const supabaseAdmin = createClient(
-    Deno.env.get('SUPABASE_URL')!,
-    Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!
-  );
-
-  const { data, error } = await supabaseAdmin
-    .from('settings')
-    .select('value')
-    .eq('key', 'GEMINI_API_KEY')
-    .single();
-
-  if (error || !data) {
-    console.error("Error fetching API key from database:", error);
-    return null;
+async function callGemini(prompt: string): Promise<string> {
+  if (!GEMINI_API_KEY) {
+    throw new Error("Missing GEMINI_API_KEY");
   }
-  
-  return data.value;
+
+  const url =
+    `https://generativelanguage.googleapis.com/v1beta/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+
+  const body = {
+    contents: [
+      {
+        parts: [
+          {
+            text: prompt,
+          },
+        ],
+      },
+    ],
+  };
+
+  const res = await fetch(url, {
+    method: "POST",
+    headers: {
+      "Content-Type": "application/json",
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!res.ok) {
+    const errorText = await res.text();
+    console.error("[gemini-generate] API error:", errorText);
+    throw new Error(`Gemini API error (${res.status})`);
+  }
+
+  const data = await res.json();
+
+  const text =
+    data?.candidates?.[0]?.content?.parts?.[0]?.text ??
+    data?.candidates?.[0]?.output_text ??
+    "";
+
+  if (!text) {
+    throw new Error("Empty response from Gemini");
+  }
+
+  return text.trim();
 }
 
 serve(async (req: Request) => {
-  if (req.method === "OPTIONS") {
-    return new Response("ok", { headers: corsHeaders });
+  // This is needed if you're planning to invoke your function from a browser.
+  if (req.method === 'OPTIONS') {
+    return new Response('ok', { headers: {
+      'Access-Control-Allow-Origin': '*',
+      'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+    } })
   }
-
-  const API_KEY = await getApiKey();
-
-  if (!API_KEY) {
-    return new Response(JSON.stringify({ error: "Missing GEMINI_API_KEY configuration." }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+  
+  if (req.method !== "POST") {
+    return new Response("Method not allowed", { status: 405 });
   }
 
   try {
     const { prompt } = await req.json();
-    if (!prompt) {
-      return new Response(JSON.stringify({ error: "Prompt is required" }), {
-        status: 400,
-        headers: { ...corsHeaders, "Content-Type": "application/json" },
-      });
+
+    if (!prompt || typeof prompt !== "string") {
+      return new Response(
+        JSON.stringify({ error: "Missing or invalid 'prompt' field" }),
+        { status: 400 },
+      );
     }
 
-    const genAI = new GoogleGenerativeAI(API_KEY);
-    const model = genAI.getGenerativeModel({ model: "gemini-pro" });
+    // Aqui você pode colocar um “system prompt” padrão, se quiser:
+    const wrappedPrompt = `
+Você é um assistente de copywriting focado em conteúdo sensual, porém elegante,
+para uma plataforma de assinaturas no estilo Privacy.
+Respeite sempre um tom sexy, mas sem ser explícito demais.
 
-    const result = await model.generateContent(prompt);
-    const response = await result.response;
-    const text = response.text();
+Instruções:
+- Escreva em português do Brasil.
+- Use emojis com moderação.
+- Não mencione que é IA ou modelo de linguagem.
 
-    return new Response(JSON.stringify({ generatedText: text }), {
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-      status: 200,
-    });
-  } catch (error: unknown) {
-    return new Response(JSON.stringify({ error: (error as Error).message }), {
-      status: 500,
-      headers: { ...corsHeaders, "Content-Type": "application/json" },
-    });
+Agora gere o conteúdo a partir deste pedido:
+
+${prompt}
+`.trim();
+
+    const generatedText = await callGemini(wrappedPrompt);
+
+    return new Response(
+      JSON.stringify({ generatedText }),
+      { headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Content-Type': 'application/json'
+      }, status: 200 },
+    );
+  } catch (err) {
+    const e = err as Error;
+    console.error("[gemini-generate] Error:", e.message);
+    const status = e.message === "Missing GEMINI_API_KEY" ? 500 : 500;
+    return new Response(
+      JSON.stringify({ error: e.message }),
+      { headers: {
+        'Access-Control-Allow-Origin': '*',
+        'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+        'Content-Type': 'application/json'
+      }, status },
+    );
   }
 });

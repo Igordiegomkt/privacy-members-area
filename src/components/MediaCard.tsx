@@ -1,4 +1,4 @@
-import React, { useRef } from 'react';
+import React, { useRef, useState } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { Lock, Video, Camera } from 'lucide-react';
 
@@ -18,24 +18,21 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   const isVideo = media.type === 'video';
   const isLocked = media.accessStatus === 'locked';
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  const [isPreviewing, setIsPreviewing] = useState(false);
 
   const posterSrc = media.thumbnail || '/video-fallback.svg';
 
   const startPreview = () => {
-    if (!isVideo || isLocked) return;
-    const v = videoRef.current;
-    if (!v) return;
-    v.muted = true;
-    v.playsInline = true;
-    v.play().catch(() => {});
+    if (!isVideo || isLocked || !videoRef.current) return;
+    setIsPreviewing(true);
+    videoRef.current.play().catch(() => {});
   };
 
   const stopPreview = () => {
-    if (!isVideo || isLocked) return;
-    const v = videoRef.current;
-    if (!v) return;
-    v.pause();
-    v.currentTime = 0;
+    if (!isVideo || isLocked || !videoRef.current) return;
+    videoRef.current.pause();
+    videoRef.current.currentTime = 0;
+    setIsPreviewing(false);
   };
 
   const handleClick = () => {
@@ -53,39 +50,43 @@ export const MediaCard: React.FC<MediaCardProps> = ({
       onTouchStart={startPreview}
       onTouchEnd={stopPreview}
     >
-      <div className={`w-full h-full transition-transform duration-300 ${isLocked ? 'blur-md brightness-50 scale-105' : 'group-hover:scale-105'}`}>
-        {isVideo ? (
-          <video
-            ref={videoRef}
-            src={media.url}
-            poster={posterSrc}
-            className="w-full h-full object-cover"
-            preload="metadata"
-            playsInline
-            loop
-          />
-        ) : (
-          <img
-            src={posterSrc}
-            alt={media.title || 'Conteúdo'}
-            className="w-full h-full object-cover"
-            loading="lazy"
-            draggable={false}
-          />
-        )}
-      </div>
+      {/* Camada de Imagem (Thumbnail) - Sempre visível por padrão */}
+      <img
+        src={posterSrc}
+        alt={media.title || 'Conteúdo'}
+        className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${
+          isLocked ? 'blur-md brightness-50 scale-105' : ''
+        } ${isPreviewing ? 'opacity-0' : 'opacity-100'}`}
+        loading="lazy"
+        draggable={false}
+      />
 
-      {/* badge foto/vídeo */}
-      <div className="absolute bottom-2 left-2 flex items-center gap-2 text-xs text-white/90">
+      {/* Camada de Vídeo (para preview) - Fica por baixo e só aparece no hover */}
+      {isVideo && !isLocked && (
+        <video
+          ref={videoRef}
+          src={media.url}
+          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
+            isPreviewing ? 'opacity-100' : 'opacity-0'
+          }`}
+          preload="metadata"
+          playsInline
+          muted
+          loop
+        />
+      )}
+
+      {/* Badge foto/vídeo */}
+      <div className="absolute bottom-2 left-2 flex items-center gap-2 text-xs text-white/90 z-10">
         <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5">
           {isVideo ? <Video size={12} /> : <Camera size={12} />}
           {isVideo ? 'Vídeo' : 'Foto'}
         </span>
       </div>
 
-      {/* overlay de bloqueado */}
+      {/* Overlay de bloqueado */}
       {isLocked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-center px-3 z-10">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/60 text-center px-3 z-20">
           <Lock className="w-8 h-8 text-white/80 mb-2" />
           <p className="text-sm text-white font-semibold mb-3">
             Conteúdo bloqueado

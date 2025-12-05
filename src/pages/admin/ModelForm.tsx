@@ -9,16 +9,15 @@ export const ModelForm: React.FC = () => {
   const [model, setModel] = useState<Partial<Model>>({ name: '', username: '', bio: '', avatar_url: '', cover_url: '' });
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState<string | null>(null);
+  const [isSuggesting, setIsSuggesting] = useState(false);
   const isEditing = !!id;
 
   useEffect(() => {
     if (isEditing) {
       const fetchModel = async () => {
         setLoading(true);
-        console.log(`[ModelForm] Fetching model with id: ${id}`);
         const { data, error } = await supabase.from('models').select('*').eq('id', id).single();
         
-        console.log('[ModelForm] Supabase fetch response:', { data, error });
         if (error) {
           setError(`Erro ao carregar modelo: ${error.message}`);
         } else if (data) {
@@ -35,17 +34,34 @@ export const ModelForm: React.FC = () => {
     setModel(prev => ({ ...prev, [name]: value }));
   };
 
+  const handleSuggestBio = async () => {
+    if (!model.name) {
+      alert('Preencha o nome da modelo para gerar uma bio.');
+      return;
+    }
+    setIsSuggesting(true);
+    const prompt = `Crie uma bio curta e magnética para o perfil de uma modelo no Privacy chamada ${model.name}. A bio deve ser convidativa, misteriosa e sugerir o tipo de conteúdo exclusivo que ela oferece.`;
+    try {
+      const { data, error } = await supabase.functions.invoke('gemini-generate', { body: { prompt } });
+      if (error) throw error;
+      if (data.error) throw new Error(data.error);
+      setModel(prev => ({ ...prev, bio: data.generatedText.trim() }));
+    } catch (err: any) {
+      alert(`Erro ao sugerir bio: ${err.message}`);
+    } finally {
+      setIsSuggesting(false);
+    }
+  };
+
   const handleSubmit = async (e: React.FormEvent) => {
     e.preventDefault();
     setLoading(true);
     setError(null);
-    console.log('[ModelForm] Submitting form data:', model);
 
-    const { data, error: submissionError } = isEditing
-      ? await supabase.from('models').update(model).eq('id', id).select().single()
-      : await supabase.from('models').insert(model).select().single();
+    const { error: submissionError } = isEditing
+      ? await supabase.from('models').update(model).eq('id', id)
+      : await supabase.from('models').insert(model);
 
-    console.log('[ModelForm] Supabase submission response:', { data, error: submissionError });
     if (submissionError) {
       setError(`Erro ao salvar: ${submissionError.message}`);
     } else {
@@ -73,7 +89,12 @@ export const ModelForm: React.FC = () => {
           <input type="text" name="username" value={model.username || ''} onChange={handleChange} className={inputStyle} required />
         </div>
         <div>
-          <label htmlFor="bio" className="block text-sm font-medium text-privacy-text-secondary mb-2">Bio</label>
+          <div className="flex justify-between items-center mb-2">
+            <label htmlFor="bio" className="block text-sm font-medium text-privacy-text-secondary">Bio</label>
+            <button type="button" onClick={handleSuggestBio} disabled={isSuggesting} className="text-xs bg-primary/20 text-primary font-semibold px-2 py-1 rounded-md hover:bg-primary/40 disabled:opacity-50">
+              {isSuggesting ? 'Gerando...' : 'Sugerir com IA ✨'}
+            </button>
+          </div>
           <textarea name="bio" value={model.bio || ''} onChange={handleChange} className={inputStyle} rows={4}></textarea>
         </div>
         <div>

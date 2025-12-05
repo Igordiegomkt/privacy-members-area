@@ -3,7 +3,11 @@
 // Entrada esperada (POST JSON): { "prompt": "..." }
 // Saída: { "generatedText": "..." } ou { "error": "..." }
 
+// @ts-ignore: Ignoring module resolution for Deno-specific URL imports
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+
+// Declare the Deno global to satisfy the TypeScript compiler in a non-Deno environment.
+declare const Deno: any;
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 

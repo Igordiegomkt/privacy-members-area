@@ -25,8 +25,13 @@
 //   ]
 // }
 
+// @ts-ignore: Ignoring module resolution for Deno-specific URL imports
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+// @ts-ignore: Ignoring module resolution for Deno-specific URL imports
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// Declare the Deno global to satisfy the TypeScript compiler in a non-Deno environment.
+declare const Deno: any;
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const GEMINI_MODEL = "models/gemini-1.5-pro";

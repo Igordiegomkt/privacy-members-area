@@ -7,7 +7,8 @@ import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 declare const Deno: any;
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-const GEMINI_MODEL = "models/gemini-1.5-pro";
+const GEMINI_MODEL = "gemini-1.5-pro";
+const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL")!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
@@ -37,8 +38,7 @@ async function callGeminiForMedia(
     throw new Error("Missing GEMINI_API_KEY");
   }
 
-  const url =
-    `https://generativelanguage.googleapis.com/v1beta/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `${GEMINI_BASE_URL}/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
   const baseContext = item.context?.trim() || "";
   const mediaLabel = item.type === "video" ? "vídeo" : "foto";
@@ -104,7 +104,6 @@ Responda APENAS em JSON VÁLIDO, no formato:
     throw new Error("Empty response from Gemini");
   }
 
-  // Limpando qualquer texto extra fora do JSON
   const jsonStart = rawText.indexOf("{");
   const jsonEnd = rawText.lastIndexOf("}");
   if (jsonStart === -1 || jsonEnd === -1) {
@@ -166,7 +165,6 @@ serve(async (req: Request) => {
     }
 
     const incomingItems: IncomingItem[] = items;
-
     const results: MetadataResult[] = [];
 
     for (const item of incomingItems) {
@@ -178,13 +176,9 @@ serve(async (req: Request) => {
         );
         results.push(meta);
 
-        // Atualiza a tabela media_items
         const updatePayload: Record<string, unknown> = {
           title: meta.title,
           description: meta.description,
-          // Descomente estas linhas se as colunas existirem na tabela:
-          // cta: meta.cta,
-          // tags: meta.tags,
         };
 
         const { error: updateError } = await supabase
@@ -203,7 +197,6 @@ serve(async (req: Request) => {
           `[gemini-media-metadata] Error processing mediaId=${item.mediaId}:`,
           itemErr,
         );
-        // Continua com as demais mídias
       }
     }
 

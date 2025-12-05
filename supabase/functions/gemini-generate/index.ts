@@ -5,7 +5,8 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 declare const Deno: any;
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
-const GEMINI_MODEL = "models/gemini-1.5-pro";
+const GEMINI_MODEL = "gemini-1.5-pro";
+const GEMINI_BASE_URL = "https://generativelanguage.googleapis.com/v1";
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -17,8 +18,7 @@ async function callGemini(prompt: string): Promise<string> {
     throw new Error("Missing GEMINI_API_KEY");
   }
 
-  const url =
-    `https://generativelanguage.googleapis.com/v1beta/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
+  const url = `${GEMINI_BASE_URL}/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
 
   const body = {
     contents: [
@@ -103,6 +103,14 @@ ${prompt}
   } catch (err) {
     const e = err as Error;
     console.error("[gemini-generate] Error:", e.message);
+    
+    if (e.message?.includes("quota") || e.message?.includes("limit")) {
+      return new Response(JSON.stringify({
+        error: "LIMIT_EXCEEDED",
+        message: "Você atingiu o limite de uso da IA. Tente novamente mais tarde."
+      }), { status: 429, headers: corsHeaders });
+    }
+
     const status = e.message === "Missing GEMINI_API_KEY" ? 500 : 500;
     return new Response(
       JSON.stringify({ error: e.message }),

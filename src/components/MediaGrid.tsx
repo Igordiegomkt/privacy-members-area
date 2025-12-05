@@ -2,11 +2,11 @@ import React, { useState } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { MediaCard } from './MediaCard';
 import { VideoPlayerModal } from './VideoPlayerModal';
-import { MediaModal } from './MediaModal'; // For images
+import { MediaModal } from './MediaModal';
 
 interface MediaGridProps {
   media: MediaItemWithAccess[];
-  onLockedClick: (media: MediaItemWithAccess) => void;
+  onLockedClick?: (media: MediaItemWithAccess) => void;
 }
 
 export const MediaGrid: React.FC<MediaGridProps> = ({ media, onLockedClick }) => {
@@ -29,7 +29,7 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ media, onLockedClick }) =>
             <MediaCard
               key={item.id}
               media={item}
-              onLockedClick={() => onLockedClick(item)}
+              onLockedClick={onLockedClick ? () => onLockedClick(item) : undefined}
               onOpenVideo={() => setOpenVideo(item)}
               onOpenImage={() => setOpenImage(item)}
             />

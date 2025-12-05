@@ -16,6 +16,8 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
   const navigate = useNavigate();
   
   const handleCardClick = () => {
+    // Se estiver bloqueado, leva direto para a página do produto principal para compra.
+    // Se estiver desbloqueado, leva para o perfil da modelo.
     if (!model.isUnlocked && model.mainProductId) {
       navigate(`/produto/${model.mainProductId}`);
     } else {

@@ -15,31 +15,19 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-interface IncomingItem {
-  mediaId: string;
-  type: "image" | "video";
-  context?: string;
-}
-
-interface MetadataResult {
-  mediaId: string;
-  title: string;
-  description: string;
-  cta: string;
-  tags: string[];
-}
-
+// ... (rest of the file is large, only showing the changed part for brevity)
 async function callGeminiForMedia(
   modelName: string,
   modelUsername: string,
-  item: IncomingItem,
-): Promise<MetadataResult> {
+  item: any,
+): Promise<any> {
   if (!GEMINI_API_KEY) {
     throw new Error("Missing GEMINI_API_KEY");
   }
 
   const url = `${GEMINI_BASE_URL}/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
-
+  
+  // ... (rest of the function remains the same)
   const baseContext = item.context?.trim() || "";
   const mediaLabel = item.type === "video" ? "vídeo" : "foto";
 
@@ -164,8 +152,8 @@ serve(async (req: Request) => {
       );
     }
 
-    const incomingItems: IncomingItem[] = items;
-    const results: MetadataResult[] = [];
+    const incomingItems: any[] = items;
+    const results: any[] = [];
 
     for (const item of incomingItems) {
       try {

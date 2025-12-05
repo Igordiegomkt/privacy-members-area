@@ -41,9 +41,9 @@ async function callGemini(prompt: string): Promise<string> {
   });
 
   if (!res.ok) {
-    const errorText = await res.text();
-    console.error("[gemini-generate] API error:", errorText);
-    throw new Error(`Gemini API error (${res.status})`);
+    const errorJson = await res.json().catch(() => ({ error: { message: "Failed to parse Gemini error response." } }));
+    console.error("[gemini-generate] API error:", JSON.stringify(errorJson, null, 2));
+    throw new Error(`Gemini API error (${res.status}): ${errorJson.error.message}`);
   }
 
   const data = await res.json();
@@ -111,10 +111,9 @@ ${prompt}
       }), { status: 429, headers: corsHeaders });
     }
 
-    const status = e.message === "Missing GEMINI_API_KEY" ? 500 : 500;
     return new Response(
-      JSON.stringify({ error: e.message }),
-      { status, headers: corsHeaders },
+      JSON.stringify({ error: "GEMINI_API_ERROR", details: e.message }),
+      { status: 500, headers: corsHeaders },
     );
   }
 });

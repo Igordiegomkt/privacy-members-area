@@ -1,68 +1,20 @@
 import React, { useEffect, useState } from 'react';
-import { useNavigate, Link } from 'react-router-dom';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
+import { PostCard } from '../components/PostCard';
+import { VideoPlayerModal } from '../components/VideoPlayerModal';
 import { MediaModal } from '../components/MediaModal';
-import { useProtection } from '../hooks/useProtection';
-import { GlobalFeedItem, fetchGlobalFeedItems } from '../lib/feedGlobal';
 import { MediaItemWithAccess } from '../lib/models';
-
-const GlobalFeedCard: React.FC<{ item: GlobalFeedItem; onMediaClick: (media: MediaItemWithAccess) => void }> = ({ item, onMediaClick }) => {
-  const navigate = useNavigate();
-  const { media, model } = item;
-  const isLocked = media.accessStatus === 'locked';
-
-  const handleCardClick = () => {
-    if (isLocked) {
-      navigate(`/modelo/${model.username}`);
-    } else {
-      onMediaClick(media);
-    }
-  };
-
-  return (
-    <article className="mb-6 bg-privacy-surface rounded-2xl overflow-hidden">
-      {/* Card Header */}
-      <Link to={`/modelo/${model.username}`} className="flex items-center justify-between p-4 hover:bg-privacy-border/50 transition-colors">
-        <div className="flex items-center gap-3">
-          <img src={model.avatar_url} alt={model.name} className="w-10 h-10 rounded-full object-cover" />
-          <div>
-            <p className="font-semibold text-sm text-privacy-text-primary">{model.name}</p>
-            <p className="text-xs text-privacy-text-secondary">@{model.username}</p>
-          </div>
-        </div>
-        {media.accessStatus === 'unlocked' ? (
-            <span className="text-xs font-semibold bg-green-500/20 text-green-400 px-2 py-1 rounded-full">✔ Você já tem acesso</span>
-        ) : (
-            <span className="text-xs font-semibold bg-purple-500/20 text-purple-400 px-2 py-1 rounded-full">💘 Sugestão pra você</span>
-        )}
-      </Link>
-
-      {/* Media Content */}
-      <div className="relative cursor-pointer" onClick={handleCardClick}>
-        <img
-          src={media.thumbnail}
-          alt="Feed content"
-          className={`w-full h-auto max-h-[70vh] object-contain bg-black ${isLocked ? 'blur-md' : ''}`}
-        />
-        {isLocked && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-center p-4">
-            <p className="font-semibold text-white text-lg">🔒 Conteúdo Premium</p>
-            <p className="text-sm text-privacy-text-secondary mt-1">Toque para ver como desbloquear</p>
-          </div>
-        )}
-      </div>
-    </article>
-  );
-};
+import { fetchGlobalFeedItems } from '../lib/feedGlobal';
 
 export const GlobalFeed: React.FC = () => {
-  useProtection();
-  const [feedItems, setFeedItems] = useState<GlobalFeedItem[]>([]);
+  const [feedItems, setFeedItems] = useState<MediaItemWithAccess[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [selectedMedia, setSelectedMedia] = useState<MediaItemWithAccess | null>(null);
-  const [isModalOpen, setIsModalOpen] = useState(false);
+  const [openVideo, setOpenVideo] = useState<MediaItemWithAccess | null>(null);
+  const [openImage, setOpenImage] = useState<MediaItemWithAccess | null>(null);
+  const navigate = useNavigate();
 
   useEffect(() => {
     const loadFeed = async () => {
@@ -80,18 +32,19 @@ export const GlobalFeed: React.FC = () => {
     loadFeed();
   }, []);
 
-  const handleMediaClick = (media: MediaItemWithAccess) => {
-    setSelectedMedia(media);
-    setIsModalOpen(true);
+  const handleLockedClick = (media: MediaItemWithAccess) => {
+    if (media.model?.username) {
+      navigate(`/modelo/${media.model.username}`);
+    }
   };
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">
       <Header />
-      <main className="mx-auto w-full max-w-md px-4 py-6">
+      <main className="mx-auto w-full max-w-md px-2 py-6 sm:px-0">
         <div className="text-center mb-6">
           <h1 className="text-2xl font-bold text-white">Feed</h1>
-          <p className="text-sm text-privacy-text-secondary">Novos conteúdos das modelos que você já tem acesso e sugestões pra você conhecer outras.</p>
+          <p className="text-sm text-privacy-text-secondary">Novos conteúdos e sugestões para você.</p>
         </div>
 
         {loading && <div className="text-center py-10">Carregando...</div>}
@@ -99,18 +52,24 @@ export const GlobalFeed: React.FC = () => {
         
         {!loading && !error && feedItems.length === 0 && (
           <div className="text-center py-10 text-privacy-text-secondary">
-            <p>Seu feed está vazio por enquanto.</p>
-            <p>Explore a seção "Em alta" para descobrir novas criadoras.</p>
+            <p>Seu feed está vazio. Explore a seção "Em alta"!</p>
           </div>
         )}
 
-        <div className="space-y-4">
+        <div className="flex flex-col items-center">
           {feedItems.map(item => (
-            <GlobalFeedCard key={item.media.id} item={item} onMediaClick={handleMediaClick} />
+            <PostCard
+              key={item.id}
+              media={item}
+              onLockedClick={() => handleLockedClick(item)}
+              onOpenVideo={() => setOpenVideo(item)}
+              onOpenImage={() => setOpenImage(item)}
+            />
           ))}
         </div>
       </main>
-      <MediaModal media={selectedMedia} isOpen={isModalOpen} onClose={() => setIsModalOpen(false)} />
+      <VideoPlayerModal media={openVideo} isOpen={!!openVideo} onClose={() => setOpenVideo(null)} />
+      <MediaModal media={openImage} isOpen={!!openImage} onClose={() => setOpenImage(null)} />
       <BottomNavigation />
     </div>
   );

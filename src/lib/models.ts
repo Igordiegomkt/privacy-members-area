@@ -1,21 +1,50 @@
 import { supabase } from './supabase';
-import { Model, Product, MediaItem } from '../types';
-import { fetchUserPurchases } from './marketplace';
+import { Model, Product, MediaItem, MediaAccessStatus } from '../types';
+import { fetchUserPurchases, UserPurchaseWithProduct } from './marketplace';
 
 export type MediaItemWithAccess = MediaItem & {
-  accessStatus: 'unlocked' | 'locked' | 'free';
+  accessStatus: MediaAccessStatus;
+  model?: Model;
 };
 
 export interface ModelWithStats extends Model {
   total_purchases: number;
 }
 
-/**
- * Busca uma modelo pelo seu username.
- */
-export const fetchModelByUsername = async (username: string): Promise<Model | null> => {
-  console.log('[fetchModelByUsername] Fetching model for username:', username);
+const BASE_MODEL_USERNAME = 'carolina-andrade';
 
+interface AccessContext {
+  purchases: UserPurchaseWithProduct[];
+  productsForModel: Product[];
+  model: Model;
+}
+
+export function computeMediaAccessStatus(
+  media: MediaItem,
+  ctx: AccessContext
+): MediaAccessStatus {
+  if (media.is_free) return 'free';
+
+  const isCarolina = ctx.model.username === BASE_MODEL_USERNAME;
+  const hasWelcome = localStorage.getItem('welcomePurchaseCarolina') === 'true';
+
+  if (isCarolina && hasWelcome) return 'unlocked';
+
+  const baseMembership = ctx.productsForModel.find(p => p.is_base_membership);
+  const purchasedIds = new Set(ctx.purchases.map(p => p.product_id));
+
+  if (baseMembership && purchasedIds.has(baseMembership.id)) {
+    return 'unlocked';
+  }
+  
+  // Lógica expandida: se qualquer produto da modelo foi comprado, libera o acesso.
+  const hasAnyProductFromModel = ctx.productsForModel.some(p => purchasedIds.has(p.id));
+  if (hasAnyProductFromModel) return 'unlocked';
+
+  return 'locked';
+}
+
+export const fetchModelByUsername = async (username: string): Promise<Model | null> => {
   const { data, error } = await supabase
     .from('models')
     .select('*')
@@ -26,14 +55,9 @@ export const fetchModelByUsername = async (username: string): Promise<Model | nu
     console.error('[fetchModelByUsername] Supabase error:', error);
     return null;
   }
-
-  console.log('[fetchModelByUsername] Fetched data:', data);
   return data;
 };
 
-/**
- * Busca os produtos de uma modelo específica.
- */
 export const fetchProductsForModel = async (modelId: string): Promise<Product[]> => {
   const { data, error } = await supabase
     .from('products')
@@ -49,11 +73,8 @@ export const fetchProductsForModel = async (modelId: string): Promise<Product[]>
   return data;
 };
 
-/**
- * Busca as mídias de uma modelo e determina o status de acesso para o usuário atual.
- */
-export const fetchMediaForModel = async (modelId: string, isBaseContent: boolean): Promise<MediaItemWithAccess[]> => {
-  const { data: media, error: mediaError } = await supabase
+export const fetchMediaForModel = async (modelId: string): Promise<MediaItemWithAccess[]> => {
+  const { data: mediaItems, error: mediaError } = await supabase
     .from('media_items')
     .select('*')
     .eq('model_id', modelId)
@@ -64,36 +85,20 @@ export const fetchMediaForModel = async (modelId: string, isBaseContent: boolean
     return [];
   }
 
-  // Se for o conteúdo base (Carolina), tudo está desbloqueado por padrão.
-  if (isBaseContent) {
-    return media.map(item => ({ ...item, accessStatus: 'unlocked' }));
-  }
+  const { data: model, error: modelError } = await supabase.from('models').select('*').eq('id', modelId).single();
+  if (modelError || !model) return [];
 
-  // Para outras modelos, verificamos as compras.
-  const userPurchases = await fetchUserPurchases();
-  const purchasedProductIds = new Set(userPurchases.map(p => p.product_id));
+  const purchases = await fetchUserPurchases();
+  const productsForModel = await fetchProductsForModel(modelId);
+  const accessContext: AccessContext = { purchases, productsForModel, model };
 
-  const modelProducts = await fetchProductsForModel(modelId);
-  const modelProductIds = new Set(modelProducts.map(p => p.id));
-
-  const hasPurchasedModelAccess = [...purchasedProductIds].some(id => modelProductIds.has(id));
-
-  return media.map(item => {
-    let accessStatus: 'unlocked' | 'locked' | 'free' = 'locked';
-    if (item.is_free) {
-      accessStatus = 'free';
-    } else if (hasPurchasedModelAccess) {
-      accessStatus = 'unlocked';
-    }
-    return { ...item, accessStatus };
-  });
+  return mediaItems.map(media => ({
+    ...media,
+    accessStatus: computeMediaAccessStatus(media, accessContext),
+  }));
 };
 
-/**
- * Busca as modelos mais populares com base no número de compras.
- */
 export const fetchTrendingModels = async (): Promise<ModelWithStats[]> => {
-  // 1. Buscar todas as compras com o model_id do produto
   const { data: purchases, error: purchaseError } = await supabase
     .from('user_purchases')
     .select('products(model_id)');
@@ -103,7 +108,6 @@ export const fetchTrendingModels = async (): Promise<ModelWithStats[]> => {
     return [];
   }
 
-  // 2. Contar compras por model_id
   const purchaseCounts = new Map<string, number>();
   purchases.forEach(p => {
     const modelId = (p.products as any)?.model_id;
@@ -114,7 +118,6 @@ export const fetchTrendingModels = async (): Promise<ModelWithStats[]> => {
 
   if (purchaseCounts.size === 0) return [];
 
-  // 3. Buscar os dados das modelos
   const { data: models, error: modelError } = await supabase
     .from('models')
     .select('*')
@@ -125,7 +128,6 @@ export const fetchTrendingModels = async (): Promise<ModelWithStats[]> => {
     return [];
   }
 
-  // 4. Combinar dados e ordenar
   const modelsWithStats: ModelWithStats[] = models.map(model => ({
     ...model,
     total_purchases: purchaseCounts.get(model.id) || 0,

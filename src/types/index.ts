@@ -1,11 +1,26 @@
 export interface MediaItem {
   id: string;
   type: 'image' | 'video';
-  thumbnail: string; // ✅ URL da thumbnail (gerada pela Edge Function para vídeos)
   url: string;
-  title?: string;
-  model_id?: string;
-  is_free?: boolean;
+  thumbnail?: string | null;
+  title?: string | null;
+  description?: string | null;
+  model_id?: string | null;
+  is_free?: boolean | null;
+  created_at?: string;
+}
+
+export type MediaAccessStatus = 'free' | 'unlocked' | 'locked';
+
+export interface Model {
+  id: string;
+  name: string;
+  username: string;
+  bio?: string;
+  avatar_url?: string | null;
+  cover_url?: string | null;
+  created_at: string;
+  is_verified?: boolean;
 }
 
 export interface CreatorProfile {
@@ -41,7 +56,6 @@ export interface FirstAccessRecord {
   created_at?: string;
 }
 
-// Types for Realtime Presence
 export interface UserPresence {
   page: string;
   user: string;
@@ -52,22 +66,7 @@ export interface PresenceState {
   [key: string]: UserPresence[];
 }
 
-// --- Marketplace & Model Types ---
-
-export interface Model {
-  id: string;
-  name: string;
-  username: string;
-  bio?: string;
-  avatar_url?: string;
-  cover_url?: string;
-  created_at: string;
-  is_verified?: boolean;
-}
-
 export type ProductType = 'pack' | 'single_media' | 'subscription';
-
-export type MediaAccessStatus = 'free' | 'paid_locked' | 'paid_unlocked';
 
 export interface Product {
   id: string;

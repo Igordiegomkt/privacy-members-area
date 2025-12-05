@@ -24,6 +24,7 @@ import { PaymentSettings } from './pages/admin/PaymentSettings';
 import PurchaseSuccess from './pages/PurchaseSuccess';
 import PurchaseFailed from './pages/PurchaseFailed';
 import { ensureFirstAccess } from './lib/firstAccess';
+import { ensureWelcomePurchaseForCarolina } from './lib/welcomePurchase';
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -98,7 +99,11 @@ const RootRedirector: React.FC = () => {
         console.log('[RootRedirector] isFirstAccess (Supabase) =', isFirstAccess);
 
         if (isFirstAccess) {
-          console.log('[RootRedirector] Primeiro acesso (Supabase) → /minhas-compras');
+          console.log('[RootRedirector] Primeiro acesso (Supabase) → concedendo compra da Carolina + /minhas-compras');
+
+          // >>> NOVO: garante compra de boas-vindas da Carolina <<<
+          await ensureWelcomePurchaseForCarolina(supabase, user.id);
+
           navigate('/minhas-compras', { replace: true });
         } else {
           console.log('[RootRedirector] Acesso recorrente (Supabase) → /feed');

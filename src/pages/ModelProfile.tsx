@@ -63,6 +63,7 @@ export const ModelProfile: React.FC = () => {
     const [loading, setLoading] = useState(true);
     const [selectedMedia, setSelectedMedia] = useState<MediaItemWithAccess | null>(null);
     const [isModalOpen, setIsModalOpen] = useState(false);
+    const [hasAccess, setHasAccess] = useState(false);
 
     useEffect(() => {
         if (!username) {
@@ -82,6 +83,11 @@ export const ModelProfile: React.FC = () => {
                     fetchMediaForModel(fetchedModel.id, fetchedModel.username === BASE_MODEL_USERNAME),
                     fetchProductsForModel(fetchedModel.id)
                 ]);
+                
+                const modelProductIds = new Set(fetchedProducts.map(p => p.id));
+                const userHasAccess = purchases.some(p => modelProductIds.has(p.product_id)) || fetchedModel.username === BASE_MODEL_USERNAME;
+                
+                setHasAccess(userHasAccess);
                 setUserPurchases(purchases);
                 setMedia([...fetchedMedia].sort(() => Math.random() - 0.5)); // Shuffle media
                 setProducts(fetchedProducts);
@@ -151,11 +157,11 @@ export const ModelProfile: React.FC = () => {
                     <div><span className="font-bold">{stats.videos}</span> <span className="text-sm text-privacy-text-secondary">vídeos</span></div>
                 </div>
 
-                {/* VIP Banner for Carolina */}
-                {model.username === BASE_MODEL_USERNAME && (
+                {/* Access Banner */}
+                {hasAccess && (
                     <div className="px-4 sm:px-6 mb-6">
                         <div className="text-center bg-primary/10 border border-primary/30 rounded-lg p-4 text-sm">
-                            <p className="font-semibold text-primary">💎 Você já é VIP da Carolina.</p>
+                            <p className="font-semibold text-primary">💎 Você já tem acesso ao conteúdo de {model.name}.</p>
                             <p className="text-privacy-text-secondary mt-1">Aproveite todos os conteúdos liberados no mural e descubra packs extras na aba Loja.</p>
                         </div>
                     </div>

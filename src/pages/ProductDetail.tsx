@@ -6,6 +6,7 @@ import { BottomNavigation } from '../components/BottomNavigation';
 import { fetchProductById, hasUserPurchased, createCheckoutSession, PixCheckoutData } from '../lib/marketplace';
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from '../components/ui/dialog';
 import { supabase } from '../lib/supabase';
+import { ArrowLeft } from 'lucide-react';
 
 const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -183,7 +184,10 @@ export const ProductDetail: React.FC = () => {
     <>
       <div className="min-h-screen bg-privacy-black text-white pb-24">
         <Header />
-        <main className="mx-auto w-full max-w-2xl px-4 py-6">
+        <main className="mx-auto w-full max-w-2xl px-4 py-6 relative">
+          <button onClick={() => navigate(-1)} className="absolute top-5 left-4 z-10 text-white bg-black/30 rounded-full p-2 hover:bg-black/50 md:hidden">
+              <ArrowLeft size={20} />
+          </button>
           <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
             <div>
               <img src={product.cover_thumbnail} alt={product.name} className="w-full aspect-square object-cover rounded-lg" />

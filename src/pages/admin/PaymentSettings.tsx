@@ -29,12 +29,26 @@ const ProviderCard: React.FC<{ provider: PaymentProvider; onUpdate: () => void }
         setLoading(false);
     };
 
-    const handleActivate = async () => {
+    const handleToggleActive = async (newActiveState: boolean) => {
         setLoading(true);
         try {
-            await supabase.from('payment_providers_config').update({ is_active: false }).neq('id', provider.id);
-            await supabase.from('payment_providers_config').update({ is_active: true }).eq('id', provider.id);
-            onUpdate();
+            // Se estiver ativando, desativa todos os outros primeiro
+            if (newActiveState) {
+                const { error: deactivateError } = await supabase
+                    .from('payment_providers_config')
+                    .update({ is_active: false })
+                    .neq('id', provider.id);
+                if (deactivateError) throw deactivateError;
+            }
+            
+            // Ativa ou desativa o provedor atual
+            const { error: toggleError } = await supabase
+                .from('payment_providers_config')
+                .update({ is_active: newActiveState })
+                .eq('id', provider.id);
+            if (toggleError) throw toggleError;
+
+            onUpdate(); // Recarrega a lista de provedores no componente pai
         } catch (err: any) {
             alert(err.message);
         }
@@ -46,13 +60,16 @@ const ProviderCard: React.FC<{ provider: PaymentProvider; onUpdate: () => void }
     return (
         <div className={`bg-privacy-surface p-6 rounded-lg border-2 ${provider.is_active ? 'border-primary' : 'border-transparent'}`}>
             <div className="flex justify-between items-start">
-                <div>
-                    <h2 className="text-xl font-bold text-white">{provider.display_name}</h2>
-                    <span className={`text-xs font-semibold px-2 py-1 rounded-full ${provider.is_active ? 'bg-primary/20 text-primary' : 'bg-privacy-border text-privacy-text-secondary'}`}>
+                <h2 className="text-xl font-bold text-white">{provider.display_name}</h2>
+                <div className="flex items-center gap-2">
+                    <span className={`text-xs font-semibold ${provider.is_active ? 'text-primary' : 'text-privacy-text-secondary'}`}>
                         {provider.is_active ? 'Ativo' : 'Inativo'}
                     </span>
+                    <label className="relative inline-flex items-center cursor-pointer">
+                        <input type="checkbox" checked={provider.is_active} onChange={(e) => handleToggleActive(e.target.checked)} className="sr-only peer" disabled={loading} />
+                        <div className="w-11 h-6 bg-privacy-border peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-primary"></div>
+                    </label>
                 </div>
-                {!provider.is_active && <button onClick={handleActivate} disabled={loading} className="bg-primary text-black font-bold py-2 px-4 rounded">Ativar</button>}
             </div>
             <div className="mt-4 space-y-4">
                 <div>

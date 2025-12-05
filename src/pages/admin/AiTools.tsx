@@ -35,11 +35,20 @@ export const AiTools: React.FC = () => {
       });
 
       if (invokeError) throw invokeError;
+      
+      if (data.error === 'LIMIT_EXCEEDED') {
+        setError('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
+        return;
+      }
       if (data.error) throw new Error(data.error);
 
       setResult(data.generatedText);
     } catch (err: any) {
-      setError(`Erro ao gerar conteúdo: ${err.message}`);
+      if (err.message.includes('LIMIT_EXCEEDED')) {
+        setError('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
+      } else {
+        setError(`Erro ao gerar conteúdo: ${err.message}`);
+      }
     } finally {
       setIsLoading(false);
     }

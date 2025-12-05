@@ -42,12 +42,20 @@ export const ModelForm: React.FC = () => {
     setIsSuggesting(true);
     const prompt = `Crie uma bio curta e magnética para o perfil de uma modelo no Privacy chamada ${model.name}. A bio deve ser convidativa, misteriosa e sugerir o tipo de conteúdo exclusivo que ela oferece.`;
     try {
-      const { data, error } = await supabase.functions.invoke('gemini-generate', { body: { prompt } });
-      if (error) throw error;
+      const { data, error: invokeError } = await supabase.functions.invoke('gemini-generate', { body: { prompt } });
+      if (invokeError) throw invokeError;
+      if (data.error === 'LIMIT_EXCEEDED') {
+        alert('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
+        return;
+      }
       if (data.error) throw new Error(data.error);
       setModel(prev => ({ ...prev, bio: data.generatedText.trim() }));
     } catch (err: any) {
-      alert(`Erro ao sugerir bio: ${err.message}`);
+      if (err.message.includes('LIMIT_EXCEEDED')) {
+        alert('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
+      } else {
+        alert(`Erro ao sugerir bio: ${err.message}`);
+      }
     } finally {
       setIsSuggesting(false);
     }

@@ -1,15 +1,16 @@
-// supabase/functions/gemini-generate/index.ts
-// Edge Function responsável por chamar o Gemini a partir de um prompt de texto
-// Entrada esperada (POST JSON): { "prompt": "..." }
-// Saída: { "generatedText": "..." } ou { "error": "..." }
-
+// @ts-ignore: Deno-specific import
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
-const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+// Declare Deno global to satisfy TypeScript compiler in non-Deno environments
+declare const Deno: any;
 
-// Modelo pode ser ajustado se você quiser outra variante
-const GEMINI_MODEL =
-  "models/gemini-1.5-pro"; // caminho padrão da API REST Generative Language
+const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
+const GEMINI_MODEL = "models/gemini-1.5-pro";
+
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
 
 async function callGemini(prompt: string): Promise<string> {
   if (!GEMINI_API_KEY) {
@@ -60,11 +61,6 @@ async function callGemini(prompt: string): Promise<string> {
 }
 
 serve(async (req: Request) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  };
-
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
@@ -83,7 +79,6 @@ serve(async (req: Request) => {
       );
     }
 
-    // Aqui você pode colocar um “system prompt” padrão, se quiser:
     const wrappedPrompt = `
 Você é um assistente de copywriting focado em conteúdo sensual, porém elegante,
 para uma plataforma de assinaturas no estilo Privacy.

@@ -1,32 +1,10 @@
-// supabase/functions/gemini-media-metadata/index.ts
-// Agente de IA para preencher título/descrição/CTA/tags de mídias em massa.
-//
-// Entrada (POST JSON):
-// {
-//   "modelName": "Carolina Andrade",
-//   "modelUsername": "carolina-andrade",
-//   "items": [
-//     { "mediaId": "uuid-1", "type": "image", "context": "foto na cama..." },
-//     { "mediaId": "uuid-2", "type": "video", "context": "vídeo no chuveiro..." }
-//   ]
-// }
-//
-// Saída:
-// {
-//   "results": [
-//     {
-//       "mediaId": "uuid-1",
-//       "title": "...",
-//       "description": "...",
-//       "cta": "...",
-//       "tags": ["...", "..."]
-//     },
-//     ...
-//   ]
-// }
-
+// @ts-ignore: Deno-specific import
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+// @ts-ignore: Deno-specific import
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
+
+// Declare Deno global to satisfy TypeScript compiler in non-Deno environments
+declare const Deno: any;
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
 const GEMINI_MODEL = "models/gemini-1.5-pro";

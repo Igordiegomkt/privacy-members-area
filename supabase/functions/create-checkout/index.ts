@@ -99,6 +99,11 @@ serve(async (req: Request) => {
       ? `${typeLabel} de ${modelName} – ${productName}`
       : `${typeLabel} – ${productName}`;
 
+    // Chave de referência externa e Idempotência
+    const externalReference = `${user.id}|${productId}`;
+    // Usamos uma chave de idempotência única por usuário/produto/momento (para evitar reuso acidental)
+    const idempotencyKey = `${externalReference}-${Date.now()}`; 
+
     // 2) Criar cobrança PIX no provedor (Mercado Pago ou outro)
     if (!MERCADO_PAGO_ACCESS_TOKEN) {
       console.warn('[create-checkout] MERCADO_PAGO_ACCESS_TOKEN não configurado. Retornando mock.');
@@ -121,12 +126,13 @@ serve(async (req: Request) => {
       );
     }
 
-    // Exemplo de chamada a Mercado Pago PIX (ajuste conforme sua implementação):
+    // Chamada a Mercado Pago PIX
     const mpRes = await fetch('https://api.mercadopago.com/v1/payments', {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',
         Authorization: `Bearer ${MERCADO_PAGO_ACCESS_TOKEN}`,
+        'X-Idempotency-Key': idempotencyKey, // Adicionando a chave de idempotência
       },
       body: JSON.stringify({
         transaction_amount: amountCents / 100,
@@ -135,7 +141,7 @@ serve(async (req: Request) => {
         payer: {
           email: user.email,
         },
-        external_reference: `${user.id}|${productId}`, // Adicionando external_reference para o webhook
+        external_reference: externalReference, // Referência para o webhook
         notification_url: `${SUPABASE_URL}/functions/v1/payment-webhook`, // URL do webhook
       }),
     });

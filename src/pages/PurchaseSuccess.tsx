@@ -2,7 +2,7 @@ import React, { useEffect, useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
 import { fetchProductById } from '../lib/marketplace';
-import { supabase } from '../lib/supabase'; // Assuming you might need model data
+import { supabase } from '../lib/supabase';
 
 const PurchaseSuccess: React.FC = () => {
   const [searchParams] = useSearchParams();

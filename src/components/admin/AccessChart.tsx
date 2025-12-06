@@ -5,7 +5,13 @@ interface AccessChartProps {
   data: { hour: string; count: number }[];
 }
 
-const CustomTooltip = ({ active, payload, label }: any) => {
+interface CustomTooltipProps {
+  active?: boolean;
+  payload?: any[];
+  label?: string;
+}
+
+const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-privacy-surface p-3 rounded-md border border-privacy-border">

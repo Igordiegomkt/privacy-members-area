@@ -73,7 +73,7 @@ export const AdminDashboard: React.FC = () => {
       else setAccessLogs(logsResult.data as FirstAccessRecord[]);
       
       if (chartResult.error) console.error("Error fetching chart data:", chartResult.error);
-      else setAccessesByHour(formatDataForChart(chartResult.data));
+      else setAccessesByHour(formatDataForChart(chartResult.data as { hour: string; count: number }[]));
 
       setLoading(false);
     };

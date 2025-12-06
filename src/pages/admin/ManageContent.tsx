@@ -46,6 +46,7 @@ export const ManageContent: React.FC = () => {
             const { data, error } = await supabase.functions.invoke('gemini-media-metadata', {
                 body: {
                     modelName: model.name,
+                    modelUsername: model.username, // Adicionando username para o prompt
                     items: newMedia.map(m => ({ mediaId: m.id, type: m.type, context: '' }))
                 }
             });
@@ -164,7 +165,7 @@ export const ManageContent: React.FC = () => {
                 <form onSubmit={handleManualSubmit} className="bg-privacy-surface p-6 rounded-lg space-y-4">
                     <h2 className="text-xl font-bold text-white">Cadastro Manual</h2>
                     <input value={manualUrl} onChange={e => setManualUrl(e.target.value)} placeholder="URL da Mídia" className={inputStyle} required />
-                    <select value={manualType} onChange={e => setManualType(e.target.value as any)} className={inputStyle}>
+                    <select value={manualType} onChange={e => setManualType(e.target.value as 'image' | 'video')} className={inputStyle}>
                         <option value="image">Imagem</option>
                         <option value="video">Vídeo</option>
                     </select>
@@ -180,7 +181,7 @@ export const ManageContent: React.FC = () => {
                     <h2 className="text-xl font-bold text-white">Gerar em Lote (R2)</h2>
                     <input value={batchBaseUrl} onChange={e => setBatchBaseUrl(e.target.value)} placeholder="URL Base (ex: .../foto/foto)" className={inputStyle} required />
                     <input type="number" value={batchCount} onChange={e => setBatchCount(parseInt(e.target.value))} placeholder="Quantidade" className={inputStyle} min="1" required />
-                    <select value={batchType} onChange={e => setBatchType(e.target.value as any)} className={inputStyle}>
+                    <select value={batchType} onChange={e => setBatchType(e.target.value as 'image' | 'video')} className={inputStyle}>
                         <option value="image">Imagem</option>
                         <option value="video">Vídeo</option>
                     </select>

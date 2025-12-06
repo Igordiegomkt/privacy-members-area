@@ -1,9 +1,9 @@
-// @ts-ignore: Deno-specific import
+// @ts-ignore: Ignoring module resolution for Deno-specific URL imports
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
-// @ts-ignore: Deno-specific import
+// @ts-ignore: Ignoring module resolution for Deno-specific URL imports
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2";
 
-// Declare Deno global to satisfy TypeScript compiler in non-Deno environments
+// Declare the Deno global to satisfy the TypeScript compiler in a non-Deno environment.
 declare const Deno: any;
 
 const GEMINI_API_KEY = Deno.env.get("GEMINI_API_KEY");
@@ -15,7 +15,21 @@ const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY")!;
 
 const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY);
 
-// ... (rest of the file is large, only showing the changed part for brevity)
+const corsHeaders = {
+  'Access-Control-Allow-Origin': '*',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+};
+
+/**
+ * Cria uma resposta de erro padronizada com status 200 para evitar erros non-2xx no invoke.
+ */
+const createResponse = (ok: boolean, code: string, message: string, data?: any) => {
+  return new Response(
+    JSON.stringify({ ok, code, message, ...data }),
+    { status: 200, headers: { ...corsHeaders, "Content-Type": "application/json" } },
+  );
+};
+
 async function callGeminiForMedia(
   modelName: string,
   modelUsername: string,
@@ -27,7 +41,6 @@ async function callGeminiForMedia(
 
   const url = `${GEMINI_BASE_URL}/models/${GEMINI_MODEL}:generateContent?key=${GEMINI_API_KEY}`;
   
-  // ... (rest of the function remains the same)
   const baseContext = item.context?.trim() || "";
   const mediaLabel = item.type === "video" ? "vídeo" : "foto";
 
@@ -126,30 +139,19 @@ Responda APENAS em JSON VÁLIDO, no formato:
 }
 
 serve(async (req: Request) => {
-  const corsHeaders = {
-    'Access-Control-Allow-Origin': '*',
-    'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
-  };
-
   if (req.method === 'OPTIONS') {
     return new Response('ok', { headers: corsHeaders });
   }
 
   if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+    return createResponse(false, 'METHOD_NOT_ALLOWED', 'Method not allowed');
   }
 
   try {
     const { modelName, modelUsername, items } = await req.json();
 
     if (!modelName || !modelUsername || !Array.isArray(items)) {
-      return new Response(
-        JSON.stringify({
-          error:
-            "Campos obrigatórios: 'modelName', 'modelUsername' e 'items' (array)",
-        }),
-        { status: 400, headers: corsHeaders },
-      );
+      return createResponse(false, 'BAD_REQUEST', "Campos obrigatórios: 'modelName', 'modelUsername' e 'items' (array)");
     }
 
     const incomingItems: any[] = items;
@@ -169,6 +171,7 @@ serve(async (req: Request) => {
           description: meta.description,
         };
 
+        // Atualiza o Supabase usando o Service Role Key (admin client)
         const { error: updateError } = await supabase
           .from("media_items")
           .update(updatePayload)
@@ -188,16 +191,10 @@ serve(async (req: Request) => {
       }
     }
 
-    return new Response(
-      JSON.stringify({ results }),
-      { status: 200, headers: corsHeaders },
-    );
+    return createResponse(true, 'SUCCESS', 'Metadata generated and saved.', { results });
   } catch (err) {
     const e = err as Error;
     console.error("[gemini-media-metadata] Error:", e.message);
-    return new Response(
-      JSON.stringify({ error: e.message }),
-      { status: 500, headers: corsHeaders },
-    );
+    return createResponse(false, 'SERVER_ERROR', e.message || 'Erro desconhecido no servidor.');
   }
 });

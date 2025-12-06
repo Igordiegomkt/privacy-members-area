@@ -16,7 +16,7 @@ if (!supabaseUrl || !supabaseAnonKey) {
 // It is now guaranteed to be non-null throughout the app.
 export const supabase = createClient(supabaseUrl, supabaseAnonKey);
 
-// Optional: log success for easier debugging
+// Optional: log success for easier debugging (apenas em desenvolvimento)
 if (import.meta.env.DEV) {
   console.log('✅ Supabase client initialized successfully.');
 }

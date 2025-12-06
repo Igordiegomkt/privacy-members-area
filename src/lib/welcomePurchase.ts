@@ -18,7 +18,7 @@ export const ensureWelcomePurchaseForCarolina = async (
   userId: string
 ): Promise<void> => {
   try {
-    console.log('[welcomePurchase] Iniciando para user:', userId);
+    // console.log('[welcomePurchase] Iniciando para user:', userId); // Removido log verboso
 
     // 1) Buscar modelo da Carolina
     const { data: model, error: modelError } = await supabase
@@ -32,7 +32,7 @@ export const ensureWelcomePurchaseForCarolina = async (
       return;
     }
 
-    console.log('[welcomePurchase] Modelo encontrado:', model.id);
+    // console.log('[welcomePurchase] Modelo encontrado:', model.id); // Removido log verboso
 
     // 2) Buscar produtos dessa modelo
     const { data: products, error: productsError } = await supabase
@@ -49,7 +49,7 @@ export const ensureWelcomePurchaseForCarolina = async (
     const baseMembership =
       products.find((p: any) => p.is_base_membership === true) ?? products[0];
 
-    console.log('[welcomePurchase] Produto escolhido para boas-vindas:', baseMembership.id);
+    // console.log('[welcomePurchase] Produto escolhido para boas-vindas:', baseMembership.id); // Removido log verboso
 
     // 3) Verificar se já existe compra desse produto para esse usuário
     const { data: existing, error: existingError } = await supabase
@@ -65,7 +65,7 @@ export const ensureWelcomePurchaseForCarolina = async (
     }
 
     if (existing) {
-      console.log('[welcomePurchase] Compra de boas-vindas já existe. Nada a fazer.');
+      // console.log('[welcomePurchase] Compra de boas-vindas já existe. Nada a fazer.'); // Removido log verboso
       return;
     }
 
@@ -82,7 +82,7 @@ export const ensureWelcomePurchaseForCarolina = async (
       return;
     }
 
-    console.log('[welcomePurchase] Compra de boas-vindas criada com sucesso!');
+    // console.log('[welcomePurchase] Compra de boas-vindas criada com sucesso!'); // Removido log verboso
   } catch (err) {
     console.error('[welcomePurchase] Erro inesperado:', err);
   }

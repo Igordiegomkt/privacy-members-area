@@ -2,7 +2,7 @@ import React, { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { User } from '@supabase/supabase-js';
 
-const UserList: React.FC = () => {
+const UserList: React.FC<{ userListKey: number }> = ({ userListKey }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -17,7 +17,9 @@ const UserList: React.FC = () => {
 
       const { data, error: invokeError } = await supabase.functions.invoke('get-users');
       if (invokeError) throw invokeError;
-      if (data.error) throw new Error(data.error);
+      
+      if (data.ok === false) throw new Error(data.error || 'Erro desconhecido ao listar usuários.');
+      
       setUsers(data.users);
     } catch (err: any) {
       setError(`Erro ao buscar usuários: ${err.message}`);
@@ -28,7 +30,7 @@ const UserList: React.FC = () => {
 
   useEffect(() => {
     fetchUsers();
-  }, [fetchUsers]);
+  }, [fetchUsers, userListKey]);
 
   const handleDeleteUser = async (userId: string, userEmail: string) => {
     if (window.confirm(`Tem certeza que deseja excluir o usuário ${userEmail}? Esta ação não pode ser desfeita.`)) {
@@ -37,10 +39,12 @@ const UserList: React.FC = () => {
           body: { userIdToDelete: userId },
         });
         if (error) throw error;
-        if (data.error) {
+        
+        if (data.ok === false) {
           alert(`Erro ao excluir usuário: ${data.error}`);
           return;
         }
+        
         alert('Usuário excluído com sucesso.');
         fetchUsers(); // Refresh the list
       } catch (err: any) {
@@ -116,7 +120,8 @@ export const ManageUsers: React.FC = () => {
       });
 
       if (error) throw new Error(error.message);
-      if (data.error) throw new Error(data.error);
+      
+      if (data.ok === false) throw new Error(data.error || 'Erro desconhecido ao criar usuário.');
 
       setMessage({ type: 'success', text: `Usuário ${data.user.email} criado com sucesso!` });
       setEmail('');
@@ -192,7 +197,7 @@ export const ManageUsers: React.FC = () => {
 
       <div className="bg-privacy-surface p-8 rounded-lg shadow-lg">
         <h2 className="text-xl font-bold text-privacy-text-primary mb-4">Usuários Admin Existentes</h2>
-        <UserList key={userListKey} />
+        <UserList key={userListKey} userListKey={userListKey} />
       </div>
     </div>
   );

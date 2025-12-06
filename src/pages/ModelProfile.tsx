@@ -19,6 +19,18 @@ const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { s
 
 const ProductCard: React.FC<{ product: Product; isPurchased: boolean; modelName: string; isFirst: boolean }> = ({ product, isPurchased, modelName, isFirst }) => {
     const navigate = useNavigate();
+    const { openCheckoutModal } = useCheckout();
+
+    const handleCtaClick = () => {
+        if (isPurchased) {
+            // Se já comprou, navega para o perfil (ou para a página de compras)
+            navigate(`/minhas-compras?highlight=${product.id}`);
+        } else {
+            // Se não comprou, abre o modal de checkout
+            openCheckoutModal(product.id);
+        }
+    };
+
     return (
         <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
             <div className="relative aspect-square cursor-pointer" onClick={() => navigate(`/produto/${product.id}`)}>
@@ -38,7 +50,7 @@ const ProductCard: React.FC<{ product: Product; isPurchased: boolean; modelName:
                 <h3 className="font-semibold text-privacy-text-primary truncate flex-1">{product.name}</h3>
                 <p className="text-lg font-bold text-primary mt-1">{formatPrice(product.price_cents)}</p>
                 <button
-                    onClick={() => navigate(`/produto/${product.id}`)}
+                    onClick={handleCtaClick}
                     className={`w-full mt-3 text-sm font-semibold py-2 rounded-lg transition-colors ${
                         isPurchased
                             ? 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
@@ -91,10 +103,14 @@ export const ModelProfile: React.FC = () => {
         loadProfileData();
     }, [username, purchases]);
 
+    const mainProduct = products.find(p => p.is_base_membership) || products[0];
+
     const handleLockedClick = () => {
-        const mainProduct = products.find(p => p.is_base_membership) || products[0];
         if (mainProduct) {
             openCheckoutModal(mainProduct.id);
+        } else {
+            // Se não houver produto base, redireciona para a loja
+            navigate('/loja');
         }
     };
 
@@ -108,7 +124,7 @@ export const ModelProfile: React.FC = () => {
     };
     const feedMedia = media.filter(m => m.accessStatus === 'free' || m.accessStatus === 'unlocked');
     const purchasedProductIds = new Set(purchases.map((p: UserPurchaseWithProduct) => p.product_id));
-    const mainProduct = products.find(p => p.is_base_membership) || products[0];
+    
 
     return (
         <div className="min-h-screen bg-privacy-black text-white pb-24">
@@ -146,7 +162,7 @@ export const ModelProfile: React.FC = () => {
                     </div>
                 </div>
 
-                {!hasAccess && (
+                {!hasAccess && mainProduct && (
                   <div className="px-4 sm:px-6 my-6">
                     <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3">
                       <div className="text-center sm:text-left">
@@ -156,27 +172,41 @@ export const ModelProfile: React.FC = () => {
                         <p className="text-privacy-text-secondary mt-1">
                           Desbloqueie vídeos privados, mural VIP e conteúdos completos.
                         </p>
-                        {mainProduct && (
-                          <p className="text-privacy-text-secondary mt-1">
-                            Acesso VIP por{' '}
-                            <span className="text-primary font-semibold">
-                              {formatPrice(mainProduct.price_cents)}
-                            </span>
-                          </p>
-                        )}
+                        <p className="text-privacy-text-secondary mt-1">
+                          Acesso VIP por{' '}
+                          <span className="text-primary font-semibold">
+                            {formatPrice(mainProduct.price_cents)}
+                          </span>
+                        </p>
                       </div>
 
-                      {products.length > 0 && (
-                        <button
-                          onClick={handleLockedClick}
-                          className="w-full sm:w-auto bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg hover:opacity-90"
-                        >
-                          🔓 Desbloquear conteúdo VIP
-                        </button>
-                      )}
+                      <button
+                        onClick={handleLockedClick}
+                        className="w-full sm:w-auto bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg hover:opacity-90"
+                      >
+                        🔓 Desbloquear conteúdo VIP
+                      </button>
                     </div>
                   </div>
                 )}
+                
+                {/* Se não houver produto base, mas houver outros produtos, mostra o banner genérico */}
+                {!hasAccess && !mainProduct && products.length > 0 && (
+                    <div className="px-4 sm:px-6 my-6">
+                        <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+                            <p className="font-semibold text-primary">
+                                Conteúdo exclusivo. Explore a loja para desbloquear!
+                            </p>
+                            <button
+                                onClick={() => navigate('/loja')}
+                                className="w-full sm:w-auto bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg hover:opacity-90"
+                            >
+                                🛒 Ver Produtos
+                            </button>
+                        </div>
+                    </div>
+                )}
+
 
                 <Tabs defaultValue="mural" className="w-full mt-6">
                     <TabsList className="grid w-full grid-cols-3">

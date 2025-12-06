@@ -55,23 +55,46 @@ export const ModelForm: React.FC = () => {
       alert('Preencha o nome da modelo para gerar uma bio.');
       return;
     }
+
     setIsSuggesting(true);
+
     const prompt = `Crie uma bio curta e magnética para o perfil de uma modelo no Privacy chamada ${model.name}. A bio deve ser convidativa, misteriosa e sugerir o tipo de conteúdo exclusivo que ela oferece.`;
+
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('gemini-generate', { body: { prompt } });
-      if (invokeError) throw invokeError;
-      if (data.error === 'LIMIT_EXCEEDED') {
-        alert('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
+      const { data, error: invokeError } = await supabase.functions.invoke('gemini-generate', {
+        body: { prompt },
+      });
+
+      if (invokeError) {
+        console.error('[ModelForm] invoke error', invokeError);
+        alert(`Erro na função de IA: ${invokeError.message || 'Falha desconhecida.'}`);
         return;
       }
-      if (data.error) throw new Error(data.error);
-      setModel(prev => ({ ...prev, bio: data.generatedText.trim() }));
-    } catch (err: any) {
-      if (err.message.includes('LIMIT_EXCEEDED')) {
-        alert('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
-      } else {
-        alert(`Erro ao sugerir bio: ${err.message}`);
+
+      if (!data) {
+        alert('Resposta vazia da IA.');
+        return;
       }
+
+      if (data.ok === false) {
+        if (data.code === 'LIMIT_EXCEEDED') {
+          alert('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
+        } else {
+          alert(`Erro na IA: ${data.message || data.code || 'Erro desconhecido.'}`);
+        }
+        return;
+      }
+
+      const text = data.generatedText?.toString().trim();
+      if (!text) {
+        alert('A IA não retornou texto.');
+        return;
+      }
+
+      setModel(prev => ({ ...prev, bio: text }));
+    } catch (err: any) {
+      console.error('[ModelForm] unexpected error', err);
+      alert(`Erro ao sugerir bio: ${err?.message || 'Falha desconhecida na IA.'}`);
     } finally {
       setIsSuggesting(false);
     }

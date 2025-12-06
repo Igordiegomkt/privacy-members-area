@@ -93,7 +93,9 @@ export const fetchMediaForModel = async (modelId: string): Promise<MediaItemWith
 
   return mediaItems.map(media => {
     const rawThumb = media.thumbnail;
-    const isVideoThumb = typeof rawThumb === 'string' && (rawThumb.endsWith('.mp4') || rawThumb.endsWith('.mov') || rawThumb.endsWith('.webm'));
+    const isVideoThumb =
+      typeof rawThumb === 'string' &&
+      (rawThumb.endsWith('.mp4') || rawThumb.endsWith('.mov') || rawThumb.endsWith('.webm'));
     
     return {
       ...media,

@@ -24,6 +24,7 @@ import { PaymentSettings } from './pages/admin/PaymentSettings';
 import PurchaseSuccess from './pages/PurchaseSuccess';
 import PurchaseFailed from './pages/PurchaseFailed';
 import { AiTools } from './pages/admin/AiTools';
+import { CheckoutModal } from './components/CheckoutModal'; // Novo import
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
@@ -96,6 +97,9 @@ function App() {
         <Route path="/home" element={<Navigate to="/" replace />} />
         <Route path="/admin" element={<Navigate to="/admin/dashboard" replace />} />
       </Routes>
+      
+      {/* Modal global de checkout PIX */}
+      <CheckoutModal />
     </>
   );
 }

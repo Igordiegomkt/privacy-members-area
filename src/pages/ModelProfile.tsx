@@ -19,7 +19,7 @@ const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { s
 
 const ProductCard: React.FC<{ product: Product; isPurchased: boolean; modelName: string; isFirst: boolean }> = ({ product, isPurchased, modelName, isFirst }) => {
     const navigate = useNavigate();
-    const { openCheckoutModal } = useCheckout();
+    const { openCheckoutForProduct } = useCheckout();
 
     const handleCtaClick = () => {
         if (isPurchased) {
@@ -27,7 +27,7 @@ const ProductCard: React.FC<{ product: Product; isPurchased: boolean; modelName:
             navigate(`/minhas-compras?highlight=${product.id}`);
         } else {
             // Se não comprou, abre o modal de checkout
-            openCheckoutModal(product.id);
+            openCheckoutForProduct(product.id);
         }
     };
 
@@ -68,7 +68,7 @@ export const ModelProfile: React.FC = () => {
     useProtection();
     const { username } = useParams<{ username: string }>();
     const navigate = useNavigate();
-    const { openCheckoutModal } = useCheckout();
+    const { openCheckoutForProduct } = useCheckout();
     const [model, setModel] = useState<Model | null>(null);
     const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
@@ -107,7 +107,7 @@ export const ModelProfile: React.FC = () => {
 
     const handleLockedClick = () => {
         if (mainProduct) {
-            openCheckoutModal(mainProduct.id);
+            openCheckoutForProduct(mainProduct.id);
         } else {
             // Se não houver produto base, redireciona para a loja
             navigate('/loja');
@@ -170,7 +170,7 @@ export const ModelProfile: React.FC = () => {
                           Você ainda não tem acesso ao conteúdo exclusivo de {model.name}.
                         </p>
                         <p className="text-privacy-text-secondary mt-1">
-                          Desbloqueie vídeos privados, mural VIP e conteúdos completos.
+                          Acesse vídeos privados, mural VIP e conteúdos completos.
                         </p>
                         <p className="text-privacy-text-secondary mt-1">
                           Acesso VIP por{' '}

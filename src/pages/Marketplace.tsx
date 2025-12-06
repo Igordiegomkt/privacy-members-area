@@ -1,5 +1,4 @@
 import React, { useEffect, useState } from 'react';
-import { Link } from 'react-router-dom';
 import { Product, Model } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
@@ -15,48 +14,78 @@ const formatPrice = (cents: number) => {
   });
 };
 
-const ProductCard: React.FC<{ product: Product }> = ({ product }) => (
-  <Link to={`/produto/${product.id}`} className="bg-privacy-surface rounded-lg overflow-hidden group">
-    <div className="relative aspect-square">
-      {product.cover_thumbnail ? (
-        <img src={product.cover_thumbnail} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-      ) : (
-        <div className="w-full h-full bg-privacy-border flex items-center justify-center">
-          <span className="text-xs text-privacy-text-secondary">Sem prévia</span>
+const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
+  const { openCheckoutForProduct } = useCheckout();
+
+  return (
+    <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
+      <div className="relative aspect-square">
+        {product.cover_thumbnail ? (
+          <img
+            src={product.cover_thumbnail}
+            alt={product.name}
+            className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
+          />
+        ) : (
+          <div className="w-full h-full bg-privacy-border flex items-center justify-center">
+            <span className="text-xs text-privacy-text-secondary">Sem prévia</span>
+          </div>
+        )}
+        <div className="absolute top-2 left-2 bg-black/50 rounded-full px-2 py-1 text-[10px] font-semibold text-white capitalize">
+          {product.type === 'pack' && 'Pack'}
+          {product.type === 'single_media' && 'Conteúdo'}
+          {product.type === 'subscription' && 'Assinatura'}
         </div>
-      )}
-      <div className="absolute top-2 left-2 bg-black/50 rounded-full px-2 py-1 text-xs font-semibold text-white capitalize">
-        {product.type === 'pack' && 'Pack'}
-        {product.type === 'single_media' && 'Conteúdo'}
-        {product.type === 'subscription' && 'Assinatura'}
+      </div>
+      <div className="p-3 flex flex-col gap-1 flex-1">
+        <h3 className="font-semibold text-privacy-text-primary text-sm line-clamp-2">
+          {product.name}
+        </h3>
+        <p className="text-sm font-bold text-primary">
+          {formatPrice(product.price_cents)}
+        </p>
+        <button
+          onClick={() => openCheckoutForProduct(product.id)}
+          className="mt-auto w-full bg-primary text-privacy-black text-xs font-semibold py-1.5 rounded-lg hover:opacity-90"
+        >
+          Comprar agora via PIX
+        </button>
       </div>
     </div>
-    <div className="p-4">
-      <h3 className="font-semibold text-privacy-text-primary truncate">{product.name}</h3>
-      <p className="text-lg font-bold text-primary mt-1">{formatPrice(product.price_cents)}</p>
-    </div>
-  </Link>
-);
+  );
+};
 
 interface ModelVipCardProps {
   product: Product & { models: Model | null };
 }
 
 const ModelVipCard: React.FC<ModelVipCardProps> = ({ product }) => {
-  const { openCheckoutModal } = useCheckout();
+  const { openCheckoutForProduct } = useCheckout();
   const model = product.models;
 
   if (!model) return null;
 
   return (
     <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
-      <div className="relative aspect-square cursor-pointer" onClick={() => openCheckoutModal(product.id)}>
+      <div className="relative aspect-square">
         <img src={model.avatar_url ?? ''} alt={model.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
       </div>
-      <div className="p-3">
-        <h3 className="font-semibold text-sm text-privacy-text-primary truncate">{model.name}</h3>
-        <p className="text-xs text-privacy-text-secondary truncate">@{model.username}</p>
-        <p className="text-base font-bold text-primary mt-1">{formatPrice(product.price_cents)}</p>
+      <div className="p-3 flex flex-col gap-1 flex-1">
+        <h3 className="font-semibold text-sm text-privacy-text-primary truncate">
+          {model.name}
+        </h3>
+        <p className="text-xs text-privacy-text-secondary truncate">
+          @{model.username}
+        </p>
+        <p className="text-sm font-bold text-primary">
+          {formatPrice(product.price_cents)}
+        </p>
+        <button
+          onClick={() => openCheckoutForProduct(product.id)}
+          className="mt-auto w-full bg-primary text-privacy-black text-xs font-semibold py-1.5 rounded-lg hover:opacity-90"
+        >
+          Desbloquear VIP via PIX
+        </button>
       </div>
     </div>
   );

@@ -16,7 +16,7 @@ const formatPrice = (cents: number) => {
 export const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
-  const { openCheckoutModal } = useCheckout();
+  const { openCheckoutForProduct } = useCheckout();
   const [product, setProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
@@ -59,12 +59,13 @@ export const ProductDetail: React.FC = () => {
       if (!user) throw new Error("Sessão inválida. Por favor, faça login novamente.");
 
       // Chama o modal centralizado do CheckoutContext
-      openCheckoutModal(id);
+      openCheckoutForProduct(id);
       
     } catch (err: any) {
       setPurchaseError(err.message ?? 'Não foi possível iniciar a compra. Tente novamente.');
     } finally {
-      setPurchaseLoading(false);
+      // O loading é gerenciado pelo CheckoutContext, mas mantemos o local para o botão
+      setPurchaseLoading(false); 
     }
   };
 

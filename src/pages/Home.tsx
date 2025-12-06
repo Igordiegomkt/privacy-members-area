@@ -5,8 +5,6 @@ import { Model } from '../types';
 import { fetchUserPurchases } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
-import { Lock } from 'lucide-react';
-import { useCheckout } from '../contexts/CheckoutContext';
 
 interface ModelWithAccess extends Model {
   isUnlocked: boolean;
@@ -16,23 +14,7 @@ interface ModelWithAccess extends Model {
 
 const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
   const navigate = useNavigate();
-  const { openCheckoutModal } = useCheckout();
-
-  const handleOpenVip = () => {
-    if (model.mainProductId) {
-      openCheckoutModal(model.mainProductId);
-    } else {
-      navigate(`/modelo/${model.username}`);
-    }
-  };
-
-  const handleCardClick = () => {
-    if (!model.isUnlocked && model.mainProductId) {
-      openCheckoutModal(model.mainProductId);
-    } else {
-      navigate(`/modelo/${model.username}`);
-    }
-  };
+  // Removendo openCheckoutForProduct daqui, pois a Home só navega para o perfil.
 
   const formattedPrice =
     model.mainProductPriceCents != null
@@ -43,69 +25,45 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
       : null;
 
   return (
-    <div
-      className="relative rounded-lg overflow-hidden group cursor-pointer aspect-[3/4]"
-      onClick={handleCardClick}
-    >
-      <img
-        src={model.avatar_url ?? ''}
-        alt={model.name}
-        className={`w-full h-full object-cover transition-all duration-300 ${
-          !model.isUnlocked ? 'grayscale' : ''
-        }`}
-      />
-      <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+    <div className="flex flex-col bg-privacy-surface rounded-lg overflow-hidden">
+      <div
+        className="relative w-full aspect-[3/4] cursor-pointer"
+        onClick={() => navigate(`/modelo/${model.username}`)}
+      >
+        <img
+          src={model.avatar_url ?? ''}
+          alt={model.name}
+          className={`w-full h-full object-cover transition-all duration-300 ${
+            !model.isUnlocked ? 'grayscale' : ''
+          }`}
+        />
+        <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
 
-      <div className="absolute bottom-0 left-0 p-4 w-full">
-        <h3 className="font-bold text-white text-lg truncate">{model.name}</h3>
-        <p className="text-sm text-privacy-text-secondary">@{model.username}</p>
-
-        {formattedPrice && (
-          <p className="mt-1 text-sm text-primary font-semibold flex items-center gap-2">
-            VIP por {formattedPrice}
-            {model.isUnlocked && (
-              <span className="text-xs text-green-400 flex items-center gap-1">
-                ✔ Já desbloqueado
-              </span>
-            )}
-          </p>
-        )}
-      </div>
-
-      {/* Overlay quando bloqueado */}
-      {!model.isUnlocked && (
-        <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4 text-center">
-          <div className="flex items-center gap-1.5 bg-red-500/20 text-red-400 px-2 py-1 rounded-full text-xs font-semibold mb-3">
-            <Lock size={14} />
-            <span>Bloqueado</span>
-          </div>
-          <p className="text-white font-semibold mb-2">
-            Desbloqueie o VIP da {model.name?.split(' ')[0] ?? 'modelo'}
-          </p>
-
-          {model.mainProductId ? (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                handleOpenVip();
-              }}
-              className="bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg text-sm shadow-lg hover:opacity-90 transition"
-            >
-              🔓 Desbloquear perfil VIP
-            </button>
-          ) : (
-            <button
-              onClick={(e) => {
-                e.stopPropagation();
-                navigate(`/modelo/${model.username}`);
-              }}
-              className="bg-privacy-surface text-privacy-text-secondary font-semibold py-2 px-4 rounded-lg text-xs shadow hover:bg-privacy-surface/80 transition"
-            >
-              Ver perfil
-            </button>
+        <div className="absolute bottom-2 left-2 right-2">
+          <h3 className="font-bold text-white text-sm truncate">{model.name}</h3>
+          <p className="text-[11px] text-privacy-text-secondary">@{model.username}</p>
+          {formattedPrice && (
+            <p className="mt-0.5 text-[11px] text-primary font-semibold">
+              VIP a partir de {formattedPrice}
+            </p>
           )}
         </div>
-      )}
+      </div>
+
+      {/* CTA fixo embaixo do card */}
+      <div className="p-2 border-t border-privacy-border flex flex-col gap-1">
+        {model.isUnlocked && (
+          <span className="text-[11px] text-green-400 flex items-center gap-1">
+            ✔ Acesso VIP liberado
+          </span>
+        )}
+        <button
+          onClick={() => navigate(`/modelo/${model.username}`)}
+          className="w-full bg-primary text-privacy-black text-xs font-semibold py-1.5 rounded-lg hover:opacity-90"
+        >
+          Ver perfil da modelo
+        </button>
+      </div>
     </div>
   );
 };

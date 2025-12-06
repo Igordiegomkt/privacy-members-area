@@ -65,17 +65,20 @@ serve(async (req: Request) => {
     return new Response('ok', { headers: corsHeaders });
   }
   
-  if (req.method !== "POST") {
-    return new Response("Method not allowed", { status: 405, headers: corsHeaders });
+  if (req.method !== 'POST') {
+    return new Response(
+      JSON.stringify({ ok: false, code: 'METHOD_NOT_ALLOWED', message: 'Method not allowed' }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+    );
   }
 
   try {
     const { prompt } = await req.json();
 
-    if (!prompt || typeof prompt !== "string") {
+    if (!prompt || typeof prompt !== 'string') {
       return new Response(
-        JSON.stringify({ error: "Missing or invalid 'prompt' field" }),
-        { status: 400, headers: corsHeaders },
+        JSON.stringify({ ok: false, code: 'BAD_REQUEST', message: "Missing or invalid 'prompt' field" }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
@@ -97,23 +100,31 @@ ${prompt}
     const generatedText = await callGemini(wrappedPrompt);
 
     return new Response(
-      JSON.stringify({ generatedText }),
-      { status: 200, headers: corsHeaders },
+      JSON.stringify({ ok: true, generatedText }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   } catch (err) {
     const e = err as Error;
-    console.error("[gemini-generate] Error:", e.message);
-    
-    if (e.message?.includes("quota") || e.message?.includes("limit")) {
-      return new Response(JSON.stringify({
-        error: "LIMIT_EXCEEDED",
-        message: "Você atingiu o limite de uso da IA. Tente novamente mais tarde."
-      }), { status: 429, headers: corsHeaders });
+    console.error('[gemini-generate] Error:', e.message);
+
+    if (e.message?.toLowerCase().includes('quota') || e.message?.toLowerCase().includes('limit')) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          code: 'LIMIT_EXCEEDED',
+          message: 'Você atingiu o limite de uso da IA. Tente novamente mais tarde.',
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
     }
 
     return new Response(
-      JSON.stringify({ error: "GEMINI_API_ERROR", details: e.message }),
-      { status: 500, headers: corsHeaders },
+      JSON.stringify({
+        ok: false,
+        code: 'GEMINI_API_ERROR',
+        message: e.message || 'Erro desconhecido na Gemini.',
+      }),
+      { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
     );
   }
 });

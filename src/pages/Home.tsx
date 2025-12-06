@@ -18,6 +18,14 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
   const navigate = useNavigate();
   const { openCheckoutModal } = useCheckout();
 
+  const handleOpenVip = () => {
+    if (model.mainProductId) {
+      openCheckoutModal(model.mainProductId);
+    } else {
+      navigate(`/modelo/${model.username}`);
+    }
+  };
+
   const handleCardClick = () => {
     if (!model.isUnlocked && model.mainProductId) {
       openCheckoutModal(model.mainProductId);
@@ -26,28 +34,45 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
     }
   };
 
+  const formattedPrice =
+    model.mainProductPriceCents != null
+      ? (model.mainProductPriceCents / 100).toLocaleString('pt-BR', {
+          style: 'currency',
+          currency: 'BRL',
+        })
+      : null;
+
   return (
-    <div 
+    <div
       className="relative rounded-lg overflow-hidden group cursor-pointer aspect-[3/4]"
       onClick={handleCardClick}
     >
-      <img src={model.avatar_url ?? ''} alt={model.name} className={`w-full h-full object-cover transition-all duration-300 ${!model.isUnlocked ? 'grayscale' : ''}`} />
+      <img
+        src={model.avatar_url ?? ''}
+        alt={model.name}
+        className={`w-full h-full object-cover transition-all duration-300 ${
+          !model.isUnlocked ? 'grayscale' : ''
+        }`}
+      />
       <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
-      
+
       <div className="absolute bottom-0 left-0 p-4 w-full">
         <h3 className="font-bold text-white text-lg truncate">{model.name}</h3>
         <p className="text-sm text-privacy-text-secondary">@{model.username}</p>
-        {model.mainProductPriceCents != null && !model.isUnlocked && (
-          <p className="mt-1 text-sm text-primary font-semibold">
-            Acesso VIP a partir de{' '}
-            {(model.mainProductPriceCents / 100).toLocaleString('pt-BR', {
-              style: 'currency',
-              currency: 'BRL',
-            })}
+
+        {formattedPrice && (
+          <p className="mt-1 text-sm text-primary font-semibold flex items-center gap-2">
+            VIP por {formattedPrice}
+            {model.isUnlocked && (
+              <span className="text-xs text-green-400 flex items-center gap-1">
+                ✔ Já desbloqueado
+              </span>
+            )}
           </p>
         )}
       </div>
 
+      {/* Overlay quando bloqueado */}
       {!model.isUnlocked && (
         <div className="absolute inset-0 bg-black/50 flex flex-col items-center justify-center p-4 text-center">
           <div className="flex items-center gap-1.5 bg-red-500/20 text-red-400 px-2 py-1 rounded-full text-xs font-semibold mb-3">
@@ -62,7 +87,7 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
             <button
               onClick={(e) => {
                 e.stopPropagation();
-                openCheckoutModal(model.mainProductId!);
+                handleOpenVip();
               }}
               className="bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg text-sm shadow-lg hover:opacity-90 transition"
             >

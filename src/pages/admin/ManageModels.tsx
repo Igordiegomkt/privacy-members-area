@@ -22,6 +22,20 @@ export const ManageModels: React.FC = () => {
     fetchModels();
   }, []);
 
+  const handleDeleteModel = async (id: string) => {
+    if (!window.confirm('Tem certeza que deseja apagar esta modelo? Essa ação não pode ser desfeita.')) {
+      return;
+    }
+
+    const { error } = await supabase.from('models').delete().eq('id', id);
+    if (error) {
+      alert(`Erro ao apagar modelo: ${error.message}`);
+      return;
+    }
+
+    setModels(prev => prev.filter(m => m.id !== id));
+  };
+
   return (
     <div>
       <div className="flex justify-between items-center mb-6">
@@ -54,7 +68,7 @@ export const ManageModels: React.FC = () => {
                   </td>
                   <td className="px-6 py-4">@{model.username}</td>
                   <td className="px-6 py-4">{new Date(model.created_at).toLocaleDateString('pt-BR')}</td>
-                  <td className="px-6 py-4 space-x-4">
+                  <td className="px-6 py-4 space-x-2">
                     <Link to={`/admin/modelos/${model.id}`} className="font-medium text-primary hover:underline">
                       Editar
                     </Link>
@@ -64,6 +78,9 @@ export const ManageModels: React.FC = () => {
                      <Link to={`/admin/modelos/${model.id}/conteudos`} className="font-medium text-green-400 hover:underline">
                       Conteúdos
                     </Link>
+                    <button onClick={() => handleDeleteModel(model.id)} className="font-medium text-red-500 hover:underline">
+                      Apagar
+                    </button>
                   </td>
                 </tr>
               ))}

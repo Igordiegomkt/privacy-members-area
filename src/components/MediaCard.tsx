@@ -21,7 +21,6 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [thumbError, setThumbError] = useState(false);
 
-  console.debug('[MediaCard] media.id=', media.id, 'thumbnail=', media.thumbnail);
   const posterSrc = !thumbError && media.thumbnail ? media.thumbnail : '/video-fallback.svg';
 
   const startPreview = () => {
@@ -70,7 +69,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
             isPreviewing ? 'opacity-100' : 'opacity-0'
           }`}
-          preload="metadata"
+          preload="none"
           playsInline
           muted
           loop

@@ -34,29 +34,38 @@ export const AiTools: React.FC = () => {
         body: { prompt },
       });
 
-      if (invokeError) throw invokeError;
-      
-      if (data.error === 'LIMIT_EXCEEDED') {
-        setError('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
-        return;
-      }
-      if (data.error === 'GEMINI_API_ERROR') {
-        setError(`Erro na IA: ${data.details || 'Verifique sua chave GEMINI_API_KEY e billing.'}`);
-        return;
-      }
-      if (data.error) {
-        setError(`Erro na IA: ${data.error}`);
+      if (invokeError) {
+        console.error('[AiTools] invoke error', invokeError);
+        setError(`Erro na função de IA: ${invokeError.message || 'Falha desconhecida.'}`);
         return;
       }
 
-      setResult(data.generatedText);
-    } catch (err: any) {
-      console.error('[AiTools] invoke error', err);
-      if (err?.message?.includes('LIMIT_EXCEEDED')) {
-        setError('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
-      } else {
-        setError(`Erro ao gerar conteúdo: ${err.message || 'Falha desconhecida na IA.'}`);
+      if (!data) {
+        setError('Resposta vazia da IA.');
+        return;
       }
+
+      if (data.ok === false) {
+        if (data.code === 'LIMIT_EXCEEDED') {
+          setError('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
+        } else if (data.code === 'GEMINI_API_ERROR') {
+          setError(`Erro na IA: ${data.message || 'Verifique a GEMINI_API_KEY e o billing.'}`);
+        } else {
+          setError(`Erro na IA: ${data.message || data.code || 'Erro desconhecido.'}`);
+        }
+        return;
+      }
+
+      const text = data.generatedText?.toString().trim();
+      if (!text) {
+        setError('A IA não retornou texto.');
+        return;
+      }
+
+      setResult(text);
+    } catch (err: any) {
+      console.error('[AiTools] unexpected error', err);
+      setError(`Erro ao gerar conteúdo: ${err?.message || 'Falha desconhecida na IA.'}`);
     } finally {
       setIsLoading(false);
     }

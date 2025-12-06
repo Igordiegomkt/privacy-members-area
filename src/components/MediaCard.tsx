@@ -21,7 +21,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [thumbError, setThumbError] = useState(false);
 
-  const posterSrc = !thumbError && media.thumbnail ? media.thumbnail : '/video-fallback.svg';
+  const posterSrc = thumbError || !media.thumbnail ? '/video-fallback.svg' : media.thumbnail;
 
   const startPreview = () => {
     if (!isVideo || isLocked || !videoRef.current) return;

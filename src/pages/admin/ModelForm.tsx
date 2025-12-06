@@ -141,7 +141,7 @@ export const ModelForm: React.FC = () => {
         const { error: updateError } = await supabase.from('products').update({ name: productName, price_cents: priceCents, status: 'active' }).eq('id', existingProducts[0].id);
         if (updateError) setError(`Erro ao atualizar produto base: ${updateError.message}`);
       } else {
-        const { error: insertError } = await supabase.from('products').insert({ model_id: modelId, name: productName, price_cents: priceCents, is_base_membership: true, status: 'active' });
+        const { error: insertError } = await supabase.from('products').insert({ model_id: modelId, name: productName, price_cents: priceCents, is_base_membership: true, status: 'active', type: 'subscription' });
         if (insertError) setError(`Erro ao criar produto base: ${insertError.message}`);
       }
     }

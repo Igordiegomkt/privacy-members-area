@@ -105,28 +105,36 @@ export const ModelForm: React.FC = () => {
     setLoading(true);
     setError(null);
 
+    // 1. Validação do Preço VIP (Tornando obrigatório)
+    const numericPrice = parseFloat(basePrice.replace(',', '.'));
+    if (isNaN(numericPrice) || numericPrice <= 0) {
+      setError('O preço base do VIP deve ser um valor numérico positivo (ex: 49.90).');
+      setLoading(false);
+      return;
+    }
+    
     let modelId = id;
+    
+    // 2. Salvar/Atualizar Modelo
     if (isEditing) {
       const { error: submissionError } = await supabase.from('models').update(model).eq('id', id);
       if (submissionError) {
-        setError(`Erro ao salvar: ${submissionError.message}`);
+        setError(`Erro ao salvar modelo: ${submissionError.message}`);
         setLoading(false);
         return;
       }
     } else {
       const { data: inserted, error: submissionError } = await supabase.from('models').insert(model).select().single();
       if (submissionError) {
-        setError(`Erro ao salvar: ${submissionError.message}`);
+        setError(`Erro ao criar modelo: ${submissionError.message}`);
         setLoading(false);
         return;
       }
       modelId = inserted?.id;
     }
 
-    const numericPrice = parseFloat(basePrice.replace(',', '.'));
-    const shouldManageBaseProduct = !isNaN(numericPrice) && numericPrice > 0;
-
-    if (shouldManageBaseProduct && modelId) {
+    // 3. Gerenciar Produto Base VIP
+    if (modelId) {
       const priceCents = Math.round(numericPrice * 100);
       const productName = baseProductName.trim() || `VIP completo de ${model.name || ''}`.trim() || 'VIP da modelo';
 
@@ -137,11 +145,23 @@ export const ModelForm: React.FC = () => {
         .eq('is_base_membership', true)
         .limit(1);
 
+      const productPayload = {
+        model_id: modelId,
+        name: productName,
+        price_cents: priceCents,
+        is_base_membership: true, // Reforçado
+        status: 'active', // Reforçado
+        type: 'subscription' as const, // Reforçado
+      };
+
       if (existingProducts && existingProducts.length > 0) {
-        const { error: updateError } = await supabase.from('products').update({ name: productName, price_cents: priceCents, status: 'active' }).eq('id', existingProducts[0].id);
+        const { error: updateError } = await supabase
+          .from('products')
+          .update(productPayload)
+          .eq('id', existingProducts[0].id);
         if (updateError) setError(`Erro ao atualizar produto base: ${updateError.message}`);
       } else {
-        const { error: insertError } = await supabase.from('products').insert({ model_id: modelId, name: productName, price_cents: priceCents, is_base_membership: true, status: 'active', type: 'subscription' });
+        const { error: insertError } = await supabase.from('products').insert(productPayload);
         if (insertError) setError(`Erro ao criar produto base: ${insertError.message}`);
       }
     }
@@ -187,8 +207,8 @@ export const ModelForm: React.FC = () => {
           </div>
           <div>
             <label className="block text-sm font-medium text-privacy-text-secondary mb-2">Preço base do VIP (R$)</label>
-            <input type="number" step="0.01" min="0" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} placeholder="Ex: 49.90" className={inputStyle} />
-            <p className="mt-1 text-xs text-privacy-text-secondary">Esse valor será usado no produto base (PIX) desta modelo.</p>
+            <input type="number" step="0.01" min="0.01" value={basePrice} onChange={(e) => setBasePrice(e.target.value)} placeholder="Ex: 49.90" className={inputStyle} required />
+            <p className="mt-1 text-xs text-privacy-text-secondary">Este valor é obrigatório para o checkout Pix.</p>
           </div>
         </div>
 

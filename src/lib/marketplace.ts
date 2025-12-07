@@ -20,7 +20,6 @@ export type PixCheckoutData = {
 };
 
 const PRODUCT_COLUMNS = 'id, name, description, price_cents, type, status, cover_thumbnail, created_at, model_id, is_base_membership';
-const MODEL_COLUMNS = 'id, name, username, avatar_url';
 
 export const fetchProducts = async (): Promise<Product[]> => {
   const { data, error } = await supabase

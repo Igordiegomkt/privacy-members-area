@@ -72,7 +72,7 @@ export const TrendingModels: React.FC = () => {
     loadTrending();
   }, []);
 
-  const purchasedModelIds = new Set(userPurchases.map(p => p.product?.model_id).filter(Boolean));
+  const purchasedModelIds = new Set(userPurchases.map(p => p.products?.model_id).filter(Boolean));
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">

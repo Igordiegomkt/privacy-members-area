@@ -12,7 +12,7 @@ export interface GlobalFeedItem {
 export const fetchGlobalFeedItems = async (): Promise<GlobalFeedItem[]> => {
   // 1. Identificar modelos que o usuário já tem acesso
   const userPurchases = await fetchUserPurchases();
-  const purchasedModelIds = new Set(userPurchases.map(p => p.product?.model_id).filter(Boolean));
+  const purchasedModelIds = new Set(userPurchases.map(p => p.products?.model_id).filter(Boolean));
   const hasWelcomeCarolina = localStorage.getItem('welcomePurchaseCarolina') === 'true';
 
   // 2. Buscar todas as mídias com os dados de suas modelos

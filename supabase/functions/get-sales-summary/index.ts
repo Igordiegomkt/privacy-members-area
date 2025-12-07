@@ -3,6 +3,7 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
 declare const Deno: any;
 
+// @ts-ignore: Deno-specific import
 import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
@@ -102,7 +103,6 @@ serve(async (req: Request) => {
       const product = p.products;
       const model = product?.models;
 
-      // Prioriza o valor pago (amount_cents) se existir, senão usa o preço do produto
       const amountCents = p.amount_cents ?? product?.price_cents ?? 0;
 
       if (model) {

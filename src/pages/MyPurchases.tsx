@@ -25,7 +25,6 @@ export const MyPurchases: React.FC = () => {
     load();
   }, []);
 
-  // Filtra e agrupa as compras
   const vipPurchases = purchases.filter((p) => {
     const product = p.products;
     return (

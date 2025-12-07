@@ -91,7 +91,7 @@ export const Home: React.FC = () => {
       }
 
       const products = productsRes.data || [];
-      const purchasedModelIds = new Set(purchasesRes.map(p => p.product?.model_id).filter(Boolean));
+      const purchasedModelIds = new Set(purchasesRes.map(p => p.products?.model_id).filter(Boolean));
 
       const modelsWithAccess = modelsRes.data.map(model => {
         const isCarolina = model.username === 'carolina-andrade';

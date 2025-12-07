@@ -7,9 +7,11 @@ export interface UserPurchaseWithProduct {
   product_id: string;
   status: 'pending' | 'paid' | 'expired' | 'refunded';
   created_at: string;
-  paid_at?: string | null;
-  amount_cents?: number | null;
-  products: Product & { models?: Model | null };
+  paid_at: string | null;
+  amount_cents: number | null;
+  products: (Product & {
+    models: Model | null;
+  }) | null;
 }
 
 export type PixCheckoutData = {
@@ -44,9 +46,16 @@ export const fetchProductById = async (id: string): Promise<Product | null> => {
 };
 
 export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> => {
-  const { data: { user }, error: userError } = await supabase.auth.getUser();
-  if (userError || !user) {
-    console.error('[fetchUserPurchases] No logged user');
+  const { data: sessionData, error: sessionError } = await supabase.auth.getSession();
+
+  if (sessionError) {
+    console.error('[fetchUserPurchases] Error getting session:', sessionError);
+    return [];
+  }
+
+  const user = sessionData?.session?.user;
+  if (!user) {
+    console.warn('[fetchUserPurchases] No logged user, returning empty list.');
     return [];
   }
 
@@ -78,14 +87,14 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
     `)
     .eq('user_id', user.id)
     .eq('status', 'paid')
-    .order('paid_at', { ascending: false });
+    .order('created_at', { ascending: false }); // Corrigido para usar created_at e remover o ":1"
 
   if (error) {
-    console.error('[fetchUserPurchases] Error:', error);
+    console.error('[fetchUserPurchases] Supabase error:', error);
     return [];
   }
 
-  return (data ?? []) as unknown as UserPurchaseWithProduct[];
+  return (data || []) as UserPurchaseWithProduct[];
 };
 
 export const hasUserPurchased = async (productId: string): Promise<boolean> => {

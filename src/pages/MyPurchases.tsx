@@ -4,11 +4,13 @@ import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
 
-const formatPrice = (cents: number) =>
-  (cents / 100).toLocaleString('pt-BR', {
+const formatPrice = (cents: number | null | undefined) => {
+  if (cents == null) return '';
+  return (cents / 100).toLocaleString('pt-BR', {
     style: 'currency',
     currency: 'BRL',
   });
+};
 
 export const MyPurchases: React.FC = () => {
   const [purchases, setPurchases] = useState<UserPurchaseWithProduct[]>([]);
@@ -25,156 +27,184 @@ export const MyPurchases: React.FC = () => {
     load();
   }, []);
 
-  const vipPurchases = purchases.filter((p) => {
-    const product = p.products;
-    return (
-      product &&
-      (product.is_base_membership ||
-        (product.type === 'subscription' && !!product.model_id))
-    );
-  });
+  // 🔐 Garante que só lidamos com compras que realmente têm products
+  const purchasesWithProduct = purchases.filter((p): p is UserPurchaseWithProduct & { products: NonNullable<UserPurchaseWithProduct['products']> } => p.products !== null);
 
-  const packPurchases = purchases.filter(
-    (p) => p.products?.type === 'pack'
+  const vipPurchases = purchasesWithProduct.filter(
+    (p) => p.products.is_base_membership === true
   );
 
-  const singlePurchases = purchases.filter(
-    (p) => p.products?.type === 'single_media'
+  const packPurchases = purchasesWithProduct.filter(
+    (p) => !p.products.is_base_membership && p.products.type === 'pack'
   );
 
-  const renderVipCard = (p: UserPurchaseWithProduct) => {
-    const product = p.products;
-    const model = product.models;
-    if (!product || !model) return null;
+  const singlePurchases = purchasesWithProduct.filter(
+    (p) => !p.products.is_base_membership && p.products.type === 'single_media'
+  );
 
-    return (
-      <div
-        key={p.id}
-        className="bg-privacy-surface rounded-lg overflow-hidden flex items-center gap-4 p-3 cursor-pointer hover:bg-privacy-surface/80 transition"
-        onClick={() => navigate(`/modelo/${model.username}`)}
-      >
-        <img
-          src={model.avatar_url ?? ''}
-          alt={model.name}
-          className="w-16 h-16 rounded-full object-cover bg-privacy-border"
-        />
-        <div className="flex-1">
-          <p className="text-sm text-privacy-text-secondary mb-0.5">
-            VIP de
-          </p>
-          <h3 className="font-semibold text-white text-sm">
-            {model.name}
-          </h3>
-          <p className="text-xs text-privacy-text-secondary">
-            Desbloqueado em{' '}
-            {p.paid_at
-              ? new Date(p.paid_at).toLocaleString('pt-BR')
-              : new Date(p.created_at).toLocaleString('pt-BR')}
-          </p>
-        </div>
-        <div className="text-right">
-          <p className="text-xs text-privacy-text-secondary">Valor</p>
-          <p className="text-sm font-bold text-primary">
-            {formatPrice(p.amount_cents ?? p.products.price_cents)}
-          </p>
-        </div>
-      </div>
-    );
+  const handleOpenModel = (username?: string | null) => {
+    if (!username) return;
+    navigate(`/modelo/${username}`);
   };
 
-  const renderProductCard = (p: UserPurchaseWithProduct) => {
-    const product = p.products;
-    if (!product) return null;
-
-    return (
-      <div
-        key={p.id}
-        className="bg-privacy-surface rounded-lg overflow-hidden cursor-pointer hover:bg-privacy-surface/80 transition"
-        onClick={() => navigate(`/produto/${product.id}`)}
-      >
-        <div className="relative aspect-[4/3]">
-          {product.cover_thumbnail ? (
-            <img
-              src={product.cover_thumbnail}
-              alt={product.name}
-              className="w-full h-full object-cover"
-            />
-          ) : (
-            <div className="w-full h-full bg-privacy-border flex items-center justify-center text-xs text-privacy-text-secondary">
-              Sem prévia
-            </div>
-          )}
-        </div>
-        <div className="p-3">
-          <h3 className="font-semibold text-sm text-white truncate">
-            {product.name}
-          </h3>
-          <p className="text-xs text-privacy-text-secondary mt-0.5">
-            Comprado em{' '}
-            {p.paid_at
-              ? new Date(p.paid_at).toLocaleString('pt-BR')
-              : new Date(p.created_at).toLocaleString('pt-BR')}
-          </p>
-          <p className="text-sm font-bold text-primary mt-1">
-            {formatPrice(p.amount_cents ?? product.price_cents)}
-          </p>
-        </div>
-      </div>
-    );
+  const handleOpenProduct = (productId?: string | null) => {
+    if (!productId) return;
+    navigate(`/produto/${productId}`);
   };
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">
       <Header />
       <main className="mx-auto w-full max-w-4xl px-4 py-6">
-        <h1 className="text-2xl font-bold mb-1">Minhas Compras</h1>
-        <p className="text-sm text-privacy-text-secondary mb-6">
-          Aqui ficam todos os VIPs, packs e conteúdos que você já desbloqueou.
-        </p>
+        <h1 className="text-2xl font-bold mb-4">Minhas Compras</h1>
 
         {loading && (
-          <div className="text-center py-16 text-privacy-text-secondary">
-            Carregando suas compras...
-          </div>
+          <p className="text-privacy-text-secondary text-sm">Carregando suas compras...</p>
         )}
 
-        {!loading && purchases.length === 0 && (
-          <div className="text-center py-16 text-privacy-text-secondary">
-            Você ainda não desbloqueou nenhum conteúdo.
-          </div>
+        {!loading && purchasesWithProduct.length === 0 && (
+          <p className="text-privacy-text-secondary text-sm">
+            Você ainda não possui compras confirmadas. Assim que um pagamento for aprovado, ele
+            aparecerá aqui. 💸
+          </p>
         )}
 
-        {!loading && purchases.length > 0 && (
+        {!loading && purchasesWithProduct.length > 0 && (
           <div className="space-y-8">
+            {/* VIP / Assinaturas base */}
             {vipPurchases.length > 0 && (
               <section>
-                <h2 className="text-lg font-semibold mb-3">
-                  Perfis VIP de Modelos
-                </h2>
-                <div className="space-y-3">
-                  {vipPurchases.map(renderVipCard)}
+                <h2 className="text-xl font-semibold mb-3">Perfis VIP</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {vipPurchases.map((p) => {
+                    const product = p.products;
+                    const model = product.models;
+
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleOpenModel(model?.username)}
+                        className="bg-privacy-surface rounded-lg overflow-hidden text-left group"
+                      >
+                        <div className="relative aspect-[3/4]">
+                          {model?.avatar_url ? (
+                            <img
+                              src={model.avatar_url}
+                              alt={model.name || 'Modelo'}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-privacy-border flex items-center justify-center text-xs text-privacy-text-secondary">
+                              Sem foto
+                            </div>
+                          )}
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                            <p className="text-sm font-semibold truncate">
+                              VIP de {model?.name || 'Modelo'}
+                            </p>
+                            <p className="text-xs text-privacy-text-secondary truncate">
+                              @{model?.username}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
             )}
 
+            {/* Packs */}
             {packPurchases.length > 0 && (
               <section>
-                <h2 className="text-lg font-semibold mb-3">
-                  Packs Exclusivos
-                </h2>
+                <h2 className="text-xl font-semibold mb-3">Packs</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {packPurchases.map(renderProductCard)}
+                  {packPurchases.map((p) => {
+                    const product = p.products;
+                    const model = product.models;
+
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleOpenProduct(product.id)}
+                        className="bg-privacy-surface rounded-lg overflow-hidden text-left group"
+                      >
+                        <div className="relative aspect-[3/4]">
+                          {product.cover_thumbnail ? (
+                            <img
+                              src={product.cover_thumbnail}
+                              alt={product.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-privacy-border flex items-center justify-center text-xs text-privacy-text-secondary">
+                              Sem capa
+                            </div>
+                          )}
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                            <p className="text-sm font-semibold truncate">{product.name}</p>
+                            {model && (
+                              <p className="text-xs text-privacy-text-secondary truncate">
+                                @{model.username}
+                              </p>
+                            )}
+                            <p className="text-xs text-primary mt-1">
+                              {formatPrice(product.price_cents)}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
             )}
 
+            {/* Conteúdos avulsos */}
             {singlePurchases.length > 0 && (
               <section>
-                <h2 className="text-lg font-semibold mb-3">
-                  Conteúdos Avulsos
-                </h2>
+                <h2 className="text-xl font-semibold mb-3">Conteúdos Avulsos</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                  {singlePurchases.map(renderProductCard)}
+                  {singlePurchases.map((p) => {
+                    const product = p.products;
+                    const model = product.models;
+
+                    return (
+                      <button
+                        key={p.id}
+                        type="button"
+                        onClick={() => handleOpenProduct(product.id)}
+                        className="bg-privacy-surface rounded-lg overflow-hidden text-left group"
+                      >
+                        <div className="relative aspect-[3/4]">
+                          {product.cover_thumbnail ? (
+                            <img
+                              src={product.cover_thumbnail}
+                              alt={product.name}
+                              className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
+                            />
+                          ) : (
+                            <div className="w-full h-full bg-privacy-border flex items-center justify-center text-xs text-privacy-text-secondary">
+                              Sem capa
+                            </div>
+                          )}
+                          <div className="absolute inset-x-0 bottom-0 bg-gradient-to-t from-black/80 to-transparent p-2">
+                            <p className="text-sm font-semibold truncate">{product.name}</p>
+                            {model && (
+                              <p className="text-xs text-privacy-text-secondary truncate">
+                                @{model.username}
+                              </p>
+                            )}
+                            <p className="text-xs text-primary mt-1">
+                              {formatPrice(product.price_cents)}
+                            </p>
+                          </div>
+                        </div>
+                      </button>
+                    );
+                  })}
                 </div>
               </section>
             )}

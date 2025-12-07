@@ -1,3 +1,11 @@
+'paid'.">
+// ⚠️ ZONA CRÍTICA DO SISTEMA DE PAGAMENTO
+// - Não alterar formato de external_reference (userId|productId)
+// - Não alterar condição status 'pending' -> 'paid' no update
+// Qualquer mudança aqui exige:
+// 1) Rodar checklist de compras end-to-end
+// 2) Conferir Minhas Compras + Admin Dashboard
+
 // @ts-ignore: Deno-specific import
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 
@@ -196,7 +204,7 @@ serve(async (req: Request) => {
       })
       .eq("user_id", userId)
       .eq("product_id", productId)
-      .eq("status", "pending");
+      .eq("status", "pending"); // ⚠️ CRÍTICO: SÓ ATUALIZA SE ESTIVER PENDENTE
 
     if (updateError) {
       console.error("[payment-webhook] Error updating user_purchases:", updateError);

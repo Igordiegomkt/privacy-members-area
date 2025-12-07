@@ -1,3 +1,10 @@
+// ⚠️ ZONA CRÍTICA DO SISTEMA DE PAGAMENTO
+// - Não alterar estrutura da resposta (ok, pixCopiaCola, qrCodeUrl, productName, modelName, amountCents)
+// - Não alterar a função openCheckoutForProduct (ela é o único ponto de entrada para create-checkout)
+// Qualquer mudança aqui exige:
+// 1) Rodar checklist de compras end-to-end
+// 2) Conferir Minhas Compras + Admin Dashboard
+
 import React, { createContext, useContext, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 

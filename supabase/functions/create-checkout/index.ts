@@ -1,3 +1,11 @@
+// ⚠️ ZONA CRÍTICA DO SISTEMA DE PAGAMENTO
+// - Não alterar estrutura da resposta (ok, pixCopiaCola, qrCodeUrl, productName, modelName, amountCents)
+// - Não alterar formato de external_reference (userId|productId)
+// - Não remover/alterar upsert em user_purchases (status 'pending')
+// Qualquer mudança aqui exige:
+// 1) Rodar checklist de compras end-to-end
+// 2) Conferir Minhas Compras + Admin Dashboard
+
 // @ts-ignore Deno
 import { serve } from 'https://deno.land/std@0.177.0/http/server.ts';
 // @ts-ignore Deno

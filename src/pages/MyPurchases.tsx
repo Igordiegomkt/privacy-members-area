@@ -1,205 +1,184 @@
 import React, { useEffect, useState } from 'react';
-import { useLocation, useNavigate } from 'react-router-dom';
-import { supabase } from '../lib/supabase';
-import { fetchUserPurchases } from '../lib/marketplace';
+import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
+import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
 
-type PurchaseItem = any;
+const formatPrice = (cents: number) =>
+  (cents / 100).toLocaleString('pt-BR', {
+    style: 'currency',
+    currency: 'BRL',
+  });
 
 export const MyPurchases: React.FC = () => {
-  const [purchases, setPurchases] = useState<PurchaseItem[]>([]);
-  const [isLoading, setIsLoading] = useState(true);
+  const [purchases, setPurchases] = useState<UserPurchaseWithProduct[]>([]);
+  const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
-  const location = useLocation();
-
-  const highlightId = new URLSearchParams(location.search).get('highlight');
 
   useEffect(() => {
-    const loadPurchases = async () => {
-      setIsLoading(true);
-
-      let list: PurchaseItem[] = [];
-
-      try {
-        // 1) Tenta pegar o usuário do Supabase (caso seja uma compra via Pix normal)
-        const { data, error } = await supabase.auth.getUser();
-
-        if (!error && data?.user) {
-          const backendPurchases = await fetchUserPurchases();
-          if (backendPurchases) {
-            list = backendPurchases;
-          }
-        }
-      } catch (err) {
-        console.error('[MyPurchases] Erro ao buscar compras no Supabase:', err);
-      }
-
-      // 2) Verifica se existe compra de boas-vindas da Carolina via localStorage
-      const hasWelcomeCarolina =
-        typeof window !== 'undefined' &&
-        localStorage.getItem('welcomePurchaseCarolina') === 'true';
-
-      if (hasWelcomeCarolina) {
-        const alreadyHasCarolina = list.some((p) => {
-          const model =
-            (p as any).product?.model ||
-            (p as any).model ||
-            (p as any).models ||
-            (p as any).creator ||
-            null;
-
-          const username =
-            model?.username ||
-            model?.slug ||
-            '';
-
-          return username === 'carolina-andrade';
-        });
-
-        // Se ainda não existir nenhuma compra da Carolina vinda do back-end,
-        // adiciona um card sintético de boas-vindas.
-        if (!alreadyHasCarolina) {
-          const welcomePurchase: PurchaseItem = {
-            id: 'welcome-carolina',
-            created_at: new Date().toISOString(),
-            isSyntheticWelcome: true,
-            product: {
-              id: 'welcome-carolina',
-              name: 'Conteúdo VIP da Carolina Andrade',
-              type: 'welcome',
-              price_cents: 0,
-              model: {
-                id: 'carolina-andrade',
-                name: 'Carolina Andrade',
-                username: 'carolina-andrade',
-                avatar_url: null,
-              }
-            },
-          };
-
-          list = [welcomePurchase, ...list];
-        }
-      }
-
-      setPurchases(list);
-      setIsLoading(false);
+    const load = async () => {
+      setLoading(true);
+      const data = await fetchUserPurchases();
+      setPurchases(data);
+      setLoading(false);
     };
-
-    loadPurchases();
+    load();
   }, []);
 
-  const handleOpenPurchase = (purchase: PurchaseItem) => {
-    const model =
-      (purchase as any).product?.model ||
-      (purchase as any).model ||
-      (purchase as any).models ||
-      (purchase as any).creator ||
-      {};
-
-    const modelUsername = model.username || 'carolina-andrade';
-
-    // Por enquanto, levar sempre para o perfil da modelo.
-    navigate(`/modelo/${modelUsername}`);
-  };
-
-  if (isLoading) {
+  // Filtra e agrupa as compras
+  const vipPurchases = purchases.filter((p) => {
+    const product = p.products;
     return (
-      <div className="min-h-screen bg-privacy-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
+      product &&
+      (product.is_base_membership ||
+        (product.type === 'subscription' && !!product.model_id))
+    );
+  });
+
+  const packPurchases = purchases.filter(
+    (p) => p.products?.type === 'pack'
+  );
+
+  const singlePurchases = purchases.filter(
+    (p) => p.products?.type === 'single_media'
+  );
+
+  const renderVipCard = (p: UserPurchaseWithProduct) => {
+    const product = p.products;
+    const model = product.models;
+    if (!product || !model) return null;
+
+    return (
+      <div
+        key={p.id}
+        className="bg-privacy-surface rounded-lg overflow-hidden flex items-center gap-4 p-3 cursor-pointer hover:bg-privacy-surface/80 transition"
+        onClick={() => navigate(`/modelo/${model.username}`)}
+      >
+        <img
+          src={model.avatar_url ?? ''}
+          alt={model.name}
+          className="w-16 h-16 rounded-full object-cover bg-privacy-border"
+        />
+        <div className="flex-1">
+          <p className="text-sm text-privacy-text-secondary mb-0.5">
+            VIP de
+          </p>
+          <h3 className="font-semibold text-white text-sm">
+            {model.name}
+          </h3>
+          <p className="text-xs text-privacy-text-secondary">
+            Desbloqueado em{' '}
+            {p.paid_at
+              ? new Date(p.paid_at).toLocaleString('pt-BR')
+              : new Date(p.created_at).toLocaleString('pt-BR')}
+          </p>
+        </div>
+        <div className="text-right">
+          <p className="text-xs text-privacy-text-secondary">Valor</p>
+          <p className="text-sm font-bold text-primary">
+            {formatPrice(p.amount_cents ?? p.products.price_cents)}
+          </p>
+        </div>
       </div>
     );
-  }
+  };
 
-  const hasPurchases = purchases.length > 0;
+  const renderProductCard = (p: UserPurchaseWithProduct) => {
+    const product = p.products;
+    if (!product) return null;
+
+    return (
+      <div
+        key={p.id}
+        className="bg-privacy-surface rounded-lg overflow-hidden cursor-pointer hover:bg-privacy-surface/80 transition"
+        onClick={() => navigate(`/produto/${product.id}`)}
+      >
+        <div className="relative aspect-[4/3]">
+          {product.cover_thumbnail ? (
+            <img
+              src={product.cover_thumbnail}
+              alt={product.name}
+              className="w-full h-full object-cover"
+            />
+          ) : (
+            <div className="w-full h-full bg-privacy-border flex items-center justify-center text-xs text-privacy-text-secondary">
+              Sem prévia
+            </div>
+          )}
+        </div>
+        <div className="p-3">
+          <h3 className="font-semibold text-sm text-white truncate">
+            {product.name}
+          </h3>
+          <p className="text-xs text-privacy-text-secondary mt-0.5">
+            Comprado em{' '}
+            {p.paid_at
+              ? new Date(p.paid_at).toLocaleString('pt-BR')
+              : new Date(p.created_at).toLocaleString('pt-BR')}
+          </p>
+          <p className="text-sm font-bold text-primary mt-1">
+            {formatPrice(p.amount_cents ?? product.price_cents)}
+          </p>
+        </div>
+      </div>
+    );
+  };
 
   return (
-    <div className="min-h-screen bg-privacy-black text-privacy-text-primary pb-20">
+    <div className="min-h-screen bg-privacy-black text-white pb-24">
       <Header />
-      <main className="max-w-5xl mx-auto pt-8 px-4">
-        <h1 className="text-2xl md:text-3xl font-bold mb-2">Minhas Compras</h1>
-        <p className="text-privacy-text-secondary mb-8">
-          Todo o conteúdo que você já desbloqueou.
+      <main className="mx-auto w-full max-w-4xl px-4 py-6">
+        <h1 className="text-2xl font-bold mb-1">Minhas Compras</h1>
+        <p className="text-sm text-privacy-text-secondary mb-6">
+          Aqui ficam todos os VIPs, packs e conteúdos que você já desbloqueou.
         </p>
 
-        {!hasPurchases && (
-          <div className="bg-privacy-surface border border-privacy-border rounded-2xl px-6 py-10 text-center">
-            <p className="text-lg font-semibold mb-2">Nada por aqui ainda</p>
-            <p className="text-privacy-text-secondary mb-6">
-              Você ainda não comprou nenhum conteúdo.
-            </p>
-            <button
-              onClick={() => navigate('/loja')}
-              className="inline-flex items-center justify-center px-6 py-3 rounded-xl bg-primary text-privacy-black font-semibold hover:opacity-90 transition-opacity"
-            >
-              Explorar a Loja
-            </button>
+        {loading && (
+          <div className="text-center py-16 text-privacy-text-secondary">
+            Carregando suas compras...
           </div>
         )}
 
-        {hasPurchases && (
-          <div className="grid gap-4 md:gap-6 md:grid-cols-2">
-            {purchases.map((purchase: PurchaseItem) => {
-              const product =
-                (purchase as any).product ||
-                (purchase as any).products ||
-                purchase;
+        {!loading && purchases.length === 0 && (
+          <div className="text-center py-16 text-privacy-text-secondary">
+            Você ainda não desbloqueou nenhum conteúdo.
+          </div>
+        )}
 
-              const model =
-                (purchase as any).product?.model ||
-                (purchase as any).model ||
-                (purchase as any).models ||
-                (purchase as any).creator ||
-                {};
+        {!loading && purchases.length > 0 && (
+          <div className="space-y-8">
+            {vipPurchases.length > 0 && (
+              <section>
+                <h2 className="text-lg font-semibold mb-3">
+                  Perfis VIP de Modelos
+                </h2>
+                <div className="space-y-3">
+                  {vipPurchases.map(renderVipCard)}
+                </div>
+              </section>
+            )}
 
-              const isHighlighted = highlightId && highlightId === String(purchase.id);
+            {packPurchases.length > 0 && (
+              <section>
+                <h2 className="text-lg font-semibold mb-3">
+                  Packs Exclusivos
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {packPurchases.map(renderProductCard)}
+                </div>
+              </section>
+            )}
 
-              const productName = product?.name || 'Conteúdo adquirido';
-              const modelName = model?.name || 'Criadora';
-              const isWelcome = (purchase as any).isSyntheticWelcome === true;
-
-              return (
-                <button
-                  key={purchase.id}
-                  onClick={() => handleOpenPurchase(purchase)}
-                  className={`flex items-center gap-4 bg-privacy-surface border rounded-2xl w-full text-left px-4 py-4 md:px-5 md:py-5 hover:border-primary/70 transition-colors ${
-                    isHighlighted ? 'border-primary shadow-lg shadow-primary/20' : 'border-privacy-border'
-                  }`}
-                >
-                  <div className="w-16 h-16 rounded-xl bg-privacy-border flex items-center justify-center overflow-hidden flex-shrink-0">
-                    {model?.avatar_url ? (
-                      <img
-                        src={model.avatar_url}
-                        alt={modelName}
-                        className="w-full h-full object-cover"
-                      />
-                    ) : (
-                      <span className="text-xl font-semibold">
-                        {modelName.charAt(0)}
-                      </span>
-                    )}
-                  </div>
-
-                  <div className="flex-1">
-                    <p className="text-xs uppercase text-primary font-semibold mb-1">
-                      {isWelcome ? 'Desbloqueado na entrada' : 'Conteúdo adquirido'}
-                    </p>
-                    <p className="font-semibold text-sm md:text-base">
-                      {productName}
-                    </p>
-                    <p className="text-xs text-privacy-text-secondary mt-1">
-                      por {modelName}
-                    </p>
-                  </div>
-
-                  <div className="text-right">
-                    <span className="text-xs md:text-sm text-primary font-semibold">
-                      Ver conteúdo
-                    </span>
-                  </div>
-                </button>
-              );
-            })}
+            {singlePurchases.length > 0 && (
+              <section>
+                <h2 className="text-lg font-semibold mb-3">
+                  Conteúdos Avulsos
+                </h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
+                  {singlePurchases.map(renderProductCard)}
+                </div>
+              </section>
+            )}
           </div>
         )}
       </main>

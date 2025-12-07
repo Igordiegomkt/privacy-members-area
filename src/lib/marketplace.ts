@@ -1,9 +1,16 @@
 import { supabase } from './supabase';
-import { Product, UserPurchase, Model } from '../types';
+import { Product, Model } from '../types';
 
-export type UserPurchaseWithProduct = UserPurchase & {
-  product: (Product & { model: Model | null }) | null;
-};
+export interface UserPurchaseWithProduct {
+  id: string;
+  user_id: string;
+  product_id: string;
+  status: 'pending' | 'paid' | 'expired' | 'refunded';
+  created_at: string;
+  paid_at?: string | null;
+  amount_cents?: number | null;
+  products: Product & { models?: Model | null };
+}
 
 export type PixCheckoutData = {
   paymentId: string;
@@ -38,21 +45,48 @@ export const fetchProductById = async (id: string): Promise<Product | null> => {
 };
 
 export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> => {
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return [];
+  const { data: { user }, error: userError } = await supabase.auth.getUser();
+  if (userError || !user) {
+    console.error('[fetchUserPurchases] No logged user');
+    return [];
+  }
 
   const { data, error } = await supabase
     .from('user_purchases')
-    .select(`*, product:products!inner(${PRODUCT_COLUMNS}, model:models(${MODEL_COLUMNS}))`)
+    .select(`
+      id,
+      user_id,
+      product_id,
+      status,
+      created_at,
+      paid_at,
+      amount_cents,
+      products (
+        id,
+        name,
+        type,
+        price_cents,
+        model_id,
+        is_base_membership,
+        cover_thumbnail,
+        models (
+          id,
+          name,
+          username,
+          avatar_url
+        )
+      )
+    `)
     .eq('user_id', user.id)
-    .order('created_at', { ascending: false });
+    .eq('status', 'paid')
+    .order('paid_at', { ascending: false });
 
   if (error) {
-    console.error("Error fetching user purchases with model:", error);
-    throw new Error('Não foi possível buscar as compras do usuário.');
+    console.error('[fetchUserPurchases] Error:', error);
+    return [];
   }
-  
-  return data as UserPurchaseWithProduct[] || [];
+
+  return (data ?? []) as unknown as UserPurchaseWithProduct[];
 };
 
 export const hasUserPurchased = async (productId: string): Promise<boolean> => {

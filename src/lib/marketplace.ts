@@ -87,14 +87,14 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
     `)
     .eq('user_id', user.id)
     .eq('status', 'paid')
-    .order('created_at', { ascending: false }); // Corrigido para usar created_at e remover o ":1"
+    .order('created_at', { ascending: false });
 
   if (error) {
     console.error('[fetchUserPurchases] Supabase error:', error);
     return [];
   }
 
-  return (data || []) as UserPurchaseWithProduct[];
+  return (data || []) as unknown as UserPurchaseWithProduct[];
 };
 
 export const hasUserPurchased = async (productId: string): Promise<boolean> => {

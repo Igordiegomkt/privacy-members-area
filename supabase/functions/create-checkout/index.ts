@@ -101,10 +101,33 @@ serve(async (req: Request) => {
 
     // Chave de referência externa e Idempotência
     const externalReference = `${user.id}|${productId}`;
-    // Usamos uma chave de idempotência única por usuário/produto/momento (para evitar reuso acidental)
     const idempotencyKey = `${externalReference}-${Date.now()}`; 
 
-    // 2) Criar cobrança PIX no provedor (Mercado Pago ou outro)
+    // 2) Registrar intenção de compra (status: pending)
+    const { error: upsertError } = await supabaseAdmin
+      .from('user_purchases')
+      .upsert(
+        {
+          user_id: user.id,
+          product_id: productId,
+          status: 'pending',
+          amount_cents: amountCents,
+        },
+        {
+          onConflict: 'user_id, product_id',
+          ignoreDuplicates: false, // Atualiza se já existir, mas mantém o status 'pending' se for o caso
+        }
+      );
+
+    if (upsertError) {
+      console.error('[create-checkout] Upsert error:', upsertError);
+      return new Response(
+        JSON.stringify({ ok: false, message: 'Erro ao registrar intenção de compra.' }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    // 3) Criar cobrança PIX no provedor (Mercado Pago ou outro)
     if (!MERCADO_PAGO_ACCESS_TOKEN) {
       console.warn('[create-checkout] MERCADO_PAGO_ACCESS_TOKEN não configurado. Retornando mock.');
       const fakePixString = `PIX-MOCK-${productId}-${Date.now()}`;

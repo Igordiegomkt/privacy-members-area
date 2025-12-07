@@ -1,4 +1,3 @@
-'paid'.">
 // ⚠️ ZONA CRÍTICA DO SISTEMA DE PAGAMENTO
 // - Não alterar formato de external_reference (userId|productId)
 // - Não alterar condição status 'pending' -> 'paid' no update

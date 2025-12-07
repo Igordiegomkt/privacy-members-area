@@ -1,9 +1,23 @@
 import { supabase } from './supabase';
 import { getCombinedUTMs, getDeviceInfo, getReferrerDomain } from '../utils/utmParser';
-import { FirstAccessRecord } from '../types';
 
-// Usamos FirstAccessRecord do types, mas removemos o ID e created_at que são gerados pelo DB
-type InsertFirstAccessPayload = Omit<FirstAccessRecord, 'id' | 'created_at' | 'updated_at'>;
+interface FirstAccessPayload {
+  name: string;
+  is_adult: boolean;
+  ip_address: string;
+  user_agent: string;
+  utm_source: string | null;
+  utm_medium: string | null;
+  utm_campaign: string | null;
+  utm_term: string | null;
+  utm_content: string | null;
+  referrer: string | null;
+  referrer_domain: string | null;
+  landing_page: string;
+  device_type: string;
+  browser: string;
+  operating_system: string;
+}
 
 const fetchIpAddress = async (): Promise<string> => {
   try {
@@ -24,7 +38,7 @@ const buildAccessPayload = async ({
   name: string;
   isAdult: boolean;
   landingPage: string;
-}): Promise<InsertFirstAccessPayload> => {
+}): Promise<FirstAccessPayload> => {
   const userAgent = navigator.userAgent;
   const utms = getCombinedUTMs();
   const deviceInfo = getDeviceInfo();
@@ -51,23 +65,24 @@ const buildAccessPayload = async ({
   };
 };
 
-const insertAccessRecord = async (payload: InsertFirstAccessPayload): Promise<string | null> => {
+const insertAccessRecord = async (payload: FirstAccessPayload): Promise<string | null> => {
   if (!supabase) {
     console.warn('Supabase não configurado. Registro de acesso ignorado.');
     return null;
   }
 
   try {
-    // console.log('🔵 Tentando inserir no Supabase...'); // Removido log verboso
-    // console.log('📦 Payload:', payload); // Removido log verboso
+    console.log('🔵 Tentando inserir no Supabase...');
+    console.log('📦 Payload:', payload);
+    console.log('🔗 Supabase URL:', import.meta.env.VITE_SUPABASE_URL ? 'Configurado' : 'Não configurado');
 
-    const { data, error } = await supabase
-      .from('first_access')
+    // eslint-disable-next-line @typescript-eslint/no-explicit-any
+    const { data, error } = await (supabase.from('first_access') as any)
       .insert([payload])
       .select('id')
       .single();
 
-    // console.log('📥 Resposta do Supabase:', { data, error }); // Removido log verboso
+    console.log('📥 Resposta do Supabase:', { data, error });
 
     if (error) {
       console.error('❌ Erro ao registrar acesso no Supabase:', error);
@@ -76,7 +91,7 @@ const insertAccessRecord = async (payload: InsertFirstAccessPayload): Promise<st
 
     const accessId = data?.id ?? null;
     if (accessId) {
-      // console.log('✅ Acesso registrado com sucesso no Supabase. ID:', accessId); // Removido log verboso
+      console.log('✅ Acesso registrado com sucesso no Supabase. ID:', accessId);
     } else {
       console.warn('⚠️ Supabase retornou sem dados e sem erro');
     }
@@ -116,3 +131,5 @@ export const registerAuthenticatedPageAccess = async (pageLabel: string): Promis
     landingPage,
   });
 };
+
+

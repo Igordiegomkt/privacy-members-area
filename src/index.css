@@ -4,7 +4,7 @@
 
 @layer base {
   body {
-    @apply bg-privacy-black text-privacy-text-primary antialiased;
+    @apply bg-dark text-white antialiased;
   }
 }
 
@@ -17,3 +17,4 @@
     display: none;
   }
 }
+

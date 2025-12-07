@@ -1,4 +1,4 @@
-# Meu Privacy - Área de Membros
+# Privacy - Área de Membros
 
 Uma aplicação web responsiva de área de membros inspirada na plataforma Privacy, construída com React, TypeScript e Tailwind CSS.
 
@@ -116,3 +116,4 @@ Modal fullscreen para visualização de imagens e vídeos.
 ## 📄 Licença
 
 Este projeto é privado e destinado apenas para uso interno.
+

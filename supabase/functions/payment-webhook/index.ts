@@ -1,246 +1,264 @@
-// ⚠️ ZONA CRÍTICA DO SISTEMA DE PAGAMENTO
-// - Não alterar formato de external_reference (userId|productId)
-// - Não alterar condição status 'pending' -> 'paid' no update
-// Qualquer mudança aqui exige:
-// 1) Rodar checklist de compras end-to-end
-// 2) Conferir Minhas Compras + Admin Dashboard
+// ZONA CRÍTICA – WEBHOOK DE PAGAMENTO
+// NÃO ALTERE ESSA FUNÇÃO SEM TER CERTEZA DO IMPACTO NO FLUXO DE PAGAMENTO.
+// Ela é responsável por:
+// - Receber o webhook do Mercado Pago
+// - Buscar os dados do pagamento
+// - Atualizar user_purchases de 'pending' → 'paid' (ou 'expired' / 'refunded')
 
 // @ts-ignore: Deno-specific import
 import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
+// @ts-ignore: Supabase client for Deno
+import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
 
-// Declaramos Deno pra não quebrar no TypeScript fora do Deno
 declare const Deno: any;
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
-  "Access-Control-Allow-Headers":
-    "authorization, x-client-info, apikey, content-type, x-signature",
+  "Access-Control-Allow-Headers": "authorization, x-client-info, apikey, content-type",
 };
 
-const MP_ACCESS_TOKEN = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN");
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
-
-// Cliente Supabase no Deno (service role)
-// @ts-ignore: Deno-specific import
-import { createClient } from "https://esm.sh/@supabase/supabase-js@2.48.0";
+const MP_ACCESS_TOKEN = Deno.env.get("MERCADO_PAGO_ACCESS_TOKEN");
 
 if (!SUPABASE_URL || !SUPABASE_SERVICE_ROLE_KEY) {
-  console.error("[payment-webhook] Supabase env vars missing");
+  console.error("[payment-webhook] Missing SUPABASE env vars");
+}
+if (!MP_ACCESS_TOKEN) {
+  console.error("[payment-webhook] Missing MERCADO_PAGO_ACCESS_TOKEN");
 }
 
-const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
+const supabase = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
   auth: { persistSession: false },
 });
 
-// Tipo básico do payment que vamos consumir do MP
-interface MercadoPagoPayment {
-  id: string;
-  status: string;
-  status_detail: string;
-  transaction_amount: number;
-  external_reference: string | null;
-  date_approved: string | null;
-  payer: {
-    email?: string;
-    id?: string;
-  };
-}
-
-async function fetchPaymentFromMP(paymentId: string): Promise<MercadoPagoPayment | null> {
-  if (!MP_ACCESS_TOKEN) {
-    console.error("[payment-webhook] Missing MERCADO_PAGO_ACCESS_TOKEN");
-    return null;
-  }
-
-  const res = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
-    method: "GET",
-    headers: {
-      "Authorization": `Bearer ${MP_ACCESS_TOKEN}`,
-      "Content-Type": "application/json",
-    },
-  });
-
-  if (!res.ok) {
-    console.error("[payment-webhook] Failed to fetch payment from MP:", res.status);
-    return null;
-  }
-
-  const data = await res.json();
-  return data as MercadoPagoPayment;
-}
-
 serve(async (req: Request) => {
-  // CORS preflight
+  // CORS pré-flight
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
   }
 
-  try {
-    if (req.method !== "POST") {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          code: "METHOD_NOT_ALLOWED",
-          message: "Method not allowed",
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    const body = await req.json().catch(() => null);
-
-    // Webhooks do MP normalmente vêm como:
-    // { "type": "payment", "data": { "id": "123456789" }, ... }
-    const type = body?.type ?? body?.topic;
-    const paymentId = body?.data?.id ?? body?.data?.payment?.id;
-
-    if (!type || type !== "payment") {
-      console.log("[payment-webhook] Ignored event type:", type);
-      return new Response(
-        JSON.stringify({ ok: true, ignored: true }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    if (!paymentId) {
-      console.error("[payment-webhook] Missing payment id in webhook body");
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          code: "BAD_REQUEST",
-          message: "Missing payment id",
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    const payment = await fetchPaymentFromMP(paymentId.toString());
-    if (!payment) {
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          code: "MP_FETCH_ERROR",
-          message: "Could not fetch payment details from MercadoPago",
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    console.log("[payment-webhook] Payment fetched:", payment.id, payment.status);
-
-    const isApproved = payment.status === "approved";
-    if (!isApproved) {
-      // Se não está aprovado, podemos só marcar como "pending"/"failed" se quiser
-      return new Response(
-        JSON.stringify({
-          ok: true,
-          processed: true,
-          status: payment.status,
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    const externalRef = payment.external_reference;
-    if (!externalRef) {
-      console.error("[payment-webhook] Payment without external_reference");
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          code: "MISSING_EXTERNAL_REFERENCE",
-          message: "Payment has no external_reference",
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // O padrão que combinamos: userId|productId
-    const [userId, productId] = externalRef.split("|");
-    if (!userId || !productId) {
-      console.error("[payment-webhook] Invalid external_reference format:", externalRef);
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          code: "INVALID_EXTERNAL_REFERENCE",
-          message: "Invalid external_reference format",
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
-    // Atualiza a compra como "paid"
-    const { error: updateError } = await supabaseAdmin
-      .from("user_purchases")
-      .update({
-        status: "paid",
-        paid_at: payment.date_approved ?? new Date().toISOString(),
-        mp_payment_id: payment.id,
-        mp_status: payment.status,
-        mp_status_detail: payment.status_detail,
-        amount_cents: Math.round(payment.transaction_amount * 100),
-      })
-      .eq("user_id", userId)
-      .eq("product_id", productId)
-      .eq("status", "pending"); // ⚠️ CRÍTICO: SÓ ATUALIZA SE ESTIVER PENDENTE
-
-    if (updateError) {
-      console.error("[payment-webhook] Error updating user_purchases:", updateError);
-      return new Response(
-        JSON.stringify({
-          ok: false,
-          code: "DB_UPDATE_ERROR",
-          message: updateError.message,
-        }),
-        {
-          status: 200,
-          headers: { ...corsHeaders, "Content-Type": "application/json" },
-        },
-      );
-    }
-
+  if (req.method !== "POST") {
     return new Response(
       JSON.stringify({
-        ok: true,
-        processed: true,
-        userId,
-        productId,
+        ok: false,
+        code: "METHOD_NOT_ALLOWED",
+        message: "Method not allowed",
       }),
       {
         status: 200,
         headers: { ...corsHeaders, "Content-Type": "application/json" },
       },
     );
-  } catch (err) {
-    const e = err as Error;
-    console.error("[payment-webhook] Unexpected error:", e.message);
+  }
 
+  try {
+    const rawBody = await req.text();
+    let body: any = {};
+    try {
+      body = rawBody ? JSON.parse(rawBody) : {};
+    } catch (_err) {
+      console.warn("[payment-webhook] Failed to parse JSON body. Using raw text.");
+      body = rawBody;
+    }
+
+    // Mercado Pago envia geralmente: { data: { id: "PAYMENT_ID" }, type: "payment" }
+    const paymentId = body?.data?.id ?? body?.id;
+    if (!paymentId) {
+      console.error("[payment-webhook] Missing payment id in webhook body:", body);
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          code: "MISSING_PAYMENT_ID",
+          message: "Pagamento sem ID no webhook.",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (!MP_ACCESS_TOKEN) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          code: "MISSING_MP_ACCESS_TOKEN",
+          message: "MERCADO_PAGO_ACCESS_TOKEN não configurado.",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Busca detalhes do pagamento no Mercado Pago
+    const mpRes = await fetch(`https://api.mercadopago.com/v1/payments/${paymentId}`, {
+      method: "GET",
+      headers: {
+        "Content-Type": "application/json",
+        Authorization: `Bearer ${MP_ACCESS_TOKEN}`,
+      },
+    });
+
+    if (!mpRes.ok) {
+      const errJson = await mpRes.json().catch(() => ({}));
+      console.error("[payment-webhook] Failed to fetch payment from MP:", mpRes.status, errJson);
+
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          code: "MP_FETCH_ERROR",
+          message: "Erro ao buscar pagamento no Mercado Pago.",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    const payment = await mpRes.json();
+    const status: string | undefined = payment?.status;
+    const externalReference: string | undefined = payment?.external_reference;
+
+    if (!externalReference) {
+      console.error("[payment-webhook] Missing external_reference in payment:", payment);
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          code: "MISSING_EXTERNAL_REFERENCE",
+          message: "Pagamento sem external_reference.",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Padrão que combinamos na create-checkout: "userId|productId"
+    const [userId, productId] = externalReference.split("|");
+
+    if (!userId || !productId) {
+      console.error("[payment-webhook] Invalid external_reference format:", externalReference);
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          code: "INVALID_EXTERNAL_REFERENCE",
+          message: "Formato inválido de external_reference.",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Atualiza a linha de user_purchases de acordo com o status
+    if (status === "approved") {
+      const { error } = await supabase
+        .from("user_purchases")
+        .update({
+          status: "paid",
+          payment_provider: "mercado_pago",
+          payment_data: payment,
+          paid_at: new Date().toISOString(),
+        })
+        .eq("user_id", userId)
+        .eq("product_id", productId)
+        .eq("status", "pending");
+
+      if (error) {
+        console.error("[payment-webhook] Error updating purchase to paid:", error);
+        return new Response(
+          JSON.stringify({
+            ok: false,
+            code: "DB_UPDATE_ERROR",
+            message: error.message,
+          }),
+          {
+            status: 200,
+            headers: { ...corsHeaders, "Content-Type": "application/json" },
+          },
+        );
+      }
+
+      console.log("[payment-webhook] Purchase updated to paid:", { userId, productId, paymentId });
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          code: "PAYMENT_CONFIRMED",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Outros status – marca como expirado ou reembolsado
+    if (status === "rejected" || status === "cancelled" || status === "expired" || status === "refunded") {
+      const newStatus =
+        status === "refunded"
+          ? "refunded"
+          : "expired";
+
+      const { error } = await supabase
+        .from("user_purchases")
+        .update({
+          status: newStatus,
+          payment_provider: "mercado_pago",
+          payment_data: payment,
+        })
+        .eq("user_id", userId)
+        .eq("product_id", productId)
+        .eq("status", "pending");
+
+      if (error) {
+        console.error("[payment-webhook] Error updating purchase to non-approved status:", error);
+      }
+
+      return new Response(
+        JSON.stringify({
+          ok: true,
+          code: "PAYMENT_NOT_APPROVED",
+          status,
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Status que não tratamos explicitamente → só logamos
+    console.log("[payment-webhook] Ignoring payment with status:", status, {
+      userId,
+      productId,
+      paymentId,
+    });
+
+    return new Response(
+      JSON.stringify({
+        ok: true,
+        code: "PAYMENT_IGNORED",
+        status,
+      }),
+      {
+        status: 200,
+        headers: { ...corsHeaders, "Content-Type": "application/json" },
+      },
+    );
+  } catch (err: any) {
+    console.error("[payment-webhook] Unexpected error:", err);
     return new Response(
       JSON.stringify({
         ok: false,
         code: "UNEXPECTED_ERROR",
-        message: e.message ?? "Unknown error",
+        message: err?.message || "Erro desconhecido no webhook.",
       }),
       {
         status: 200,

@@ -85,13 +85,22 @@ export const AdminDashboard: React.FC = () => {
       firstDayOfMonth.setHours(0, 0, 0, 0);
       const firstDayOfMonthISO = firstDayOfMonth.toISOString();
 
-      const [todayResult, sevenDaysResult, monthResult, logsResult, chartResult] = await Promise.all([
+      const [todayResult, sevenDaysResult, monthResult, chartResult] = await Promise.all([
         supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', todayISO),
         supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', sevenDaysAgoISO),
         supabase.from('first_access').select('*', { count: 'exact', head: true }).gte('created_at', firstDayOfMonthISO),
-        supabase.from('first_access').select('*').order('created_at', { ascending: false }).limit(20),
         supabase.rpc('get_accesses_by_hour_today')
       ]);
+      
+      // --- NOVO: Buscar logs via Edge Function para contornar RLS de SELECT linha a linha ---
+      const { data: logsData, error: logsError } = await supabase.functions.invoke('get-access-logs', {
+        body: {},
+      });
+      
+      if (logsError) console.error("Error invoking get-access-logs:", logsError);
+      else if (logsData.ok === false) console.error("Error fetching logs from EF:", logsData.message);
+      else setAccessLogs(logsData.logs as FirstAccessRecord[] || []);
+      // -------------------------------------------------------------------------------------
 
       if (todayResult.error) console.error("Error fetching today's count:", todayResult.error);
       else setTotalAccessesToday(todayResult.count ?? 0);
@@ -101,9 +110,6 @@ export const AdminDashboard: React.FC = () => {
 
       if (monthResult.error) console.error("Error fetching month count:", monthResult.error);
       else setTotalAccessesThisMonth(monthResult.count ?? 0);
-
-      if (logsResult.error) console.error("Error fetching logs:", logsResult.error);
-      else setAccessLogs(logsResult.data as FirstAccessRecord[]);
       
       if (chartResult.error) console.error("Error fetching chart data:", chartResult.error);
       else setAccessesByHour(formatDataForChart(chartResult.data as { hour: string; count: number }[]));
@@ -152,6 +158,9 @@ export const AdminDashboard: React.FC = () => {
         { event: 'INSERT', schema: 'public', table: 'first_access' },
         (payload) => {
           const newRecord = payload.new as FirstAccessRecord;
+          
+          // Atualiza logs em tempo real (apenas se o RLS permitir, mas mantemos para o caso de a EF ser mais rápida)
+          // Nota: A EF é a fonte primária, mas o Realtime é útil para feedback imediato.
           setAccessLogs((prev) => [newRecord, ...prev.slice(0, 19)]);
 
           setTotalAccessesToday((prev) => (typeof prev === 'number' ? prev + 1 : 1));

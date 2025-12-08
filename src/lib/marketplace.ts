@@ -77,6 +77,8 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
         model_id,
         is_base_membership,
         cover_thumbnail,
+        status,
+        created_at,
         models (
           id,
           name,
@@ -125,6 +127,8 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
             model_id: firstProduct.model_id,
             is_base_membership: firstProduct.is_base_membership,
             cover_thumbnail: firstProduct.cover_thumbnail,
+            status: firstProduct.status,
+            created_at: firstProduct.created_at,
             models: firstModel,
           }
         : null;

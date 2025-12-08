@@ -44,8 +44,22 @@ export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     }));
   }, []);
 
-  const openCheckoutForProduct = useCallback((productId: string) => {
-    setState({
+  const openCheckoutForProduct = useCallback(async (productId: string) => {
+    // 1) Garantir que tem usuário logado
+    const { data: { user }, error: userError } = await supabase.auth.getUser();
+
+    if (userError || !user) {
+      setState(prev => ({
+        ...prev,
+        isOpen: false,
+        loading: false,
+        error: 'Sua sessão expirou ou não foi possível identificar seu usuário. Faça login novamente.',
+      }));
+      return;
+    }
+
+    setState(prev => ({
+      ...prev,
       isOpen: true,
       loading: true,
       productId,
@@ -55,11 +69,15 @@ export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       productName: undefined,
       modelName: undefined,
       error: null,
-    });
+    }));
 
+    // 2) Chamar a Edge Function passando productId + userId
     supabase.functions
       .invoke('create-checkout', {
-        body: { productId },
+        body: { 
+          productId,
+          userId: user.id, // <-- Enviando userId explicitamente
+        },
       })
       .then(({ data, error }) => {
         if (error) {

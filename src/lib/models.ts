@@ -106,39 +106,20 @@ export const fetchMediaForModel = async (modelId: string): Promise<MediaItemWith
 };
 
 export const fetchTrendingModels = async (): Promise<ModelWithStats[]> => {
-  const { data: purchases, error: purchaseError } = await supabase
-    .from('user_purchases')
-    .select('products(model_id)');
-
-  if (purchaseError || !purchases) {
-    console.error('Error fetching purchases for trending models:', purchaseError);
-    return [];
-  }
-
-  const purchaseCounts = new Map<string, number>();
-  purchases.forEach(p => {
-    const modelId = (p.products as any)?.model_id;
-    if (modelId) {
-      purchaseCounts.set(modelId, (purchaseCounts.get(modelId) || 0) + 1);
-    }
+  const { data, error } = await supabase.functions.invoke('get-trending-models', {
+    method: 'GET',
   });
 
-  if (purchaseCounts.size === 0) return [];
-
-  const { data: models, error: modelError } = await supabase
-    .from('models')
-    .select('*')
-    .in('id', Array.from(purchaseCounts.keys()));
-
-  if (modelError || !models) {
-    console.error('Error fetching models for trending:', modelError);
+  if (error) {
+    console.error('[fetchTrendingModels] invoke error:', error);
     return [];
   }
 
-  const modelsWithStats: ModelWithStats[] = models.map(model => ({
-    ...model,
-    total_purchases: purchaseCounts.get(model.id) || 0,
-  }));
+  if (!data || data.ok === false) {
+    console.error('[fetchTrendingModels] payload error:', data);
+    return [];
+  }
 
-  return modelsWithStats.sort((a, b) => b.total_purchases - a.total_purchases);
+  // A Edge Function retorna um array de objetos que já se encaixam em ModelWithStats
+  return (data.models || []) as ModelWithStats[];
 };

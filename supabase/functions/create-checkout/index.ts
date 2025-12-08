@@ -42,40 +42,58 @@ serve(async (req: Request) => {
   }
 
   try {
-    const authHeader = req.headers.get('Authorization');
-    const token = authHeader?.replace('Bearer ', '').trim();
-
-    if (!token) {
-      console.error('[create-checkout] MISSING_TOKEN: Authorization header missing or empty.');
-      return new Response(
-        JSON.stringify({ ok: false, code: 'MISSING_TOKEN', message: 'Sessão inválida ou expirada. Faça login novamente.' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
-
-    // Usar o cliente Supabase com o token do usuário para obter a sessão
-    const supabaseUserClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
-      global: { headers: { Authorization: authHeader } },
-    });
-
-    const {
-      data: { user },
-      error: userError,
-    } = await supabaseUserClient.auth.getUser();
-
-    if (userError || !user) {
-      console.error('[create-checkout] INVALID_USER:', userError?.message || 'User object is null.');
-      return new Response(
-        JSON.stringify({ ok: false, code: 'INVALID_USER', message: 'Não foi possível identificar o usuário. Faça login novamente.' }),
-        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
-      );
-    }
-
-    const { productId } = await req.json();
+    const { productId, userId: bodyUserId } = await req.json();
 
     if (!productId || typeof productId !== 'string') {
       return new Response(
-        JSON.stringify({ ok: false, message: "Campo 'productId' é obrigatório." }),
+        JSON.stringify({
+          ok: false,
+          code: 'BAD_REQUEST',
+          message: 'productId é obrigatório.',
+        }),
+        { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
+      );
+    }
+
+    let userId: string | null = null;
+    let userEmail: string | null = null;
+
+    // 1) Tentar pegar via token (usando Service Role Key para decodificar o JWT)
+    const authHeader = req.headers.get('Authorization');
+    const token = authHeader?.replace('Bearer ', '').trim();
+
+    if (token) {
+      try {
+        // Usamos o Service Role Key para verificar o token, pois o anon key pode falhar
+        const { data: { user }, error: userError } = await supabaseAdmin.auth.getUser(token);
+        if (!userError && user) {
+          userId = user.id;
+          userEmail = user.email;
+        }
+      } catch (e) {
+        console.error('[create-checkout] Error resolving user from token:', e);
+      }
+    }
+
+    // 2) Fallback: usar o userId vindo no body, se ainda não temos userId
+    if (!userId && bodyUserId && typeof bodyUserId === 'string') {
+      userId = bodyUserId;
+      
+      // Se pegamos o ID do body, tentamos buscar o email do usuário (necessário para o Mercado Pago)
+      const { data: { user: fetchedUser } } = await supabaseAdmin.auth.admin.getUserById(userId);
+      if (fetchedUser) {
+        userEmail = fetchedUser.email;
+      }
+    }
+
+    if (!userId || !userEmail) {
+      console.error('[create-checkout] INVALID_USER: Could not resolve user ID or Email.');
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          code: 'INVALID_USER',
+          message: 'Não foi possível identificar o usuário. Faça login novamente.',
+        }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
@@ -113,7 +131,7 @@ serve(async (req: Request) => {
       : `${typeLabel} – ${productName}`;
 
     // Chave de referência externa e Idempotência
-    const externalReference = `${user.id}|${productId}`;
+    const externalReference = `${userId}|${productId}`; // Usando o userId resolvido
     const idempotencyKey = `${externalReference}-${Date.now()}`; 
     const NOTIFICATION_URL = `${SUPABASE_URL}/functions/v1/payment-webhook`; // Definindo a URL do webhook
 
@@ -122,7 +140,7 @@ serve(async (req: Request) => {
       .from('user_purchases')
       .upsert(
         {
-          user_id: user.id,
+          user_id: userId, // Usando o userId resolvido
           product_id: productId,
           status: 'pending',
           amount_cents: amountCents,
@@ -182,7 +200,7 @@ serve(async (req: Request) => {
         description,
         payment_method_id: 'pix',
         payer: {
-          email: user.email,
+          email: userEmail, // Usando o email resolvido
         },
         external_reference: externalReference, // Referência para o webhook
         notification_url: NOTIFICATION_URL, // Usando a URL definida

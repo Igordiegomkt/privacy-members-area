@@ -120,6 +120,7 @@ serve(async (req: Request) => {
           product_id: productId,
           status: 'pending',
           amount_cents: amountCents,
+          price_paid_cents: amountCents, // <-- CORREÇÃO: Adicionando price_paid_cents
           // Adicionando campos para evitar erros de NOT NULL ou tipagem
           payment_provider: 'mercado_pago',
           payment_data: null,

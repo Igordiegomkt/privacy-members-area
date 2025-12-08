@@ -58,31 +58,28 @@ const insertAccessRecord = async (payload: InsertFirstAccessPayload): Promise<st
   }
 
   try {
-    // console.log('🔵 Tentando inserir no Supabase...'); // Removido log verboso
-    // console.log('📦 Payload:', payload); // Removido log verboso
-
-    const { data, error } = await supabase
-      .from('first_access')
-      .insert([payload])
-      .select('id')
-      .single();
-
-    // console.log('📥 Resposta do Supabase:', { data, error }); // Removido log verboso
+    // Chamando a Edge Function para inserir o log com o Service Role Key
+    const { data, error } = await supabase.functions.invoke('register-access', {
+      body: payload,
+    });
 
     if (error) {
-      console.error('❌ Erro ao registrar acesso no Supabase:', error);
+      console.error('❌ Erro ao invocar Edge Function register-access:', error);
       return null;
     }
 
-    const accessId = data?.id ?? null;
-    if (accessId) {
-      // console.log('✅ Acesso registrado com sucesso no Supabase. ID:', accessId); // Removido log verboso
-    } else {
-      console.warn('⚠️ Supabase retornou sem dados e sem erro');
+    if (data.ok === false) {
+      console.error('❌ Erro retornado pela Edge Function register-access:', data.message);
+      return null;
+    }
+
+    const accessId = data?.accessId ?? null;
+    if (!accessId) {
+      console.warn('⚠️ Edge Function retornou sucesso, mas sem ID de acesso.');
     }
     return accessId;
   } catch (error) {
-    console.error('Erro ao conectar com Supabase:', error);
+    console.error('Erro ao conectar com Edge Function:', error);
     return null;
   }
 };

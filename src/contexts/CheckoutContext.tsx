@@ -82,10 +82,17 @@ export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         }
 
         if (data.ok === false) {
+          let errorMessage = data.message || 'Erro ao criar cobrança PIX.';
+          
+          // Tratamento de erros de autenticação específicos
+          if (data.code === 'MISSING_TOKEN' || data.code === 'INVALID_USER') {
+            errorMessage = 'Sua sessão expirou ou não foi possível identificar seu usuário. Faça login novamente e tente comprar de novo.';
+          }
+
           setState(prev => ({
             ...prev,
             loading: false,
-            error: data.message || 'Erro ao criar cobrança PIX.',
+            error: errorMessage,
           }));
           return;
         }

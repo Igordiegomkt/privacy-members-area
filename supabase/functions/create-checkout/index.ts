@@ -20,6 +20,7 @@ const corsHeaders = {
 
 const SUPABASE_URL = Deno.env.get('SUPABASE_URL')!;
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!;
+const SUPABASE_ANON_KEY = Deno.env.get('SUPABASE_ANON_KEY')!;
 const MERCADO_PAGO_ACCESS_TOKEN = Deno.env.get('MERCADO_PAGO_ACCESS_TOKEN'); // se estiver usando MP
 
 const supabaseAdmin = createClient(SUPABASE_URL, SUPABASE_SERVICE_ROLE_KEY, {
@@ -42,15 +43,18 @@ serve(async (req: Request) => {
 
   try {
     const authHeader = req.headers.get('Authorization');
-    const token = authHeader?.replace('Bearer ', '');
+    const token = authHeader?.replace('Bearer ', '').trim();
+
     if (!token) {
+      console.error('[create-checkout] MISSING_TOKEN: Authorization header missing or empty.');
       return new Response(
-        JSON.stringify({ ok: false, message: 'Não autenticado.' }),
+        JSON.stringify({ ok: false, code: 'MISSING_TOKEN', message: 'Sessão inválida ou expirada. Faça login novamente.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }
 
-    const supabaseUserClient = createClient(SUPABASE_URL, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    // Usar o cliente Supabase com o token do usuário para obter a sessão
+    const supabaseUserClient = createClient(SUPABASE_URL, SUPABASE_ANON_KEY, {
       global: { headers: { Authorization: authHeader } },
     });
 
@@ -60,8 +64,9 @@ serve(async (req: Request) => {
     } = await supabaseUserClient.auth.getUser();
 
     if (userError || !user) {
+      console.error('[create-checkout] INVALID_USER:', userError?.message || 'User object is null.');
       return new Response(
-        JSON.stringify({ ok: false, message: 'Usuário inválido.' }),
+        JSON.stringify({ ok: false, code: 'INVALID_USER', message: 'Não foi possível identificar o usuário. Faça login novamente.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }

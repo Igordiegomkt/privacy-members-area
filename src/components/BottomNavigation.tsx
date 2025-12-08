@@ -1,5 +1,6 @@
 import React from 'react';
 import { useLocation, useNavigate } from 'react-router-dom';
+import { Home, LayoutGrid, Store, Flame } from 'lucide-react';
 
 export const BottomNavigation: React.FC = () => {
   const location = useLocation();
@@ -8,59 +9,52 @@ export const BottomNavigation: React.FC = () => {
   const navItems = [
     {
       id: 'mural',
-      label: 'Mural',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 10V3L4 14h7v7l9-11h-7z" />
-        </svg>
-      ),
-      path: '/mural',
+      label: 'Início',
+      icon: <Home size={28} />,
+      path: '/', // ✅ Rota corrigida para a Home de Modelos
     },
     {
       id: 'feed',
       label: 'Feed',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 6h13M8 12h13M8 18h13M3 6h.01M3 12h.01M3 18h.01" />
-        </svg>
-      ),
+      icon: <LayoutGrid size={28} />,
       path: '/feed',
+    },
+    {
+      id: 'loja',
+      label: 'Loja',
+      icon: <Store size={28} />,
+      path: '/loja',
     },
     {
       id: 'trending',
       label: 'Em alta',
-      icon: (
-        <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-          <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M13 7h8m0 0v8m0-8l-8 8-4-4-6 6" />
-        </svg>
-      ),
-      path: '/trending',
+      icon: <Flame size={28} />,
+      path: '/em-alta',
     },
   ];
 
   const isActive = (path: string) => {
-    return location.pathname === path || location.pathname.startsWith(path + '/');
+    // ✅ Lógica de estado ativo corrigida
+    // Mantém "Início" ativo na Home de Modelos (/) e em qualquer perfil de modelo (/modelo/*)
+    if (path === '/') {
+      return location.pathname === '/' || location.pathname.startsWith('/modelo/');
+    }
+    return location.pathname === path;
   };
 
   return (
-    <nav className="fixed bottom-5 left-1/2 z-50 flex w-[90%] max-w-md -translate-x-1/2 items-center justify-around rounded-full bg-dark-lighter/90 px-4 py-3 backdrop-blur-md shadow-lg border border-dark-lighter">
+    <nav className="fixed bottom-0 left-0 right-0 z-50 flex w-full items-center justify-around bg-privacy-surface/80 backdrop-blur-md border-t border-privacy-border">
       {navItems.map((item) => {
         const active = isActive(item.path);
         return (
           <button
             key={item.id}
             onClick={() => navigate(item.path)}
-            className={`flex flex-col items-center gap-1 transition-all ${
-              active ? 'text-primary' : 'text-gray-400'
+            className={`flex flex-col items-center gap-1 py-2 px-4 transition-colors ${
+              active ? 'text-primary' : 'text-privacy-text-secondary hover:text-privacy-text-primary'
             }`}
           >
-            <span
-              className={`flex h-10 w-10 items-center justify-center rounded-full transition-all ${
-                active ? 'bg-primary/20 text-primary' : ''
-              }`}
-            >
-              {item.icon}
-            </span>
+            {item.icon}
             <span className="text-xs font-medium">{item.label}</span>
           </button>
         );
@@ -68,4 +62,3 @@ export const BottomNavigation: React.FC = () => {
     </nav>
   );
 };
-

@@ -25,9 +25,8 @@ export const Avatar: React.FC<AvatarProps> = ({
       <img
         src={src}
         alt={alt}
-        className="w-full h-full rounded-full object-cover border-2 border-dark-lighter"
+        className="w-full h-full rounded-full object-cover border-2 border-privacy-border"
       />
     </div>
   );
 };
-

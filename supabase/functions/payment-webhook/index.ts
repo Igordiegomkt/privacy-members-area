@@ -122,6 +122,11 @@ serve(async (req: Request) => {
     const payment = await mpRes.json();
     const status: string | undefined = payment?.status;
     const externalReference: string | undefined = payment?.external_reference;
+    
+    // Valor pago em centavos (transaction_amount é em R$)
+    const paidAmountCents = payment.transaction_amount 
+        ? Math.round(payment.transaction_amount * 100) 
+        : null;
 
     if (!externalReference) {
       console.error("[payment-webhook] Missing external_reference in payment:", payment);
@@ -165,10 +170,12 @@ serve(async (req: Request) => {
           payment_provider: "mercado_pago",
           payment_data: payment,
           paid_at: new Date().toISOString(),
+          amount_cents: paidAmountCents, // Atualiza o valor real pago
+          price_paid_cents: paidAmountCents, // Atualiza o valor real pago
         })
         .eq("user_id", userId)
         .eq("product_id", productId)
-        .eq("status", "pending");
+        .eq("status", "pending"); // Garante que só atualiza se estiver pendente
 
       if (error) {
         console.error("[payment-webhook] Error updating purchase to paid:", error);
@@ -212,6 +219,8 @@ serve(async (req: Request) => {
           status: newStatus,
           payment_provider: "mercado_pago",
           payment_data: payment,
+          amount_cents: paidAmountCents, // Atualiza o valor real pago
+          price_paid_cents: paidAmountCents, // Atualiza o valor real pago
         })
         .eq("user_id", userId)
         .eq("product_id", productId)

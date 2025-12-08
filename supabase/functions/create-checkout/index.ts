@@ -110,6 +110,7 @@ serve(async (req: Request) => {
     // Chave de referência externa e Idempotência
     const externalReference = `${user.id}|${productId}`;
     const idempotencyKey = `${externalReference}-${Date.now()}`; 
+    const NOTIFICATION_URL = `${SUPABASE_URL}/functions/v1/payment-webhook`; // Definindo a URL do webhook
 
     // 2) Registrar intenção de compra (status: pending)
     const { error: upsertError } = await supabaseAdmin
@@ -120,7 +121,7 @@ serve(async (req: Request) => {
           product_id: productId,
           status: 'pending',
           amount_cents: amountCents,
-          price_paid_cents: amountCents, // <-- CORREÇÃO: Adicionando price_paid_cents
+          price_paid_cents: amountCents, // Preenchendo NOT NULL
           // Adicionando campos para evitar erros de NOT NULL ou tipagem
           payment_provider: 'mercado_pago',
           payment_data: null,
@@ -179,7 +180,7 @@ serve(async (req: Request) => {
           email: user.email,
         },
         external_reference: externalReference, // Referência para o webhook
-        notification_url: `${SUPABASE_URL}/functions/v1/payment-webhook`, // URL do webhook
+        notification_url: NOTIFICATION_URL, // Usando a URL definida
       }),
     });
 

@@ -4,9 +4,10 @@ import { Product, Model } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { useProtection } from '../hooks/useProtection';
-import { fetchProducts } from '../lib/marketplace';
+import { fetchProducts, UserPurchaseWithProduct, fetchUserPurchases, hasUserPurchasedProduct } from '../lib/marketplace';
 import { supabase } from '../lib/supabase';
 import { useCheckout } from '../contexts/CheckoutContext';
+import { useNavigate } from 'react-router-dom';
 
 const formatPrice = (cents: number) => {
   return (cents / 100).toLocaleString('pt-BR', {
@@ -15,8 +16,22 @@ const formatPrice = (cents: number) => {
   });
 };
 
-const ProductCard: React.FC<{ product: Product }> = ({ product }: { product: Product }) => {
+interface ProductCardProps {
+  product: Product;
+  isPurchased: boolean;
+}
+
+const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: ProductCardProps) => {
   const { openCheckoutForProduct } = useCheckout();
+  const navigate = useNavigate();
+
+  const handleCtaClick = () => {
+    if (isPurchased) {
+      navigate(`/produto/${product.id}`);
+    } else {
+      openCheckoutForProduct(product.id);
+    }
+  };
 
   return (
     <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
@@ -37,6 +52,11 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }: { product: Pro
           {product.type === 'single_media' && 'Conteúdo'}
           {product.type === 'subscription' && 'Assinatura'}
         </div>
+        {isPurchased && (
+          <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full px-2 py-1 text-[10px] font-bold">
+            ✔ Comprado
+          </div>
+        )}
       </div>
       <div className="p-3 flex flex-col gap-1 flex-1">
         <h3 className="font-semibold text-privacy-text-primary text-sm line-clamp-2">
@@ -46,10 +66,14 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }: { product: Pro
           {formatPrice(product.price_cents)}
         </p>
         <button
-          onClick={() => openCheckoutForProduct(product.id)}
-          className="mt-auto w-full bg-primary text-privacy-black text-xs font-semibold py-1.5 rounded-lg hover:opacity-90"
+          onClick={handleCtaClick}
+          className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity ${
+            isPurchased
+              ? 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
+              : 'bg-primary text-privacy-black hover:opacity-90'
+          }`}
         >
-          Comprar agora via PIX
+          {isPurchased ? 'Ver Detalhes' : 'Comprar agora via PIX'}
         </button>
       </div>
     </div>
@@ -58,18 +82,33 @@ const ProductCard: React.FC<{ product: Product }> = ({ product }: { product: Pro
 
 interface ModelVipCardProps {
   product: Product & { models: Model | null };
+  isPurchased: boolean;
 }
 
-const ModelVipCard: React.FC<ModelVipCardProps> = ({ product }: ModelVipCardProps) => {
+const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: ModelVipCardProps) => {
   const { openCheckoutForProduct } = useCheckout();
+  const navigate = useNavigate();
   const model = product.models;
 
   if (!model) return null;
+
+  const handleCtaClick = () => {
+    if (isPurchased) {
+      navigate(`/modelo/${model.username}`);
+    } else {
+      openCheckoutForProduct(product.id);
+    }
+  };
 
   return (
     <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
       <div className="relative aspect-square">
         <img src={model.avatar_url ?? ''} alt={model.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+        {isPurchased && (
+          <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full px-2 py-1 text-[10px] font-bold">
+            ✔ VIP Ativo
+          </div>
+        )}
       </div>
       <div className="p-3 flex flex-col gap-1 flex-1">
         <h3 className="font-semibold text-sm text-privacy-text-primary truncate">
@@ -82,10 +121,14 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product }: ModelVipCardProp
           {formatPrice(product.price_cents)}
         </p>
         <button
-          onClick={() => openCheckoutForProduct(product.id)}
-          className="mt-auto w-full bg-primary text-privacy-black text-xs font-semibold py-1.5 rounded-lg hover:opacity-90"
+          onClick={handleCtaClick}
+          className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity ${
+            isPurchased
+              ? 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
+              : 'bg-primary text-privacy-black hover:opacity-90'
+          }`}
         >
-          Desbloquear VIP via PIX
+          {isPurchased ? 'Acessar Perfil VIP' : 'Desbloquear VIP via PIX'}
         </button>
       </div>
     </div>
@@ -96,6 +139,7 @@ export const Marketplace: React.FC = () => {
   useProtection();
   const [otherProducts, setOtherProducts] = useState<Product[]>([]);
   const [baseProducts, setBaseProducts] = useState<(Product & { models: Model | null })[]>([]);
+  const [purchases, setPurchases] = useState<UserPurchaseWithProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
@@ -105,17 +149,19 @@ export const Marketplace: React.FC = () => {
         setLoading(true);
         setError(null);
         
-        const [allProducts, baseProductsRes] = await Promise.all([
+        const [allProducts, baseProductsRes, paidPurchases] = await Promise.all([
           fetchProducts(),
           supabase
             .from('products')
             .select('id, name, price_cents, model_id, is_base_membership, models ( id, name, username, avatar_url )')
             .eq('status', 'active')
-            .eq('is_base_membership', true)
+            .eq('is_base_membership', true),
+          fetchUserPurchases(),
         ]);
 
         if (baseProductsRes.error) throw baseProductsRes.error;
 
+        setPurchases(paidPurchases);
         const baseProductIds = new Set(baseProductsRes.data?.map(p => p.id));
         setBaseProducts(baseProductsRes.data as any || []);
         setOtherProducts(allProducts.filter(p => !p.is_base_membership && !baseProductIds.has(p.id)));
@@ -148,7 +194,11 @@ export const Marketplace: React.FC = () => {
                 <h2 className="text-xl font-bold mb-4">Modelos VIP</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {baseProducts.map(p => (
-                    <ModelVipCard key={p.id} product={p} />
+                    <ModelVipCard 
+                      key={p.id} 
+                      product={p} 
+                      isPurchased={hasUserPurchasedProduct(purchases, p.id)}
+                    />
                   ))}
                 </div>
               </section>
@@ -159,7 +209,11 @@ export const Marketplace: React.FC = () => {
                 <h2 className="text-xl font-bold text-white mb-4">Packs e conteúdos exclusivos</h2>
                 <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
                   {otherProducts.map((product) => (
-                    <ProductCard key={product.id} product={product} />
+                    <ProductCard 
+                      key={product.id} 
+                      product={product} 
+                      isPurchased={hasUserPurchasedProduct(purchases, product.id)}
+                    />
                   ))}
                 </div>
               </section>

@@ -51,6 +51,7 @@ serve(async (req: Request) => {
         created_at,
         paid_at,
         amount_cents,
+        price_paid_cents,
         products (
           id,
           name,
@@ -103,7 +104,8 @@ serve(async (req: Request) => {
       const product = p.products;
       const model = product?.models;
 
-      const amountCents = p.amount_cents ?? product?.price_cents ?? 0;
+      // Prioriza price_paid_cents (valor real pago), depois amount_cents, depois price_cents do produto
+      const amountCents = p.price_paid_cents ?? p.amount_cents ?? product?.price_cents ?? 0;
 
       if (model) {
         const key = model.id;

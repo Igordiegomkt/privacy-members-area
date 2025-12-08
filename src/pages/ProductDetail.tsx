@@ -2,9 +2,9 @@ import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Product } from '../types';
+import { fetchProductById, fetchUserPurchases, hasUserPurchasedProduct } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
-import { fetchProductById } from '../lib/marketplace';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft } from 'lucide-react';
 import { usePurchases } from '../contexts/PurchaseContext';
@@ -22,8 +22,9 @@ export const ProductDetail: React.FC = () => {
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
-  const { hasPurchase } = usePurchases();
-  const isPurchased = id ? hasPurchase(id) : false;
+  // Usando usePurchases para reatividade em tempo real
+  const { purchases, isLoading: isLoadingPurchases } = usePurchases();
+  const isPurchased = id ? hasUserPurchasedProduct(purchases, id) : false;
   
   const [purchaseLoading, setPurchaseLoading] = useState(false);
   const [purchaseError, setPurchaseError] = useState<string | null>(null);
@@ -70,7 +71,7 @@ export const ProductDetail: React.FC = () => {
     }
   };
 
-  if (loading) {
+  if (loading || isLoadingPurchases) {
     return (
       <div className="min-h-screen bg-privacy-black text-white flex items-center justify-center">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -119,18 +120,19 @@ export const ProductDetail: React.FC = () => {
               <p className="text-3xl font-bold text-primary">{formatPrice(product.price_cents)}</p>
               
               {isPurchased ? (
-                product.is_base_membership ? (
-                  <button 
-                    onClick={() => navigate('/modelo/carolina-andrade')}
-                    className="w-full mt-4 bg-primary hover:opacity-90 text-privacy-black font-semibold py-3 rounded-lg transition-opacity"
-                  >
-                    Entrar no VIP
-                  </button>
-                ) : (
-                  <button disabled className="w-full mt-4 bg-green-500/20 text-green-400 font-semibold py-3 rounded-lg cursor-not-allowed">
-                    Já comprado
-                  </button>
-                )
+                <>
+                  <div className="w-full mt-4 bg-green-500/20 text-green-400 font-semibold py-3 rounded-lg text-center">
+                    ✅ Conteúdo desbloqueado!
+                  </div>
+                  {product.is_base_membership && (
+                    <button 
+                      onClick={() => navigate(`/modelo/${product.model_id}`)} // Assumindo que model_id pode ser usado para buscar o username ou que o produto tem o username
+                      className="w-full mt-2 bg-primary hover:opacity-90 text-privacy-black font-semibold py-3 rounded-lg transition-opacity"
+                    >
+                      Ir para o Perfil VIP
+                    </button>
+                  )}
+                </>
               ) : (
                 <button 
                   onClick={handlePurchase}
@@ -144,6 +146,14 @@ export const ProductDetail: React.FC = () => {
             </div>
           </div>
         </div>
+        
+        {/* TODO: Adicionar a listagem de mídias do pack aqui se isPurchased for true */}
+        {isPurchased && (
+            <div className="mt-10">
+                <h2 className="text-xl font-bold mb-4">Conteúdo do Pack</h2>
+                <p className="text-privacy-text-secondary">A listagem das mídias deste pack será exibida aqui.</p>
+            </div>
+        )}
       </main>
       <BottomNavigation />
     </div>

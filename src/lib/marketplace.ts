@@ -8,7 +8,8 @@ export interface UserPurchaseWithProduct {
   status: 'pending' | 'paid' | 'expired' | 'refunded';
   created_at: string;
   paid_at: string | null;
-  amount_cents: number | null;
+  amount_cents: number; // Valor do produto no momento da compra
+  price_paid_cents: number; // Valor efetivamente pago
   products: (Product & {
     models: Model | null;
   }) | null;
@@ -69,6 +70,7 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
       created_at,
       paid_at,
       amount_cents,
+      price_paid_cents,
       products (
         id,
         name,
@@ -140,7 +142,8 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
       status: row.status,
       created_at: row.created_at,
       paid_at: row.paid_at,
-      amount_cents: row.amount_cents,
+      amount_cents: row.amount_cents ?? 0,
+      price_paid_cents: row.price_paid_cents ?? 0,
       products: normalizedProduct,
     };
 
@@ -150,22 +153,13 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
   return normalized;
 };
 
-export const hasUserPurchased = async (productId: string): Promise<boolean> => {
-  const product = await fetchProductById(productId);
-  if (!product) return false;
-  if (product.is_base_membership) return true;
-
-  const { data: { user } } = await supabase.auth.getUser();
-  if (!user) return false;
-
-  const { count } = await supabase
-    .from('user_purchases')
-    .select('id', { count: 'exact', head: true })
-    .eq('user_id', user.id)
-    .eq('product_id', productId)
-    .eq('status', 'paid');
-
-  return (count ?? 0) > 0;
+export const hasUserPurchasedProduct = (
+  purchases: UserPurchaseWithProduct[],
+  productId?: string | null
+): boolean => {
+  if (!productId) return false;
+  // Verifica se existe uma compra com status 'paid' para o produto
+  return purchases.some(p => p.product_id === productId && p.status === 'paid');
 };
 
 export const createCheckoutSession = async (productId: string): Promise<PixCheckoutData> => {

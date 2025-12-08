@@ -152,7 +152,7 @@ export const MyPurchases: React.FC = () => {
                               </p>
                             )}
                             <p className="text-xs text-primary mt-1">
-                              {formatPrice(product.price_cents)}
+                              {formatPrice(p.price_paid_cents)}
                             </p>
                           </div>
                         </div>
@@ -199,7 +199,7 @@ export const MyPurchases: React.FC = () => {
                               </p>
                             )}
                             <p className="text-xs text-primary mt-1">
-                              {formatPrice(product.price_cents)}
+                              {formatPrice(p.price_paid_cents)}
                             </p>
                           </div>
                         </div>

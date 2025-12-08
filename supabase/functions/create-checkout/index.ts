@@ -120,17 +120,22 @@ serve(async (req: Request) => {
           product_id: productId,
           status: 'pending',
           amount_cents: amountCents,
+          // Adicionando campos para evitar erros de NOT NULL ou tipagem
+          payment_provider: 'mercado_pago',
+          payment_data: null,
+          paid_at: null,
         },
         {
           onConflict: 'user_id, product_id',
-          ignoreDuplicates: false, // Atualiza se já existir, mas mantém o status 'pending' se for o caso
+          ignoreDuplicates: false,
         }
-      );
+      )
+      .maybeSingle(); // Usando maybeSingle para ser mais defensivo
 
     if (upsertError) {
       console.error('[create-checkout] Upsert error:', upsertError);
       return new Response(
-        JSON.stringify({ ok: false, message: 'Erro ao registrar intenção de compra.' }),
+        JSON.stringify({ ok: false, code: "PURCHASE_UPSERT_ERROR", message: upsertError.message || 'Erro ao registrar intenção de compra.' }),
         { status: 200, headers: { ...corsHeaders, 'Content-Type': 'application/json' } },
       );
     }

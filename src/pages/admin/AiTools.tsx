@@ -1,4 +1,5 @@
-import React, { useState } from 'react';
+import * as React from 'react';
+import { useState } from 'react';
 import { supabase } from '../../lib/supabase';
 
 type GenerationType = 'caption' | 'cta' | 'product_description' | 'bio' | 'media_preview';

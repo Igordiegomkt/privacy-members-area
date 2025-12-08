@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { MediaCard } from './MediaCard';
 
@@ -14,7 +14,7 @@ export const PostCard: React.FC<PostCardProps> = ({
   onLockedClick,
   onOpenVideo,
   onOpenImage,
-}) => {
+}: PostCardProps) => {
   const model = media.model;
 
   return (

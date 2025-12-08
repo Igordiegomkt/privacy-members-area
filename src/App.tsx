@@ -1,4 +1,5 @@
-import React, { useEffect } from 'react';
+import * as React from 'react';
+import { useEffect } from 'react';
 import { Routes, Route, Navigate, useNavigate } from 'react-router-dom';
 import { Login } from './pages/Login';
 import { Home } from './pages/Home';
@@ -27,7 +28,7 @@ import { AiTools } from './pages/admin/AiTools';
 import { CheckoutModal } from './components/CheckoutModal'; // Novo import
 
 // Componente de rota protegida para usuários
-const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {
   const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
   
   if (!isAuthenticated) {

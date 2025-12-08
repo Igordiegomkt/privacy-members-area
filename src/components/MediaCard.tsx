@@ -1,4 +1,5 @@
-import React, { useRef, useState } from 'react';
+import * as React from 'react';
+import { useRef, useState } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { Lock, Video, Camera } from 'lucide-react';
 
@@ -14,7 +15,7 @@ export const MediaCard: React.FC<MediaCardProps> = ({
   onLockedClick,
   onOpenVideo,
   onOpenImage,
-}) => {
+}: MediaCardProps) => {
   const isVideo = media.type === 'video';
   const isLocked = media.accessStatus === 'locked';
   const videoRef = useRef<HTMLVideoElement | null>(null);

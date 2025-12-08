@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
@@ -8,7 +9,14 @@ import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace'
 
 const BASE_MODEL_USERNAME = 'carolina-andrade';
 
-const TrendingModelCard: React.FC<{ model: ModelWithStats; rank: number; isVip: boolean; isPurchased: boolean }> = ({ model, rank, isVip, isPurchased }) => {
+interface TrendingModelCardProps {
+    model: ModelWithStats;
+    rank: number;
+    isVip: boolean;
+    isPurchased: boolean;
+}
+
+const TrendingModelCard: React.FC<TrendingModelCardProps> = ({ model, rank, isVip, isPurchased }: TrendingModelCardProps) => {
     const navigate = useNavigate();
 
     const getBadge = () => {

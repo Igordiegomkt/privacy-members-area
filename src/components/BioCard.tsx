@@ -1,11 +1,11 @@
-import React from 'react';
+import * as React from 'react';
 import { CreatorProfile } from '../types';
 
 interface BioCardProps {
   profile: CreatorProfile;
 }
 
-export const BioCard: React.FC<BioCardProps> = ({ profile }) => {
+export const BioCard: React.FC<BioCardProps> = ({ profile }: BioCardProps) => {
   return (
     <div className="w-full">
       {/* Nome e Username */}

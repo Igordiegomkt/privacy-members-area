@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 
 interface AvatarProps {
   src: string;
@@ -7,7 +7,7 @@ interface AvatarProps {
   className?: string;
 }
 
-const sizeClasses = {
+const sizeClasses: Record<NonNullable<AvatarProps['size']>, string> = {
   sm: 'w-12 h-12',
   md: 'w-16 h-16',
   lg: 'w-24 h-24',
@@ -19,7 +19,7 @@ export const Avatar: React.FC<AvatarProps> = ({
   alt, 
   size = 'md',
   className = '' 
-}) => {
+}: AvatarProps) => {
   return (
     <div className={`${sizeClasses[size]} ${className}`}>
       <img

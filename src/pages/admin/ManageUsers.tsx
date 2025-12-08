@@ -1,8 +1,9 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import * as React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { User } from '@supabase/supabase-js';
 
-const UserList: React.FC<{ userListKey: number }> = ({ userListKey }) => {
+const UserList: React.FC<{ userListKey: number }> = ({ userListKey }: { userListKey: number }) => {
   const [users, setUsers] = useState<User[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);

@@ -5,7 +5,8 @@
 // 1) Rodar checklist de compras end-to-end
 // 2) Conferir Minhas Compras + Admin Dashboard
 
-import React, { createContext, useContext, useState, useCallback } from 'react';
+import * as React from 'react';
+import { createContext, useContext, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 
 type CheckoutState = {
@@ -28,7 +29,7 @@ type CheckoutContextValue = {
 
 const CheckoutContext = createContext<CheckoutContextValue | undefined>(undefined);
 
-export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {
   const [state, setState] = useState<CheckoutState>({
     isOpen: false,
     loading: false,

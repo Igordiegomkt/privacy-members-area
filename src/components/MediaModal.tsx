@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { Dialog, DialogContent } from './ui/dialog';
 
@@ -8,7 +8,7 @@ interface MediaModalProps {
   onClose: () => void;
 }
 
-export const MediaModal: React.FC<MediaModalProps> = ({ media, isOpen, onClose }) => {
+export const MediaModal: React.FC<MediaModalProps> = ({ media, isOpen, onClose }: MediaModalProps) => {
   if (!media) return null;
 
   return (

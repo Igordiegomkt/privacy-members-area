@@ -1,4 +1,5 @@
-import React, { createContext, useContext, useState, useEffect, useCallback } from 'react';
+import * as React from 'react';
+import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
 import { Session } from '@supabase/supabase-js';
@@ -11,7 +12,7 @@ interface PurchaseContextType {
 
 const PurchaseContext = createContext<PurchaseContextType | undefined>(undefined);
 
-export const PurchaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }) => {
+export const PurchaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {
   const [purchases, setPurchases] = useState<UserPurchaseWithProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
   const [session, setSession] = useState<Session | null>(null);

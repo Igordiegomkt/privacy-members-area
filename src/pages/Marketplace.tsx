@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
+import { useEffect, useState } from 'react';
 import { Product, Model } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
@@ -14,7 +15,7 @@ const formatPrice = (cents: number) => {
   });
 };
 
-const ProductCard: React.FC<{ product: Product }> = ({ product }) => {
+const ProductCard: React.FC<{ product: Product }> = ({ product }: { product: Product }) => {
   const { openCheckoutForProduct } = useCheckout();
 
   return (
@@ -59,7 +60,7 @@ interface ModelVipCardProps {
   product: Product & { models: Model | null };
 }
 
-const ModelVipCard: React.FC<ModelVipCardProps> = ({ product }) => {
+const ModelVipCard: React.FC<ModelVipCardProps> = ({ product }: ModelVipCardProps) => {
   const { openCheckoutForProduct } = useCheckout();
   const model = product.models;
 

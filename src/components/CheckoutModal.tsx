@@ -4,7 +4,7 @@
 // 1) Rodar checklist de compras end-to-end
 // 2) Conferir Minhas Compras + Admin Dashboard
 
-import React from 'react';
+import * as React from 'react';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { X, Clipboard, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';

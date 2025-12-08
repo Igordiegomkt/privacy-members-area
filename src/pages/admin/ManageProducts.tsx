@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import * as React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Product, Model } from '../../types';
@@ -6,7 +7,13 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from 
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const ProductForm: React.FC<{ modelId: string; product?: Product; onSave: () => void }> = ({ modelId, product, onSave }) => {
+interface ProductFormProps {
+    modelId: string;
+    product?: Product;
+    onSave: () => void;
+}
+
+const ProductForm: React.FC<ProductFormProps> = ({ modelId, product, onSave }: ProductFormProps) => {
   const [formData, setFormData] = useState<Partial<Product>>({
     name: '', description: '', price_cents: 0, type: 'pack', is_base_membership: false, cover_thumbnail: '', ...product
   });

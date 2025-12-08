@@ -1,4 +1,5 @@
-import React, { useState, useEffect, useCallback } from 'react';
+import * as React from 'react';
+import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 
 interface PaymentProvider {
@@ -10,7 +11,12 @@ interface PaymentProvider {
   is_active: boolean;
 }
 
-const ProviderCard: React.FC<{ provider: PaymentProvider; onUpdate: () => void }> = ({ provider, onUpdate }) => {
+interface ProviderCardProps {
+    provider: PaymentProvider;
+    onUpdate: () => void;
+}
+
+const ProviderCard: React.FC<ProviderCardProps> = ({ provider, onUpdate }: ProviderCardProps) => {
     const [isEditing, setIsEditing] = useState(false);
     const [formData, setFormData] = useState({ ...provider });
     const [loading, setLoading] = useState(false);

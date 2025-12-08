@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { Link, useSearchParams } from 'react-router-dom';
 
 const PurchaseFailed: React.FC = () => {

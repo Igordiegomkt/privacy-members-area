@@ -1,4 +1,5 @@
-import React, { useEffect, useRef } from 'react';
+import * as React from 'react';
+import { useEffect, useRef } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 
 interface VideoPlayerModalProps {
@@ -7,7 +8,7 @@ interface VideoPlayerModalProps {
   onClose: () => void;
 }
 
-export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ media, isOpen, onClose }) => {
+export const VideoPlayerModal: React.FC<VideoPlayerModalProps> = ({ media, isOpen, onClose }: VideoPlayerModalProps) => {
   const videoRef = useRef<HTMLVideoElement | null>(null);
 
   useEffect(() => {

@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
+import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Model, Product } from '../types';
 import { fetchModelByUsername, fetchMediaForModel, fetchProductsForModel, MediaItemWithAccess } from '../lib/models';
@@ -17,7 +18,14 @@ import { useCheckout } from '../contexts/CheckoutContext';
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-const ProductCard: React.FC<{ product: Product; isPurchased: boolean; modelName: string; isFirst: boolean }> = ({ product, isPurchased, modelName, isFirst }) => {
+interface ProductCardProps {
+    product: Product;
+    isPurchased: boolean;
+    modelName: string;
+    isFirst: boolean;
+}
+
+const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelName, isFirst }: ProductCardProps) => {
     const navigate = useNavigate();
     const { openCheckoutForProduct } = useCheckout();
 

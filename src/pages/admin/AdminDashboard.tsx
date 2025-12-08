@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
+import { useEffect, useState } from 'react';
 import { DashboardCard } from '../../components/admin/DashboardCard';
 import { AccessLogTable } from '../../components/admin/AccessLogTable';
 import { RealtimeUsersWidget } from '../../components/admin/RealtimeUsersWidget';

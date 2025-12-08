@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { FirstAccessRecord } from '../../types';
 
 interface AccessLogTableProps {
@@ -6,7 +6,7 @@ interface AccessLogTableProps {
   isLoading: boolean;
 }
 
-export const AccessLogTable: React.FC<AccessLogTableProps> = ({ records, isLoading }) => {
+export const AccessLogTable: React.FC<AccessLogTableProps> = ({ records, isLoading }: AccessLogTableProps) => {
   return (
     <div className="bg-privacy-surface p-6 rounded-lg shadow-lg mt-8">
       <h2 className="text-xl font-bold text-privacy-text-primary mb-4">Últimos Acessos Registrados</h2>
@@ -32,7 +32,7 @@ export const AccessLogTable: React.FC<AccessLogTableProps> = ({ records, isLoadi
                 <td colSpan={6} className="px-6 py-4 text-center">Nenhum registro encontrado.</td>
               </tr>
             ) : (
-              records.map((record) => (
+              records.map((record: FirstAccessRecord) => (
                 <tr key={record.id} className="bg-privacy-surface border-b border-privacy-border hover:bg-privacy-border/50">
                   <td className="px-6 py-4 font-medium text-privacy-text-primary whitespace-nowrap">{record.name}</td>
                   <td className="px-6 py-4">{new Date(record.created_at!).toLocaleString('pt-BR')}</td>

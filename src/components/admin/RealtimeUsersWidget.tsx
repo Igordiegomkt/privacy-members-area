@@ -1,14 +1,14 @@
-import React from 'react';
-import { PresenceState } from '../../types';
+import * as React from 'react';
+import { PresenceState, UserPresence } from '../../types';
 
 interface RealtimeUsersWidgetProps {
   presence: PresenceState;
 }
 
-export const RealtimeUsersWidget: React.FC<RealtimeUsersWidgetProps> = ({ presence }) => {
+export const RealtimeUsersWidget: React.FC<RealtimeUsersWidgetProps> = ({ presence }: RealtimeUsersWidgetProps) => {
   const onlineUsers = Object.values(presence).flatMap(p => p);
-  const uniqueUsers = Array.from(new Map(onlineUsers.map(item => [item.user, item])).values())
-    .sort((a, b) => a.user.localeCompare(b.user));
+  const uniqueUsers = Array.from(new Map(onlineUsers.map((item: UserPresence) => [item.user, item])).values())
+    .sort((a: UserPresence, b: UserPresence) => a.user.localeCompare(b.user));
 
   return (
     <div className="bg-privacy-surface p-6 rounded-lg shadow-lg col-span-1 lg:col-span-2">
@@ -18,7 +18,7 @@ export const RealtimeUsersWidget: React.FC<RealtimeUsersWidgetProps> = ({ presen
       <div className="max-h-96 overflow-y-auto pr-2">
         {uniqueUsers.length > 0 ? (
           <ul className="space-y-3">
-            {uniqueUsers.map((userState) => (
+            {uniqueUsers.map((userState: UserPresence) => (
               <li key={userState.user} className="flex items-center justify-between p-3 bg-privacy-border rounded-md">
                 <div className="flex items-center gap-3">
                   <span className="relative flex h-3 w-3">

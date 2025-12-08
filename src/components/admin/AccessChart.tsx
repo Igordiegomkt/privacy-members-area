@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
 interface AccessChartProps {
@@ -11,7 +11,7 @@ interface CustomTooltipProps {
   label?: string;
 }
 
-const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }) => {
+const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label }: CustomTooltipProps) => {
   if (active && payload && payload.length) {
     return (
       <div className="bg-privacy-surface p-3 rounded-md border border-privacy-border">
@@ -23,7 +23,7 @@ const CustomTooltip: React.FC<CustomTooltipProps> = ({ active, payload, label })
   return null;
 };
 
-export const AccessChart: React.FC<AccessChartProps> = ({ data }) => {
+export const AccessChart: React.FC<AccessChartProps> = ({ data }: AccessChartProps) => {
   return (
     <div className="bg-privacy-surface p-6 rounded-lg shadow-lg mt-8">
       <h2 className="text-xl font-bold text-privacy-text-primary mb-4">Acessos Totais do Dia</h2>
@@ -35,7 +35,7 @@ export const AccessChart: React.FC<AccessChartProps> = ({ data }) => {
             <YAxis stroke="#A0A0A0" fontSize={12} allowDecimals={false} />
             <Tooltip content={<CustomTooltip />} cursor={{ fill: 'rgba(255, 95, 0, 0.1)' }} />
             <Bar dataKey="count" name="Acessos">
-              {data.map((_entry, index) => (
+              {data.map((_entry: { hour: string; count: number }, index: number) => (
                 <Cell key={`cell-${index}`} fill="#FF5F00" />
               ))}
             </Bar>

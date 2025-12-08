@@ -1,4 +1,4 @@
-import React from 'react';
+import * as React from 'react';
 
 interface DashboardCardProps {
   title: string;
@@ -7,7 +7,7 @@ interface DashboardCardProps {
   description?: string;
 }
 
-export const DashboardCard: React.FC<DashboardCardProps> = ({ title, value, icon, description }) => {
+export const DashboardCard: React.FC<DashboardCardProps> = ({ title, value, icon, description }: DashboardCardProps) => {
   return (
     <div className="bg-privacy-surface p-6 rounded-lg shadow-lg">
       <div className="flex items-start justify-between">

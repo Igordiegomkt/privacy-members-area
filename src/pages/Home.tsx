@@ -1,4 +1,5 @@
-import React, { useEffect, useState } from 'react';
+import * as React from 'react';
+import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Model } from '../types';
@@ -12,7 +13,7 @@ interface ModelWithAccess extends Model {
   mainProductPriceCents?: number;
 }
 
-const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }) => {
+const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: ModelWithAccess }) => {
   const navigate = useNavigate();
   // Removendo openCheckoutForProduct daqui, pois a Home só navega para o perfil.
 

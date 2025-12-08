@@ -1,4 +1,5 @@
-import React, { useState, useEffect } from 'react';
+import * as React from 'react';
+import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { saveUTMsToLocalStorage } from '../utils/utmParser';
 import { TrackingScripts } from '../components/TrackingScripts';

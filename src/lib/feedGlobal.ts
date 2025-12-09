@@ -18,7 +18,15 @@ export const fetchGlobalFeedItems = async (): Promise<GlobalFeedItem[]> => {
   // 2. Buscar todas as mídias com os dados de suas modelos
   const { data: mediaWithModels, error } = await supabase
     .from('media_items')
-    .select('*, model:models(*)')
+    .select(`
+      *, 
+      model:models(*),
+      ai_title,
+      ai_subtitle,
+      ai_description,
+      ai_cta,
+      ai_tags
+    `) // Incluindo todos os campos de copy e IA
     .order('created_at', { ascending: false })
     .limit(100); // Limitar para performance inicial
 

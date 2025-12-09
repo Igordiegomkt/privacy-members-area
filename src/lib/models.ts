@@ -75,7 +75,14 @@ export const fetchProductsForModel = async (modelId: string): Promise<Product[]>
 export const fetchMediaForModel = async (modelId: string): Promise<MediaItemWithAccess[]> => {
   const { data: mediaItems, error: mediaError } = await supabase
     .from('media_items')
-    .select('*')
+    .select(`
+      *,
+      ai_title,
+      ai_subtitle,
+      ai_description,
+      ai_cta,
+      ai_tags
+    `) // Incluindo todos os campos de copy e IA
     .eq('model_id', modelId)
     .order('created_at', { ascending: false });
 

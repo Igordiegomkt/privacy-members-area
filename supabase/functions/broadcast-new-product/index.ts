@@ -7,6 +7,7 @@ declare const Deno: any;
 
 const SUPABASE_URL = Deno.env.get("SUPABASE_URL");
 const SUPABASE_SERVICE_ROLE_KEY = Deno.env.get("SUPABASE_SERVICE_ROLE_KEY");
+const SUPABASE_ANON_KEY = Deno.env.get("SUPABASE_ANON_KEY"); // Adicionado
 
 const corsHeaders = {
   "Access-Control-Allow-Origin": "*",
@@ -49,6 +50,69 @@ serve(async (req: Request) => {
   }
 
   try {
+    // --- VALIDAÇÃO DE ADMIN ---
+    const authHeader = req.headers.get("Authorization");
+
+    if (!authHeader) {
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          code: "NO_AUTH",
+          message: "Token ausente."
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    if (!SUPABASE_ANON_KEY) {
+      console.error("[broadcast-new-product] Missing SUPABASE_ANON_KEY env var");
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          code: "SERVER_MISCONFIG",
+          message: "Configuração do servidor incompleta.",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+
+    // Client representando o usuário chamador (com o token do header)
+    const supabaseUser = createClient(SUPABASE_URL!, SUPABASE_ANON_KEY, {
+      global: {
+        headers: {
+          Authorization: authHeader,
+        },
+      },
+    });
+
+    // Buscar perfil do usuário e verificar se é admin
+    const { data: profile, error: profileError } = await supabaseUser
+      .from("profiles")
+      .select("role")
+      .single();
+
+    if (profileError || !profile || profile.role !== "admin") {
+      console.error("[broadcast-new-product] Forbidden - not admin:", profileError);
+      return new Response(
+        JSON.stringify({
+          ok: false,
+          code: "FORBIDDEN",
+          message: "Apenas administradores podem disparar notificações.",
+        }),
+        {
+          status: 200,
+          headers: { ...corsHeaders, "Content-Type": "application/json" },
+        },
+      );
+    }
+    // --- FIM DA VALIDAÇÃO DE ADMIN ---
+
     const body = (await req.json()) as BroadcastBody;
 
     if (!body.productId) {
@@ -67,7 +131,7 @@ serve(async (req: Request) => {
 
     const productId = body.productId;
 
-    // 1) Buscar produto e modelo
+    // 1) Buscar produto e modelo (USANDO supabaseAdmin)
     const { data: product, error: productError } = await supabaseAdmin
       .from("products")
       .select("id, name, type, description, price_cents, models ( name )")
@@ -111,7 +175,7 @@ serve(async (req: Request) => {
       ? `Confira o novo produto: ${product.name} por R$ ${price.toFixed(2)}.`
       : `Confira o novo produto: ${product.name} disponível na plataforma.`;
 
-    // 2) Criar notification
+    // 2) Criar notification (USANDO supabaseAdmin)
     const { data: notification, error: notificationError } = await supabaseAdmin
       .from("notifications")
       .insert([
@@ -144,7 +208,7 @@ serve(async (req: Request) => {
 
     const notificationId = notification.id as string;
 
-    // 3) Buscar todos os usuários (usando profiles, que é a tabela de usuários do projeto)
+    // 3) Buscar todos os usuários (USANDO supabaseAdmin)
     const { data: users, error: usersError } = await supabaseAdmin
       .from("profiles")
       .select("id");
@@ -154,7 +218,7 @@ serve(async (req: Request) => {
       // Não é um erro fatal, a notificação global foi criada.
     }
 
-    // 4) Criar user_notifications em batch
+    // 4) Criar user_notifications em batch (USANDO supabaseAdmin)
     const userNotificationsPayload = (users as Profile[] || []).map((u: Profile) => ({
       user_id: u.id,
       notification_id: notificationId,

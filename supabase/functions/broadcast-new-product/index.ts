@@ -25,6 +25,10 @@ interface BroadcastBody {
   productId?: string;
 }
 
+interface Profile {
+  id: string;
+}
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -151,7 +155,7 @@ serve(async (req: Request) => {
     }
 
     // 4) Criar user_notifications em batch
-    const userNotificationsPayload = (users || []).map((u) => ({
+    const userNotificationsPayload = (users as Profile[] || []).map((u: Profile) => ({
       user_id: u.id,
       notification_id: notificationId,
       is_read: false,

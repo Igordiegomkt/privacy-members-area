@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { MediaItem, Model, Product } from '../../types';
-import { Check, X, Save, Edit, Trash2, Sparkles } from 'lucide-react';
+import { Check, X, Save, Edit, Trash2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
 
 interface AiResult {
   title: string;
@@ -40,6 +40,26 @@ const linkMediaToProduct = async (mediaIds: string[], productId: string) => {
     if (error) throw new Error(`Erro ao vincular mídia ao produto: ${error.message}`);
 };
 
+const insertFeedRecords = async (modelId: string, mediaId: string, copy: AiResult) => {
+    const feedPayload = {
+        model_id: modelId,
+        media_id: mediaId,
+        title: copy.title,
+        subtitle: copy.subtitle,
+        description: copy.description,
+        cta: copy.cta,
+    };
+
+    // Inserir no feed da modelo
+    const { error: modelFeedError } = await supabase.from('model_feed').insert(feedPayload);
+    if (modelFeedError) console.error('Erro ao inserir no model_feed:', modelFeedError);
+
+    // Inserir no feed global
+    const { error: globalFeedError } = await supabase.from('global_feed').insert(feedPayload);
+    if (globalFeedError) console.error('Erro ao inserir no global_feed:', globalFeedError);
+};
+
+
 // Componente para edição inline
 interface MediaItemEditorProps {
     item: MediaItem;
@@ -52,6 +72,7 @@ interface MediaItemEditorProps {
 
 const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSave, onDelete, isSelected, onSelect }: MediaItemEditorProps) => {
     const [isEditing, setIsEditing] = useState(false);
+    const [isExpanded, setIsExpanded] = useState(false);
     const [formData, setFormData] = useState<Partial<MediaItem>>({
         title: item.title || '',
         subtitle: item.subtitle || '',
@@ -65,6 +86,21 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        // Atualiza o formulário quando o item externo muda (ex: após um save em lote)
+        setFormData({
+            title: item.title || '',
+            subtitle: item.subtitle || '',
+            description: item.description || '',
+            cta: item.cta || '',
+            tags: item.tags || [],
+            is_free: item.is_free,
+            url: item.url,
+            thumbnail: item.thumbnail,
+            type: item.type,
+        });
+    }, [item]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
@@ -94,6 +130,7 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
             };
             await onSave(item.id, updates);
             setIsEditing(false);
+            setIsExpanded(false);
         } catch (err: any) {
             setError(err.message);
         } finally {
@@ -104,78 +141,85 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
     const inputStyle = "w-full px-2 py-1 bg-privacy-black border border-privacy-border rounded-md text-privacy-text-primary text-xs focus:outline-none focus:border-primary transition-colors";
 
     return (
-        <tr key={item.id} className="border-b border-privacy-border hover:bg-privacy-border/50">
-            <td className="px-4 py-2 w-10">
-                <input 
-                    type="checkbox" 
-                    checked={isSelected} 
-                    onChange={(e) => onSelect(item.id, e.target.checked)} 
-                />
-            </td>
-            <td className="px-4 py-2 max-w-xs">
-                {error && <p className="text-red-400 text-xs mb-1">{error}</p>}
-                {isEditing ? (
-                    <div className="space-y-1">
-                        <input name="title" value={formData.title || ''} onChange={handleChange} placeholder="Título" className={inputStyle} />
-                        <input name="subtitle" value={formData.subtitle || ''} onChange={handleChange} placeholder="Subtítulo" className={inputStyle} />
-                        <textarea name="description" value={formData.description || ''} onChange={handleChange} placeholder="Descrição" className={`${inputStyle} h-12 resize-none`} />
-                        <input name="cta" value={formData.cta || ''} onChange={handleChange} placeholder="CTA" className={inputStyle} />
-                        <input name="tags" value={(formData.tags || []).join(', ')} onChange={handleChange} placeholder="Tags (separadas por vírgula)" className={inputStyle} />
-                    </div>
-                ) : (
+        <>
+            <tr key={item.id} className="border-b border-privacy-border hover:bg-privacy-border/50">
+                <td className="px-4 py-2 w-10">
+                    <input 
+                        type="checkbox" 
+                        checked={isSelected} 
+                        onChange={(e) => onSelect(item.id, e.target.checked)} 
+                    />
+                </td>
+                <td className="px-4 py-2 max-w-xs">
                     <div className="space-y-0.5">
                         <p className="font-medium text-white truncate">{item.title || 'Sem Título'}</p>
                         <p className="text-xs text-primary truncate">{item.subtitle || 'Sem Subtítulo'}</p>
                         <p className="text-xs text-privacy-text-secondary line-clamp-2">{item.description || 'Sem descrição'}</p>
-                        <p className="text-xs text-privacy-text-secondary/70 mt-1">CTA: {item.cta || 'N/A'}</p>
-                        <p className="text-xs text-privacy-text-secondary/70">Tags: {(item.tags || []).join(', ') || 'N/A'}</p>
                         {item.ai_title && (
                             <div className="flex items-center gap-1 text-[10px] text-green-400 mt-1">
                                 <Sparkles className="w-3 h-3" /> Copy IA Gerada
                             </div>
                         )}
                     </div>
-                )}
-            </td>
-            <td className="px-4 py-2 truncate max-w-[150px]">
-                {isEditing ? (
-                    <input name="url" value={formData.url || ''} onChange={handleChange} placeholder="URL" className={inputStyle} />
-                ) : (
-                    item.url
-                )}
-            </td>
-            <td className="px-4 py-2 capitalize">
-                {isEditing ? (
-                    <select name="type" value={formData.type} onChange={handleChange} className={inputStyle}>
-                        <option value="image">Imagem</option>
-                        <option value="video">Vídeo</option>
-                    </select>
-                ) : (
-                    item.type
-                )}
-            </td>
-            <td className="px-4 py-2">
-                {isEditing ? (
-                    <input type="checkbox" name="is_free" checked={!!formData.is_free} onChange={handleChange} />
-                ) : (
-                    item.is_free ? <Check className="w-4 h-4 text-green-500" /> : <X className="w-4 h-4 text-red-500" />
-                )}
-            </td>
-            <td className="px-4 py-2 space-y-1">
-                {isEditing ? (
-                    <button onClick={handleSave} disabled={loading} className="flex items-center gap-1 text-xs bg-green-600 hover:bg-green-700 text-white font-medium py-1 px-2 rounded w-full justify-center">
-                        <Save className="w-3 h-3" /> {loading ? 'Salvando...' : 'Salvar'}
+                </td>
+                <td className="px-4 py-2 truncate max-w-[150px]">
+                    {item.url}
+                </td>
+                <td className="px-4 py-2 capitalize">
+                    {item.type}
+                </td>
+                <td className="px-4 py-2">
+                    {item.is_free ? <Check className="w-4 h-4 text-green-500" /> : <X className="w-4 h-4 text-red-500" />}
+                </td>
+                <td className="px-4 py-2 space-y-1">
+                    <button 
+                        onClick={() => { setIsExpanded(prev => !prev); setIsEditing(true); }} 
+                        className="flex items-center gap-1 text-xs bg-primary/20 text-primary hover:bg-primary/40 font-medium py-1 px-2 rounded w-full justify-center"
+                    >
+                        {isExpanded ? <ChevronUp className="w-3 h-3" /> : <ChevronDown className="w-3 h-3" />} Editar Copy
                     </button>
-                ) : (
-                    <button onClick={() => setIsEditing(true)} className="flex items-center gap-1 text-xs bg-primary/20 text-primary hover:bg-primary/40 font-medium py-1 px-2 rounded w-full justify-center">
-                        <Edit className="w-3 h-3" /> Editar
+                    <button onClick={() => onDelete(item.id)} className="flex items-center gap-1 text-xs bg-red-600/20 text-red-400 hover:bg-red-600/40 font-medium py-1 px-2 rounded w-full justify-center">
+                        <Trash2 className="w-3 h-3" /> Excluir
                     </button>
-                )}
-                <button onClick={() => onDelete(item.id)} className="flex items-center gap-1 text-xs bg-red-600/20 text-red-400 hover:bg-red-600/40 font-medium py-1 px-2 rounded w-full justify-center">
-                    <Trash2 className="w-3 h-3" /> Excluir
-                </button>
-            </td>
-        </tr>
+                </td>
+            </tr>
+            {isExpanded && (
+                <tr className="bg-privacy-border/30">
+                    <td colSpan={6} className="p-4">
+                        <div className="bg-privacy-surface p-4 rounded-lg space-y-3">
+                            {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-medium text-privacy-text-secondary block mb-1">Título</label>
+                                    <input name="title" value={formData.title || ''} onChange={handleChange} placeholder="Título" className={inputStyle} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-privacy-text-secondary block mb-1">Subtítulo</label>
+                                    <input name="subtitle" value={formData.subtitle || ''} onChange={handleChange} placeholder="Subtítulo" className={inputStyle} />
+                                </div>
+                            </div>
+                            <div>
+                                <label className="text-xs font-medium text-privacy-text-secondary block mb-1">Descrição</label>
+                                <textarea name="description" value={formData.description || ''} onChange={handleChange} placeholder="Descrição" className={`${inputStyle} h-16 resize-none`} />
+                            </div>
+                            <div className="grid grid-cols-2 gap-3">
+                                <div>
+                                    <label className="text-xs font-medium text-privacy-text-secondary block mb-1">CTA</label>
+                                    <input name="cta" value={formData.cta || ''} onChange={handleChange} placeholder="CTA" className={inputStyle} />
+                                </div>
+                                <div>
+                                    <label className="text-xs font-medium text-privacy-text-secondary block mb-1">Tags (separadas por vírgula)</label>
+                                    <input name="tags" value={(formData.tags || []).join(', ')} onChange={handleChange} placeholder="Tags" className={inputStyle} />
+                                </div>
+                            </div>
+                            <button onClick={handleSave} disabled={loading} className="flex items-center gap-1 text-sm bg-primary hover:bg-primary-dark text-black font-medium py-2 px-4 rounded disabled:opacity-50">
+                                <Save className="w-4 h-4" /> {loading ? 'Salvando...' : 'Salvar texto da mídia'}
+                            </button>
+                        </div>
+                    </td>
+                </tr>
+            )}
+        </>
     );
 };
 
@@ -195,12 +239,13 @@ export const ManageContent: React.FC = () => {
     const [manualIsFree, setManualIsFree] = useState(false);
     const [manualProductId, setManualProductId] = useState<string>('');
     const [manualTitle, setManualTitle] = useState('');
-    const [manualSubtitle, setManualSubtitle] = useState(''); // Novo
+    const [manualSubtitle, setManualSubtitle] = useState('');
     const [manualDescription, setManualDescription] = useState('');
-    const [manualCta, setManualCta] = useState(''); // Novo
-    const [manualTags, setManualTags] = useState(''); // Novo
-    const [manualContext, setManualContext] = useState(''); // Campo para contexto da IA
+    const [manualCta, setManualCta] = useState('');
+    const [manualTags, setManualTags] = useState('');
+    const [manualContext, setManualContext] = useState('');
     const [isGeneratingManual, setIsGeneratingManual] = useState(false);
+    const [aiPreview, setAiPreview] = useState<AiResult | null>(null); // Preview da IA
     
     // Form States - Batch
     const [batchBaseUrl, setBatchBaseUrl] = useState('');
@@ -254,8 +299,12 @@ export const ManageContent: React.FC = () => {
             return;
         }
         setIsGeneratingManual(true);
+        setAiPreview(null);
+        
         const result = await generateMetadata(manualContext, manualType);
+        
         if (result) {
+            setAiPreview(result);
             setManualTitle(result.title);
             setManualSubtitle(result.subtitle);
             setManualDescription(result.description);
@@ -278,7 +327,7 @@ export const ManageContent: React.FC = () => {
         let finalCta = manualCta.trim();
         let finalTags = manualTags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
         
-        let aiResult: AiResult | null = null;
+        let aiResult: AiResult | null = aiPreview; // Usa o preview se existir
 
         // 1. Se o contexto foi fornecido, mas os campos de copy estão vazios, gera automaticamente
         if (manualContext.trim() && (!finalTitle || !finalDescription || !finalSubtitle || !finalCta)) {
@@ -320,8 +369,15 @@ export const ManageContent: React.FC = () => {
             const { data, error } = await supabase.from('media_items').insert(payload).select('id, type').single();
 
             if (error) throw error;
-            if (data && manualProductId) await linkMediaToProduct([data.id], manualProductId);
+            const mediaId = data.id;
+
+            if (data && manualProductId) await linkMediaToProduct([mediaId], manualProductId);
             
+            // 2. Inserir registros de feed se a copy da IA foi usada
+            if (aiResult) {
+                await insertFeedRecords(modelId!, mediaId, aiResult);
+            }
+
             alert('Conteúdo adicionado!');
             setManualUrl('');
             setManualTitle('');
@@ -330,6 +386,7 @@ export const ManageContent: React.FC = () => {
             setManualCta('');
             setManualTags('');
             setManualContext('');
+            setAiPreview(null);
             fetchData();
         } catch (err: any) {
             setError(err.message);
@@ -342,6 +399,9 @@ export const ManageContent: React.FC = () => {
         setIsGeneratingBatch(true);
         
         try {
+            const modelName = model?.name || 'a modelo';
+            const genericContext = `Conteúdo ${batchType} exclusivo de ${modelName}.`;
+            
             const newItemsPayload = Array.from({ length: batchCount }, (_, i) => ({
                 model_id: modelId,
                 type: batchType,
@@ -358,31 +418,34 @@ export const ManageContent: React.FC = () => {
                 // 2. Vincular ao produto, se houver
                 if (batchProductId) await linkMediaToProduct(insertedItems.map(item => item.id), batchProductId);
 
-                // 3. Gerar metadados para cada item (usando um contexto genérico)
-                const modelName = model?.name || 'a modelo';
-                const genericContext = `Conteúdo ${batchType} exclusivo de ${modelName}.`;
-                
-                const updates = insertedItems.map(async (item) => {
+                // 3. Gerar metadados e inserir feeds em paralelo
+                const updatesAndFeeds = insertedItems.map(async (item) => {
                     const result = await generateMetadata(genericContext, item.type as 'image' | 'video');
+                    
                     if (result) {
-                        return supabase.from('media_items').update({
+                        // Salva a copy gerada pela IA nos campos principais e ai_*
+                        const updatePromise = supabase.from('media_items').update({
                             title: result.title,
                             subtitle: result.subtitle,
                             description: result.description,
                             cta: result.cta,
                             tags: result.tags,
-                            // Salva a copy gerada pela IA nos campos ai_
                             ai_title: result.title,
                             ai_subtitle: result.subtitle,
                             ai_description: result.description,
                             ai_cta: result.cta,
                             ai_tags: result.tags,
                         }).eq('id', item.id);
+
+                        // Insere nos feeds
+                        const feedPromise = insertFeedRecords(modelId!, item.id, result);
+                        
+                        return Promise.all([updatePromise, feedPromise]);
                     }
                     return null;
                 });
                 
-                await Promise.all(updates);
+                await Promise.all(updatesAndFeeds);
             }
 
             alert(`${batchCount} conteúdos adicionados e copy gerada!`);
@@ -395,7 +458,7 @@ export const ManageContent: React.FC = () => {
     };
 
     const handleSaveMediaItem = async (id: string, updates: Partial<MediaItem>) => {
-        // Ao salvar manualmente, a copy gerada por IA não é atualizada, apenas os campos principais.
+        // Ao salvar manualmente, atualizamos apenas os campos principais.
         const { error: updateError } = await supabase
             .from('media_items')
             .update(updates)
@@ -412,6 +475,7 @@ export const ManageContent: React.FC = () => {
     const handleDeleteSelected = async () => {
         if (selectedIds.size === 0) return;
         if (window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} mídias?`)) {
+            // A exclusão em cascata deve cuidar dos feeds e product_media
             const { error: deleteError } = await supabase.from('media_items').delete().in('id', Array.from(selectedIds));
             if (deleteError) setError(deleteError.message);
             else {
@@ -424,6 +488,7 @@ export const ManageContent: React.FC = () => {
     
     const handleDeleteSingle = async (id: string) => {
         if (window.confirm('Tem certeza que deseja excluir esta mídia?')) {
+            // A exclusão em cascata deve cuidar dos feeds e product_media
             const { error: deleteError } = await supabase.from('media_items').delete().eq('id', id);
             if (deleteError) setError(deleteError.message);
             else {
@@ -468,6 +533,19 @@ export const ManageContent: React.FC = () => {
                         </div>
                         <textarea value={manualContext} onChange={e => setManualContext(e.target.value)} placeholder="Ex: na banheira, lingerie preta, sorrindo..." className={`${inputStyle} h-16 resize-none`} />
                     </div>
+
+                    {/* Preview da IA */}
+                    {aiPreview && (
+                        <div className="bg-privacy-border/50 p-3 rounded-lg space-y-1">
+                            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
+                                <Sparkles className="w-4 h-4 text-primary" /> Preview da Copy Gerada
+                            </h3>
+                            <p className="text-xs text-primary font-medium">{aiPreview.subtitle}</p>
+                            <p className="text-xs text-white font-bold">{aiPreview.title}</p>
+                            <p className="text-xs text-privacy-text-secondary line-clamp-2">{aiPreview.description}</p>
+                            <p className="text-xs text-privacy-text-secondary/70">Tags: {aiPreview.tags.join(', ')}</p>
+                        </div>
+                    )}
 
                     {/* Campos de Copy (Preenchidos pela IA ou manualmente) */}
                     <input value={manualTitle} onChange={e => setManualTitle(e.target.value)} placeholder="Título (Preenchido pela IA)" className={inputStyle} />

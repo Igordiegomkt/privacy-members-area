@@ -14,30 +14,53 @@ interface AiResult {
 }
 
 /**
- * Gera metadados de copy usando a IA, com suporte a análise visual.
+ * Gera metadados de copy usando a IA, com suporte a análise visual e fallback para texto.
  * @param context Contexto textual adicional.
  * @param type Tipo de mídia ('image' ou 'video').
  * @param imageUrl URL da imagem/thumbnail para análise visual.
  */
 const generateMetadata = async (context: string, type: 'image' | 'video', imageUrl?: string): Promise<AiResult | null> => {
     if (!context.trim() && !imageUrl) return null;
-    try {
-        const { data, error } = await supabase.functions.invoke('ai-generate-content', {
-            body: {
-                contentType: type === 'video' ? 'feed_caption' : 'media_description',
-                context: context,
-                imageUrl: imageUrl, // Passa a URL da imagem/thumbnail para a IA
-                language: 'pt-BR',
-            }
-        });
-        if (error) throw error;
-        if (data.ok === false) throw new Error(data.message || 'Erro na IA.');
-        
-        return data.data as AiResult;
-    } catch (e) {
-        console.error("Failed to generate AI metadata:", e);
-        return null;
+
+    const baseBody = {
+        contentType: type === 'video' ? 'feed_caption' : 'media_description',
+        context,
+        language: 'pt-BR' as const,
+    };
+
+    // 1) Tenta com imageUrl (se existir)
+    if (imageUrl) {
+        try {
+            const { data, error } = await supabase.functions.invoke('ai-generate-content', {
+                body: {
+                    ...baseBody,
+                    imageUrl,
+                },
+            });
+            if (error) throw error;
+            if (data.ok === false) throw new Error(data.message || 'Erro na IA (visão).');
+            return data.data as AiResult;
+        } catch (e) {
+            console.warn('IA visão falhou, tentando apenas texto...', e);
+        }
     }
+
+    // 2) Fallback: só texto (se o contexto existir)
+    if (context.trim()) {
+        try {
+            const { data, error } = await supabase.functions.invoke('ai-generate-content', {
+                body: baseBody,
+            });
+            if (error) throw error;
+            if (data.ok === false) throw new Error(data.message || 'Erro na IA (texto).');
+            return data.data as AiResult;
+        } catch (e) {
+            console.error('IA texto também falhou:', e);
+            return null;
+        }
+    }
+    
+    return null;
 };
 
 /**
@@ -466,23 +489,39 @@ export const ManageContent: React.FC = () => {
             });
             
             const insertionPromises = itemsToInsert.map(async ({ fileUrl, thumbnailUrl }) => {
-                // 1. Gerar metadados com IA Vision
-                const aiResult = await generateMetadata(genericContext, batchType, thumbnailUrl);
-                
-                if (!aiResult) {
-                    console.warn(`Falha ao gerar copy para ${fileUrl}. Pulando.`);
+                try {
+                    // 1) Tenta IA (com visão + fallback texto)
+                    let aiResult = await generateMetadata(genericContext, batchType, thumbnailUrl);
+
+                    // 2) Se mesmo assim não voltar nada, cria uma copy padrão (FALLBACK FINAL)
+                    if (!aiResult) {
+                        console.warn(`IA falhou para ${fileUrl}. Usando copy padrão.`);
+                        aiResult = {
+                            title: batchType === 'video' ? 'Vídeo exclusivo 🔥' : 'Conteúdo especial 😈',
+                            subtitle: `Conteúdo quente de ${modelName}`,
+                            description: genericContext || `Cena especial gravada só para você, clima íntimo e provocante.`,
+                            cta: 'Desbloqueie e vem ver tudo sem censura 😈',
+                            tags: batchType === 'video'
+                                ? ['video', 'vip', 'exclusivo']
+                                : ['foto', 'vip', 'hot'],
+                        };
+                    }
+
+                    // 3) Sempre tentar inserir via Edge Function (admin-create-media-item)
+                    const mediaId = await createMediaItemAndFeeds(modelId!, {
+                        file_url: fileUrl,
+                        thumbnail_url: thumbnailUrl,
+                        content_type: batchType,
+                        is_free: false,
+                        product_id: batchProductId || undefined,
+                        ai: aiResult,
+                    });
+
+                    return mediaId;
+                } catch (e) {
+                    console.error(`Erro ao processar ${fileUrl}:`, e);
                     return null;
                 }
-
-                // 2. Inserir via Service Role EF
-                return createMediaItemAndFeeds(modelId!, {
-                    file_url: fileUrl,
-                    thumbnail_url: thumbnailUrl,
-                    content_type: batchType,
-                    is_free: false,
-                    product_id: batchProductId || undefined,
-                    ai: aiResult,
-                });
             });
             
             const results = await Promise.all(insertionPromises);

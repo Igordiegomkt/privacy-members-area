@@ -11,6 +11,12 @@ export interface MediaItem {
   model_id?: string | null;
   is_free?: boolean | null;
   created_at?: string;
+  // Campos gerados por IA
+  ai_title?: string | null;
+  ai_subtitle?: string | null;
+  ai_description?: string | null;
+  ai_cta?: string | null;
+  ai_tags?: string[] | null;
 }
 
 export type MediaAccessStatus = 'free' | 'unlocked' | 'locked';

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { MediaItem, Model, Product } from '../../types';
-import { Check, X, Save, Edit, Trash2 } from 'lucide-react';
+import { Check, X, Save, Edit, Trash2, Sparkles } from 'lucide-react';
 
 interface AiResult {
   title: string;
@@ -129,6 +129,11 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
                         <p className="text-xs text-privacy-text-secondary line-clamp-2">{item.description || 'Sem descrição'}</p>
                         <p className="text-xs text-privacy-text-secondary/70 mt-1">CTA: {item.cta || 'N/A'}</p>
                         <p className="text-xs text-privacy-text-secondary/70">Tags: {(item.tags || []).join(', ') || 'N/A'}</p>
+                        {item.ai_title && (
+                            <div className="flex items-center gap-1 text-[10px] text-green-400 mt-1">
+                                <Sparkles className="w-3 h-3" /> Copy IA Gerada
+                            </div>
+                        )}
                     </div>
                 )}
             </td>
@@ -272,26 +277,28 @@ export const ManageContent: React.FC = () => {
         let finalDescription = manualDescription.trim();
         let finalCta = manualCta.trim();
         let finalTags = manualTags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
+        
+        let aiResult: AiResult | null = null;
 
         // 1. Se o contexto foi fornecido, mas os campos de copy estão vazios, gera automaticamente
         if (manualContext.trim() && (!finalTitle || !finalDescription || !finalSubtitle || !finalCta)) {
             setIsGeneratingManual(true);
-            const result = await generateMetadata(manualContext, manualType);
+            aiResult = await generateMetadata(manualContext, manualType);
             setIsGeneratingManual(false);
             
-            if (result) {
-                finalTitle = result.title;
-                finalSubtitle = result.subtitle;
-                finalDescription = result.description;
-                finalCta = result.cta;
-                finalTags = result.tags;
+            if (aiResult) {
+                finalTitle = aiResult.title;
+                finalSubtitle = aiResult.subtitle;
+                finalDescription = aiResult.description;
+                finalCta = aiResult.cta;
+                finalTags = aiResult.tags;
             } else {
                 alert('Falha ao gerar metadados automáticos. Salvando sem copy.');
             }
         }
 
         try {
-            const { data, error } = await supabase.from('media_items').insert({
+            const payload = {
                 model_id: modelId,
                 url: manualUrl,
                 thumbnail: manualUrl,
@@ -302,7 +309,15 @@ export const ManageContent: React.FC = () => {
                 description: finalDescription || null,
                 cta: finalCta || null,
                 tags: finalTags.length > 0 ? finalTags : null,
-            }).select('id, type').single();
+                // Salva a copy gerada pela IA nos campos ai_ para rastreamento
+                ai_title: aiResult?.title || null,
+                ai_subtitle: aiResult?.subtitle || null,
+                ai_description: aiResult?.description || null,
+                ai_cta: aiResult?.cta || null,
+                ai_tags: aiResult?.tags || null,
+            };
+
+            const { data, error } = await supabase.from('media_items').insert(payload).select('id, type').single();
 
             if (error) throw error;
             if (data && manualProductId) await linkMediaToProduct([data.id], manualProductId);
@@ -356,6 +371,12 @@ export const ManageContent: React.FC = () => {
                             description: result.description,
                             cta: result.cta,
                             tags: result.tags,
+                            // Salva a copy gerada pela IA nos campos ai_
+                            ai_title: result.title,
+                            ai_subtitle: result.subtitle,
+                            ai_description: result.description,
+                            ai_cta: result.cta,
+                            ai_tags: result.tags,
                         }).eq('id', item.id);
                     }
                     return null;
@@ -374,6 +395,7 @@ export const ManageContent: React.FC = () => {
     };
 
     const handleSaveMediaItem = async (id: string, updates: Partial<MediaItem>) => {
+        // Ao salvar manualmente, a copy gerada por IA não é atualizada, apenas os campos principais.
         const { error: updateError } = await supabase
             .from('media_items')
             .update(updates)

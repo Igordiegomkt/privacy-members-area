@@ -25,7 +25,8 @@ import { PaymentSettings } from './pages/admin/PaymentSettings';
 import PurchaseSuccess from './pages/PurchaseSuccess';
 import PurchaseFailed from './pages/PurchaseFailed';
 import { AiTools } from './pages/admin/AiTools';
-import { CheckoutModal } from './components/CheckoutModal'; // Novo import
+import { CheckoutModal } from './components/CheckoutModal';
+import { AdminNotifications } from './pages/admin/AdminNotifications'; // Novo import
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {
@@ -91,6 +92,7 @@ function App() {
             <Route path="/admin/modelos/:id/conteudos" element={<ManageContent />} />
             <Route path="/admin/configuracoes" element={<PaymentSettings />} />
             <Route path="/admin/ia" element={<AiTools />} />
+            <Route path="/admin/notificacoes" element={<AdminNotifications />} /> {/* Rota Adicionada */}
           </Route>
         </Route>
 

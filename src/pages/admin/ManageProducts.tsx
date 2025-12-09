@@ -35,19 +35,40 @@ const ProductForm: React.FC<ProductFormProps> = ({ modelId, product, onSave }: P
     console.log('[ProductForm] Submitting product:', formData);
 
     const payload = { ...formData, model_id: modelId };
+    let savedProductId: string | undefined;
 
     try {
       if (payload.is_base_membership) {
         console.log('[ProductForm] Setting other products as non-base membership for model:', modelId);
-        const { error: updateError } = await supabase.from('products').update({ is_base_membership: false }).eq('model_id', modelId);
+        // Ensure only one base membership exists
+        const { error: updateError } = await supabase.from('products').update({ is_base_membership: false }).eq('model_id', modelId).neq('id', product?.id);
         if (updateError) throw updateError;
       }
 
-      const { error: submissionError } = isEditing
-        ? await supabase.from('products').update(payload).eq('id', product!.id)
-        : await supabase.from('products').insert(payload);
+      if (isEditing) {
+        const { error: submissionError } = await supabase.from('products').update(payload).eq('id', product!.id);
+        if (submissionError) throw submissionError;
+        savedProductId = product!.id;
+      } else {
+        const { data: insertedProduct, error: submissionError } = await supabase.from('products').insert(payload).select('id').single();
+        if (submissionError) throw submissionError;
+        savedProductId = insertedProduct?.id;
+      }
+      
+      // Broadcast notification if a new product was created or updated
+      if (savedProductId) {
+        const { data, error: broadcastError } = await supabase.functions.invoke('broadcast-new-product', {
+            body: { productId: savedProductId },
+        });
 
-      if (submissionError) throw submissionError;
+        if (broadcastError) {
+            console.error('[Admin] broadcast-new-product error:', broadcastError);
+        } else if (data && data.ok === false) {
+            console.error('[Admin] broadcast-new-product failed:', data.message);
+        } else {
+            console.log('[Admin] Notificação broadcast disparada com sucesso.');
+        }
+      }
 
       alert('Produto salvo com sucesso!');
       onSave();

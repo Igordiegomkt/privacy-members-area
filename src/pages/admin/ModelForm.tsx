@@ -135,6 +135,8 @@ export const ModelForm: React.FC = () => {
     }
 
     // 3. Gerenciar Produto Base VIP
+    let productIdToBroadcast: string | undefined;
+
     if (modelId) {
       const priceCents = Math.round(numericPrice * 100);
       const productName = baseProductName.trim() || `VIP completo de ${model.name || ''}`.trim() || 'VIP da modelo';
@@ -156,14 +158,31 @@ export const ModelForm: React.FC = () => {
       };
 
       if (existingProducts && existingProducts.length > 0) {
+        productIdToBroadcast = existingProducts[0].id;
         const { error: updateError } = await supabase
           .from('products')
           .update(productPayload)
-          .eq('id', existingProducts[0].id);
+          .eq('id', productIdToBroadcast);
         if (updateError) setError(`Erro ao atualizar produto base: ${updateError.message}`);
       } else {
-        const { error: insertError } = await supabase.from('products').insert(productPayload);
+        const { data: insertedProduct, error: insertError } = await supabase.from('products').insert(productPayload).select('id').single();
         if (insertError) setError(`Erro ao criar produto base: ${insertError.message}`);
+        else productIdToBroadcast = insertedProduct?.id;
+      }
+      
+      // 4. Disparar notificação de novo produto (se não houver erro)
+      if (productIdToBroadcast && !error) {
+        const { data, error: broadcastError } = await supabase.functions.invoke('broadcast-new-product', {
+            body: { productId: productIdToBroadcast },
+        });
+
+        if (broadcastError) {
+            console.error('[Admin] broadcast-new-product error:', broadcastError);
+        } else if (data && data.ok === false) {
+            console.error('[Admin] broadcast-new-product failed:', data.message);
+        } else {
+            console.log('[Admin] Notificação broadcast disparada com sucesso.');
+        }
       }
     }
 

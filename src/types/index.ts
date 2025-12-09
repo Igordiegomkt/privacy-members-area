@@ -5,6 +5,9 @@ export interface MediaItem {
   thumbnail?: string | null;
   title?: string | null;
   description?: string | null;
+  subtitle?: string | null; // Novo campo
+  cta?: string | null; // Novo campo
+  tags?: string[] | null; // Novo campo
   model_id?: string | null;
   is_free?: boolean | null;
   created_at?: string;

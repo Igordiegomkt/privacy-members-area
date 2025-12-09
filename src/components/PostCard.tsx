@@ -51,12 +51,29 @@ export const PostCard: React.FC<PostCardProps> = ({
           <p className="text-privacy-text-secondary">Desbloqueie o conteúdo completo desta criadora para ver.</p>
         ) : (
           <>
+            {media.subtitle && (
+              <p className="text-primary font-medium mb-1">{media.subtitle}</p>
+            )}
             {media.title && (
               <p className="font-bold text-white mb-1">{media.title}</p>
             )}
             <p className="text-privacy-text-secondary">
               {media.description || `Conteúdo exclusivo de ${model?.name}.`}
             </p>
+            {media.cta && (
+              <p className="text-primary font-semibold mt-2">
+                {media.cta}
+              </p>
+            )}
+            {media.tags && media.tags.length > 0 && (
+              <div className="flex flex-wrap gap-1 mt-2">
+                {media.tags.map((tag, index) => (
+                  <span key={index} className="text-xs text-privacy-text-secondary/70">
+                    #{tag}
+                  </span>
+                ))}
+              </div>
+            )}
           </>
         )}
       </footer>

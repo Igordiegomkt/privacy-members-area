@@ -4,6 +4,14 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { MediaItem, Model, Product } from '../../types';
 
+interface AiResult {
+  title: string;
+  subtitle: string;
+  description: string;
+  cta: string;
+  tags: string[];
+}
+
 export const ManageContent: React.FC = () => {
     const { id: modelId } = useParams<{ id: string }>();
     const [model, setModel] = useState<Model | null>(null);
@@ -13,12 +21,17 @@ export const ManageContent: React.FC = () => {
     const [error, setError] = useState<string | null>(null);
     const [selectedIds, setSelectedIds] = useState<Set<string>>(new Set());
 
-    // Form States
+    // Form States - Manual
     const [manualUrl, setManualUrl] = useState('');
     const [manualType, setManualType] = useState<'image' | 'video'>('image');
     const [manualIsFree, setManualIsFree] = useState(false);
     const [manualProductId, setManualProductId] = useState<string>('');
+    const [manualTitle, setManualTitle] = useState('');
+    const [manualDescription, setManualDescription] = useState('');
+    const [manualContext, setManualContext] = useState(''); // Campo para contexto da IA
+    const [isGeneratingManual, setIsGeneratingManual] = useState(false);
     
+    // Form States - Batch
     const [batchBaseUrl, setBatchBaseUrl] = useState('');
     const [batchCount, setBatchCount] = useState(1);
     const [batchType, setBatchType] = useState<'image' | 'video'>('image');
@@ -41,34 +54,41 @@ export const ManageContent: React.FC = () => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    const generateAndSaveMetadata = async (newMedia: { id: string, type: 'image' | 'video' }[]) => {
-        if (!model) return;
+    const generateMetadata = async (context: string, type: 'image' | 'video'): Promise<AiResult | null> => {
+        if (!context.trim()) return null;
         try {
-            const { data, error } = await supabase.functions.invoke('gemini-media-metadata', {
+            const { data, error } = await supabase.functions.invoke('ai-generate-content', {
                 body: {
-                    modelName: model.name,
-                    modelUsername: model.username, // Adicionando username para o prompt
-                    items: newMedia.map(m => ({ mediaId: m.id, type: m.type, context: '' }))
+                    contentType: 'media_description',
+                    context: context,
+                    language: 'pt-BR',
                 }
             });
             if (error) throw error;
+            if (data.ok === false) throw new Error(data.message || 'Erro na IA.');
             
-            const updates = data.results
-                .filter((r: any) => r.title || r.description)
-                .map((r: any) => ({
-                    id: r.mediaId,
-                    title: r.title,
-                    description: r.description
-                }));
-
-            if (updates.length > 0) {
-                const { error: updateError } = await supabase.from('media_items').upsert(updates);
-                if (updateError) console.error("Error updating metadata:", updateError);
-                else console.log("Metadata generated and saved for", updates.length, "items.");
-            }
+            return data.data as AiResult;
         } catch (e) {
             console.error("Failed to generate AI metadata:", e);
+            return null;
         }
+    };
+
+    const handleGenerateManualMetadata = async () => {
+        if (!manualContext.trim()) {
+            alert('Forneça um contexto para a IA.');
+            return;
+        }
+        setIsGeneratingManual(true);
+        const result = await generateMetadata(manualContext, manualType);
+        if (result) {
+            setManualTitle(result.title);
+            setManualDescription(result.description);
+            alert('Metadados gerados com sucesso! Revise e salve.');
+        } else {
+            alert('Falha ao gerar metadados. Verifique o log do console.');
+        }
+        setIsGeneratingManual(false);
     };
 
     const linkMediaToProduct = async (mediaIds: string[], productId: string) => {
@@ -88,6 +108,8 @@ export const ManageContent: React.FC = () => {
                 thumbnail: manualUrl,
                 type: manualType,
                 is_free: manualIsFree,
+                title: manualTitle.trim() || null,
+                description: manualDescription.trim() || null,
             }).select('id, type').single();
 
             if (error) throw error;
@@ -95,8 +117,10 @@ export const ManageContent: React.FC = () => {
             
             alert('Conteúdo adicionado!');
             setManualUrl('');
+            setManualTitle('');
+            setManualDescription('');
+            setManualContext('');
             fetchData();
-            generateAndSaveMetadata([data]);
         } catch (err: any) {
             setError(err.message);
         }
@@ -119,9 +143,13 @@ export const ManageContent: React.FC = () => {
 
             if (data && batchProductId) await linkMediaToProduct(data.map(item => item.id), batchProductId);
 
+            // Geração de metadados em lote (sem contexto, apenas para preencher)
+            // Nota: A Edge Function gemini-media-metadata foi removida, mas a lógica de preenchimento de title/description via IA é importante.
+            // Como não temos contexto para o lote, vamos pular a chamada de IA aqui por enquanto, focando apenas no cadastro.
+            // Se o admin quiser metadados, ele deve usar o cadastro manual ou a ferramenta de IA.
+
             alert(`${batchCount} conteúdos adicionados em lote!`);
             fetchData();
-            generateAndSaveMetadata(data);
         } catch (err: any) {
             setError(err.message);
         }
@@ -165,17 +193,42 @@ export const ManageContent: React.FC = () => {
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
                 <form onSubmit={handleManualSubmit} className="bg-privacy-surface p-6 rounded-lg space-y-4">
                     <h2 className="text-xl font-bold text-white">Cadastro Manual</h2>
+                    
                     <input value={manualUrl} onChange={e => setManualUrl(e.target.value)} placeholder="URL da Mídia" className={inputStyle} required />
+                    
                     <select value={manualType} onChange={e => setManualType(e.target.value as 'image' | 'video')} className={inputStyle}>
                         <option value="image">Imagem</option>
                         <option value="video">Vídeo</option>
                     </select>
+
+                    {/* Campo de Contexto para IA */}
+                    <div className="space-y-2">
+                        <div className="flex justify-between items-center">
+                            <label className="text-sm font-medium text-privacy-text-secondary">Contexto para IA (Opcional)</label>
+                            <button 
+                                type="button" 
+                                onClick={handleGenerateManualMetadata} 
+                                disabled={isGeneratingManual || !manualContext.trim()}
+                                className="text-xs bg-primary/20 text-primary font-semibold px-2 py-1 rounded-md hover:bg-primary/40 disabled:opacity-50"
+                            >
+                                {isGeneratingManual ? 'Gerando...' : 'Gerar Título/Desc. ✨'}
+                            </button>
+                        </div>
+                        <textarea value={manualContext} onChange={e => setManualContext(e.target.value)} placeholder="Ex: na banheira, lingerie preta, sorrindo..." className={`${inputStyle} h-16 resize-none`} />
+                    </div>
+
+                    {/* Campos de Título e Descrição (Preenchidos pela IA ou manualmente) */}
+                    <input value={manualTitle} onChange={e => setManualTitle(e.target.value)} placeholder="Título (Preenchido pela IA)" className={inputStyle} />
+                    <textarea value={manualDescription} onChange={e => setManualDescription(e.target.value)} placeholder="Descrição (Preenchida pela IA)" className={`${inputStyle} h-20 resize-none`} />
+
                     <select value={manualProductId} onChange={e => setManualProductId(e.target.value)} className={inputStyle}>
                         <option value="">Vincular a um produto (Opcional)</option>
                         {modelProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}
                     </select>
+                    
                     <label className="flex items-center gap-2 text-white"><input type="checkbox" checked={manualIsFree} onChange={e => setManualIsFree(e.target.checked)} /> Gratuito?</label>
-                    <button type="submit" className="bg-primary text-black font-bold py-2 px-4 rounded w-full">Adicionar</button>
+                    
+                    <button type="submit" className="bg-primary text-black font-bold py-2 px-4 rounded w-full">Adicionar Conteúdo</button>
                 </form>
 
                 <form onSubmit={handleBatchSubmit} className="bg-privacy-surface p-6 rounded-lg space-y-4">
@@ -207,6 +260,7 @@ export const ManageContent: React.FC = () => {
                         <thead className="text-xs uppercase bg-privacy-border sticky top-0">
                             <tr>
                                 <th className="px-4 py-2 w-10"><input type="checkbox" onChange={e => handleSelectAll(e.target.checked)} checked={selectedIds.size === mediaItems.length && mediaItems.length > 0} /></th>
+                                <th className="px-4 py-2">Título/Descrição</th>
                                 <th className="px-4 py-2">URL</th>
                                 <th className="px-4 py-2">Tipo</th>
                                 <th className="px-4 py-2">Gratuito</th>
@@ -216,6 +270,10 @@ export const ManageContent: React.FC = () => {
                             {mediaItems.map(item => (
                                 <tr key={item.id} className="border-b border-privacy-border">
                                     <td className="px-4 py-2"><input type="checkbox" checked={selectedIds.has(item.id)} onChange={e => handleSelectionChange(item.id, e.target.checked)} /></td>
+                                    <td className="px-4 py-2 max-w-xs">
+                                        <p className="font-medium text-white truncate">{item.title || 'Sem Título'}</p>
+                                        <p className="text-xs text-privacy-text-secondary truncate">{item.description || 'Sem descrição'}</p>
+                                    </td>
                                     <td className="px-4 py-2 truncate max-w-xs">{item.url}</td>
                                     <td className="px-4 py-2">{item.type}</td>
                                     <td className="px-4 py-2">{item.is_free ? 'Sim' : 'Não'}</td>

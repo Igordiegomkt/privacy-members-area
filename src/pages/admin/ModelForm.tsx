@@ -59,11 +59,15 @@ export const ModelForm: React.FC = () => {
 
     setIsSuggesting(true);
 
-    const prompt = `Crie uma bio curta e magnética para o perfil de uma modelo no Privacy chamada ${model.name}. A bio deve ser convidativa, misteriosa e sugerir o tipo de conteúdo exclusivo que ela oferece.`;
+    const context = `Modelo chamada ${model.name}.`;
 
     try {
-      const { data, error: invokeError } = await supabase.functions.invoke('gemini-generate', {
-        body: { prompt },
+      const { data, error: invokeError } = await supabase.functions.invoke('ai-generate-content', {
+        body: { 
+            contentType: 'bio',
+            context: context,
+            language: 'pt-BR',
+        },
       });
 
       if (invokeError) {
@@ -72,21 +76,16 @@ export const ModelForm: React.FC = () => {
         return;
       }
 
-      if (!data) {
-        alert('Resposta vazia da IA.');
-        return;
-      }
-
-      if (data.ok === false) {
-        if (data.code === 'LIMIT_EXCEEDED') {
-          alert('⚠️ O assistente de IA atingiu o limite de uso da conta. Tente novamente mais tarde.');
-        } else {
-          alert(`Erro na IA: ${data.message || data.code || 'Erro desconhecido.'}`);
+      if (!data || data.ok === false) {
+        let errorMessage = data?.message || 'Falha ao gerar conteúdo com IA.';
+        if (data?.code === 'NO_OPENAI_KEY') {
+          errorMessage = '⚠️ Chave OPENAI_API_KEY não configurada no servidor.';
         }
+        alert(errorMessage);
         return;
       }
 
-      const text = data.generatedText?.toString().trim();
+      const text = data.data?.description?.toString().trim();
       if (!text) {
         alert('A IA não retornou texto.');
         return;

@@ -46,11 +46,18 @@ export const PostCard: React.FC<PostCardProps> = ({
         />
       </div>
 
-      <footer className="px-4 pb-3 text-sm text-privacy-text-secondary">
+      <footer className="px-4 pb-3 text-sm">
         {media.accessStatus === 'locked' ? (
-          <p>Desbloqueie o conteúdo completo desta criadora para ver.</p>
+          <p className="text-privacy-text-secondary">Desbloqueie o conteúdo completo desta criadora para ver.</p>
         ) : (
-          <p>{media.description || `Conteúdo exclusivo de ${model?.name}.`}</p>
+          <>
+            {media.title && (
+              <p className="font-bold text-white mb-1">{media.title}</p>
+            )}
+            <p className="text-privacy-text-secondary">
+              {media.description || `Conteúdo exclusivo de ${model?.name}.`}
+            </p>
+          </>
         )}
       </footer>
     </article>

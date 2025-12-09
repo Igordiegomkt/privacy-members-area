@@ -13,13 +13,20 @@ interface AiResult {
   tags: string[];
 }
 
-const generateMetadata = async (context: string, type: 'image' | 'video'): Promise<AiResult | null> => {
-    if (!context.trim()) return null;
+/**
+ * Gera metadados de copy usando a IA, com suporte a análise visual.
+ * @param context Contexto textual adicional.
+ * @param type Tipo de mídia ('image' ou 'video').
+ * @param imageUrl URL da imagem/thumbnail para análise visual.
+ */
+const generateMetadata = async (context: string, type: 'image' | 'video', imageUrl?: string): Promise<AiResult | null> => {
+    if (!context.trim() && !imageUrl) return null;
     try {
         const { data, error } = await supabase.functions.invoke('ai-generate-content', {
             body: {
                 contentType: type === 'video' ? 'feed_caption' : 'media_description',
                 context: context,
+                imageUrl: imageUrl, // Passa a URL da imagem/thumbnail para a IA
                 language: 'pt-BR',
             }
         });
@@ -33,31 +40,35 @@ const generateMetadata = async (context: string, type: 'image' | 'video'): Promi
     }
 };
 
-const linkMediaToProduct = async (mediaIds: string[], productId: string) => {
-    if (!productId) return;
-    const links = mediaIds.map(media_id => ({ product_id: productId, media_id }));
-    const { error } = await supabase.from('product_media').insert(links);
-    if (error) throw new Error(`Erro ao vincular mídia ao produto: ${error.message}`);
-};
+/**
+ * Função para criar o registro completo de mídia e feeds via Service Role Key.
+ */
+const createMediaItemAndFeeds = async (modelId: string, mediaPayload: {
+    file_url: string;
+    thumbnail_url: string;
+    content_type: 'image' | 'video';
+    is_free: boolean;
+    product_id?: string;
+    ai: AiResult;
+}) => {
+    const { data, error } = await supabase.functions.invoke('admin-create-media-item', {
+        body: {
+            model_id: modelId,
+            media: {
+                file_url: mediaPayload.file_url,
+                thumbnail_url: mediaPayload.thumbnail_url,
+                content_type: mediaPayload.content_type,
+                is_free: mediaPayload.is_free,
+                product_id: mediaPayload.product_id,
+                ai: mediaPayload.ai,
+            }
+        }
+    });
 
-// Função para CRIAR registros de feed (usada na inserção inicial)
-const createFeedRecords = async (modelId: string, mediaId: string, copy: AiResult) => {
-    const feedPayload = {
-        model_id: modelId,
-        media_id: mediaId,
-        title: copy.title,
-        subtitle: copy.subtitle,
-        description: copy.description,
-        cta: copy.cta,
-    };
-
-    // Inserir no feed da modelo
-    const { error: modelFeedError } = await supabase.from('model_feed').insert(feedPayload);
-    if (modelFeedError) console.error('Erro ao inserir no model_feed:', modelFeedError);
-
-    // Inserir no feed global
-    const { error: globalFeedError } = await supabase.from('global_feed').insert(feedPayload);
-    if (globalFeedError) console.error('Erro ao inserir no global_feed:', globalFeedError);
+    if (error) throw error;
+    if (data.ok === false) throw new Error(data.message || 'Erro ao criar mídia via Admin EF.');
+    
+    return data.media_id;
 };
 
 // Função para ATUALIZAR registros de feed (usada na edição manual)
@@ -180,7 +191,7 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
                         <p className="font-medium text-white truncate">{item.title || 'Sem Título'}</p>
                         <p className="text-xs text-primary truncate">{item.subtitle || 'Sem Subtítulo'}</p>
                         <p className="text-xs text-privacy-text-secondary line-clamp-2">{item.description || 'Sem descrição'}</p>
-                        {item.ai_title && (
+                        {(item.ai_title || item.ai_description) && (
                             <div className="flex items-center gap-1 text-[10px] text-green-400 mt-1">
                                 <Sparkles className="w-3 h-3" /> Copy IA Gerada
                             </div>
@@ -188,7 +199,7 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
                     </div>
                 </td>
                 <td className="px-4 py-2 truncate max-w-[150px]">
-                    {item.url}
+                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-xs truncate block">{item.url}</a>
                 </td>
                 <td className="px-4 py-2 capitalize">
                     {item.type}
@@ -212,6 +223,17 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
                 <tr className="bg-privacy-border/30">
                     <td colSpan={6} className="p-4">
                         <div className="bg-privacy-surface p-4 rounded-lg space-y-3">
+                            <div className="flex items-center gap-4 mb-3">
+                                <img 
+                                    src={item.thumbnail || item.url} 
+                                    alt="Thumbnail" 
+                                    className="w-20 h-20 object-cover rounded-md border border-privacy-border"
+                                />
+                                <div className="text-xs">
+                                    <p className="font-semibold text-white">Thumbnail usada na IA:</p>
+                                    <p className="text-privacy-text-secondary break-all">{item.thumbnail || item.url}</p>
+                                </div>
+                            </div>
                             {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
                             <div className="grid grid-cols-2 gap-3">
                                 <div>
@@ -260,6 +282,7 @@ export const ManageContent: React.FC = () => {
 
     // Form States - Manual
     const [manualUrl, setManualUrl] = useState('');
+    const [manualThumbnailUrl, setManualThumbnailUrl] = useState(''); // Novo campo para thumbnail
     const [manualType, setManualType] = useState<'image' | 'video'>('image');
     const [manualIsFree, setManualIsFree] = useState(false);
     const [manualProductId, setManualProductId] = useState<string>('');
@@ -297,6 +320,14 @@ export const ManageContent: React.FC = () => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
+    // Atualiza a URL da thumbnail automaticamente se for imagem
+    useEffect(() => {
+        if (manualType === 'image') {
+            setManualThumbnailUrl(manualUrl);
+        }
+    }, [manualType, manualUrl]);
+
+
     const handleSelectOne = (id: string, isSelected: boolean) => {
         setSelectedIds(prev => {
             const newSet = new Set(prev);
@@ -319,14 +350,17 @@ export const ManageContent: React.FC = () => {
     };
 
     const handleGenerateManualMetadata = async () => {
-        if (!manualContext.trim()) {
-            alert('Forneça um contexto para a IA.');
+        const imageUrl = manualType === 'image' ? manualUrl : manualThumbnailUrl;
+        
+        if (!manualContext.trim() && !imageUrl) {
+            alert('Forneça um contexto ou a URL da mídia/thumbnail para a IA.');
             return;
         }
+        
         setIsGeneratingManual(true);
         setAiPreview(null);
         
-        const result = await generateMetadata(manualContext, manualType);
+        const result = await generateMetadata(manualContext, manualType, imageUrl);
         
         if (result) {
             setAiPreview(result);
@@ -346,18 +380,24 @@ export const ManageContent: React.FC = () => {
         e.preventDefault();
         setError(null);
         
+        if (!manualUrl || (manualType === 'video' && !manualThumbnailUrl)) {
+            setError('URL da Mídia e URL da Thumbnail (para vídeo) são obrigatórios.');
+            return;
+        }
+
         let finalTitle = manualTitle.trim();
         let finalSubtitle = manualSubtitle.trim();
         let finalDescription = manualDescription.trim();
         let finalCta = manualCta.trim();
         let finalTags = manualTags.split(',').map(tag => tag.trim()).filter(tag => tag.length > 0);
         
-        let aiResult: AiResult | null = aiPreview; // Usa o preview se existir
+        let aiResult: AiResult | null = aiPreview; 
 
         // 1. Se o contexto foi fornecido, mas os campos de copy estão vazios, gera automaticamente
         if (manualContext.trim() && (!finalTitle || !finalDescription || !finalSubtitle || !finalCta)) {
             setIsGeneratingManual(true);
-            aiResult = await generateMetadata(manualContext, manualType);
+            const imageUrl = manualType === 'image' ? manualUrl : manualThumbnailUrl;
+            aiResult = await generateMetadata(manualContext, manualType, imageUrl);
             setIsGeneratingManual(false);
             
             if (aiResult) {
@@ -372,39 +412,29 @@ export const ManageContent: React.FC = () => {
         }
 
         try {
-            const payload = {
-                model_id: modelId,
-                url: manualUrl,
-                thumbnail: manualUrl,
-                type: manualType,
-                is_free: manualIsFree,
-                title: finalTitle || null,
-                subtitle: finalSubtitle || null,
-                description: finalDescription || null,
-                cta: finalCta || null,
-                tags: finalTags.length > 0 ? finalTags : null,
-                // Salva a copy gerada pela IA nos campos ai_ para rastreamento
-                ai_title: aiResult?.title || null,
-                ai_subtitle: aiResult?.subtitle || null,
-                ai_description: aiResult?.description || null,
-                ai_cta: aiResult?.cta || null,
-                ai_tags: aiResult?.tags || null,
+            // Se a IA falhou, usamos os campos preenchidos manualmente (mesmo que vazios)
+            const aiData: AiResult = aiResult || { 
+                title: finalTitle, 
+                subtitle: finalSubtitle, 
+                description: finalDescription, 
+                cta: finalCta, 
+                tags: finalTags 
             };
 
-            const { data, error } = await supabase.from('media_items').insert(payload).select('id, type').single();
+            const mediaId = await createMediaItemAndFeeds(modelId!, {
+                file_url: manualUrl,
+                thumbnail_url: manualThumbnailUrl || manualUrl,
+                content_type: manualType,
+                is_free: manualIsFree,
+                product_id: manualProductId || undefined,
+                ai: aiData,
+            });
 
-            if (error) throw error;
-            const mediaId = data.id;
-
-            if (data && manualProductId) await linkMediaToProduct([mediaId], manualProductId);
+            alert(`Conteúdo adicionado com ID: ${mediaId}`);
             
-            // 2. Inserir registros de feed se a copy da IA foi usada
-            if (aiResult) {
-                await createFeedRecords(modelId!, mediaId, aiResult);
-            }
-
-            alert('Conteúdo adicionado!');
+            // Limpar formulário
             setManualUrl('');
+            setManualThumbnailUrl('');
             setManualTitle('');
             setManualSubtitle('');
             setManualDescription('');
@@ -424,56 +454,41 @@ export const ManageContent: React.FC = () => {
         setIsGeneratingBatch(true);
         
         try {
-            const newItemsPayload = Array.from({ length: batchCount }, (_, i) => ({
-                model_id: modelId,
-                type: batchType,
-                url: `${batchBaseUrl}${i + 1}${batchExtension}`,
-                thumbnail: `${batchBaseUrl}${i + 1}${batchExtension}`,
-                is_free: false,
-            }));
+            const modelName = model?.name || 'a modelo';
+            const genericContext = `Conteúdo ${batchType} exclusivo de ${modelName}.`;
             
-            // 1. Inserir itens base
-            const { data: insertedItems, error: insertError } = await supabase.from('media_items').insert(newItemsPayload).select('id, url, type');
-            if (insertError) throw insertError;
-
-            if (insertedItems && insertedItems.length > 0) {
-                // 2. Vincular ao produto, se houver
-                if (batchProductId) await linkMediaToProduct(insertedItems.map(item => item.id), batchProductId);
-
-                // 3. Gerar metadados e inserir feeds em paralelo
-                const modelName = model?.name || 'a modelo';
-                const genericContext = `Conteúdo ${batchType} exclusivo de ${modelName}.`;
+            const itemsToInsert = Array.from({ length: batchCount }, (_, i) => {
+                const index = i + 1;
+                const fileUrl = `${batchBaseUrl}${index}${batchExtension}`;
+                // Para vídeos, assumimos que a thumbnail é .jpg (convenção R2/CDN)
+                const thumbnailUrl = batchType === 'image' ? fileUrl : `${batchBaseUrl}${index}.jpg`; 
+                return { fileUrl, thumbnailUrl, index };
+            });
+            
+            const insertionPromises = itemsToInsert.map(async ({ fileUrl, thumbnailUrl }) => {
+                // 1. Gerar metadados com IA Vision
+                const aiResult = await generateMetadata(genericContext, batchType, thumbnailUrl);
                 
-                const updatesAndFeeds = insertedItems.map(async (item) => {
-                    const result = await generateMetadata(genericContext, item.type as 'image' | 'video');
-                    
-                    if (result) {
-                        // Salva a copy gerada pela IA nos campos principais e ai_*
-                        const updatePromise = supabase.from('media_items').update({
-                            title: result.title,
-                            subtitle: result.subtitle,
-                            description: result.description,
-                            cta: result.cta,
-                            tags: result.tags,
-                            ai_title: result.title,
-                            ai_subtitle: result.subtitle,
-                            ai_description: result.description,
-                            ai_cta: result.cta,
-                            ai_tags: result.tags,
-                        }).eq('id', item.id);
-
-                        // Insere nos feeds
-                        const feedPromise = createFeedRecords(modelId!, item.id, result);
-                        
-                        return Promise.all([updatePromise, feedPromise]);
-                    }
+                if (!aiResult) {
+                    console.warn(`Falha ao gerar copy para ${fileUrl}. Pulando.`);
                     return null;
-                });
-                
-                await Promise.all(updatesAndFeeds);
-            }
+                }
 
-            alert(`${batchCount} conteúdos adicionados e copy gerada!`);
+                // 2. Inserir via Service Role EF
+                return createMediaItemAndFeeds(modelId!, {
+                    file_url: fileUrl,
+                    thumbnail_url: thumbnailUrl,
+                    content_type: batchType,
+                    is_free: false,
+                    product_id: batchProductId || undefined,
+                    ai: aiResult,
+                });
+            });
+            
+            const results = await Promise.all(insertionPromises);
+            const successfulInserts = results.filter(Boolean).length;
+
+            alert(`${successfulInserts} conteúdos adicionados e copy gerada!`);
             fetchData();
         } catch (err: any) {
             setError(err.message);
@@ -503,6 +518,7 @@ export const ManageContent: React.FC = () => {
     const handleDeleteSelected = async () => {
         if (selectedIds.size === 0) return;
         if (window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} mídias?`)) {
+            // Usamos o client normal, pois a política de RLS permite DELETE para o criador (admin)
             const { error: deleteError } = await supabase.from('media_items').delete().in('id', Array.from(selectedIds));
             if (deleteError) setError(deleteError.message);
             else {
@@ -537,12 +553,22 @@ export const ManageContent: React.FC = () => {
                 <form onSubmit={handleManualSubmit} className="bg-privacy-surface p-6 rounded-lg space-y-4">
                     <h2 className="text-xl font-bold text-white">Cadastro Manual + Copy Automática</h2>
                     
-                    <input value={manualUrl} onChange={e => setManualUrl(e.target.value)} placeholder="URL da Mídia" className={inputStyle} required />
+                    <input value={manualUrl} onChange={e => setManualUrl(e.target.value)} placeholder="URL da Mídia (Foto ou Vídeo)" className={inputStyle} required />
                     
                     <select value={manualType} onChange={e => setManualType(e.target.value as 'image' | 'video')} className={inputStyle}>
                         <option value="image">Imagem</option>
                         <option value="video">Vídeo</option>
                     </select>
+                    
+                    {manualType === 'video' && (
+                        <input 
+                            value={manualThumbnailUrl} 
+                            onChange={e => setManualThumbnailUrl(e.target.value)} 
+                            placeholder="URL da Thumbnail/Capa (Obrigatório para Vídeo)" 
+                            className={inputStyle} 
+                            required
+                        />
+                    )}
 
                     {/* Campo de Contexto para IA */}
                     <div className="space-y-2">
@@ -551,7 +577,7 @@ export const ManageContent: React.FC = () => {
                             <button 
                                 type="button" 
                                 onClick={handleGenerateManualMetadata} 
-                                disabled={isGeneratingManual || !manualContext.trim()}
+                                disabled={isGeneratingManual || (!manualContext.trim() && !manualUrl)}
                                 className="text-xs bg-primary/20 text-primary font-semibold px-2 py-1 rounded-md hover:bg-primary/40 disabled:opacity-50"
                             >
                                 {isGeneratingManual ? 'Gerando...' : 'Gerar Copy ✨'}
@@ -561,23 +587,38 @@ export const ManageContent: React.FC = () => {
                     </div>
 
                     {/* Preview da IA */}
-                    {aiPreview && (
+                    {(aiPreview || manualUrl) && (
                         <div className="bg-privacy-border/50 p-3 rounded-lg space-y-1">
-                            <h3 className="text-sm font-semibold text-white flex items-center gap-2">
-                                <Sparkles className="w-4 h-4 text-primary" /> Preview da Copy Gerada
+                            <h3 className="text-sm font-semibold text-white flex items-center gap-2 mb-2">
+                                <Sparkles className="w-4 h-4 text-primary" /> Preview da Mídia e Copy
                             </h3>
-                            <p className="text-xs text-primary font-medium">{aiPreview.subtitle}</p>
-                            <p className="text-xs text-white font-bold">{aiPreview.title}</p>
-                            <p className="text-xs text-privacy-text-secondary line-clamp-2">{aiPreview.description}</p>
-                            <p className="text-xs text-privacy-text-secondary/70">Tags: {aiPreview.tags.join(', ')}</p>
+                            <div className="flex items-center gap-4 mb-3">
+                                <img 
+                                    src={manualType === 'image' ? manualUrl : manualThumbnailUrl || '/video-fallback.svg'} 
+                                    alt="Preview" 
+                                    className="w-20 h-20 object-cover rounded-md border border-privacy-border"
+                                />
+                                <div className="text-xs">
+                                    <p className="font-semibold text-white">Thumbnail para IA:</p>
+                                    <p className="text-privacy-text-secondary break-all">{manualType === 'image' ? manualUrl : manualThumbnailUrl || 'N/A'}</p>
+                                </div>
+                            </div>
+                            {aiPreview && (
+                                <>
+                                    <p className="text-xs text-primary font-medium">{aiPreview.subtitle}</p>
+                                    <p className="text-xs text-white font-bold">{aiPreview.title}</p>
+                                    <p className="text-xs text-privacy-text-secondary line-clamp-2">{aiPreview.description}</p>
+                                    <p className="text-xs text-privacy-text-secondary/70">Tags: {aiPreview.tags.join(', ')}</p>
+                                </>
+                            )}
                         </div>
                     )}
 
                     {/* Campos de Copy (Preenchidos pela IA ou manualmente) */}
-                    <input value={manualTitle} onChange={e => setManualTitle(e.target.value)} placeholder="Título (Preenchido pela IA)" className={inputStyle} />
-                    <input value={manualSubtitle} onChange={e => setManualSubtitle(e.target.value)} placeholder="Subtítulo (Preenchido pela IA)" className={inputStyle} />
-                    <textarea value={manualDescription} onChange={e => setManualDescription(e.target.value)} placeholder="Descrição (Preenchida pela IA)" className={`${inputStyle} h-20 resize-none`} />
-                    <input value={manualCta} onChange={e => setManualCta(e.target.value)} placeholder="CTA (Preenchido pela IA)" className={inputStyle} />
+                    <input value={manualTitle} onChange={e => setManualTitle(e.target.value)} placeholder="Título" className={inputStyle} />
+                    <input value={manualSubtitle} onChange={e => setManualSubtitle(e.target.value)} placeholder="Subtítulo" className={inputStyle} />
+                    <textarea value={manualDescription} onChange={e => setManualDescription(e.target.value)} placeholder="Descrição" className={`${inputStyle} h-20 resize-none`} />
+                    <input value={manualCta} onChange={e => setManualCta(e.target.value)} placeholder="CTA" className={inputStyle} />
                     <input value={manualTags} onChange={e => setManualTags(e.target.value)} placeholder="Tags (separadas por vírgula)" className={inputStyle} />
 
 
@@ -593,13 +634,19 @@ export const ManageContent: React.FC = () => {
 
                 <form onSubmit={handleBatchSubmit} className="bg-privacy-surface p-6 rounded-lg space-y-4">
                     <h2 className="text-xl font-bold text-white">Gerar em Lote (R2) + Copy Automática</h2>
-                    <input value={batchBaseUrl} onChange={e => setBatchBaseUrl(e.target.value)} placeholder="URL Base (ex: .../foto/foto)" className={inputStyle} required />
+                    <input value={batchBaseUrl} onChange={e => setBatchBaseUrl(e.target.value)} placeholder="URL Base (ex: https://cdn.com/foto/foto)" className={inputStyle} required />
                     <input type="number" value={batchCount} onChange={e => setBatchCount(parseInt(e.target.value))} placeholder="Quantidade" className={inputStyle} min="1" required />
                     <select value={batchType} onChange={e => setBatchType(e.target.value as 'image' | 'video')} className={inputStyle}>
-                        <option value="image">Imagem</option>
-                        <option value="video">Vídeo</option>
+                        <option value="image">Imagem (.png, .jpg)</option>
+                        <option value="video">Vídeo (.mp4, .mov)</option>
                     </select>
-                    <input value={batchExtension} onChange={e => setBatchExtension(e.target.value)} placeholder="Extensão (ex: .png)" className={inputStyle} required />
+                    <input value={batchExtension} onChange={e => setBatchExtension(e.target.value)} placeholder="Extensão (ex: .png ou .mp4)" className={inputStyle} required />
+                    <p className="text-xs text-privacy-text-secondary">
+                        {batchType === 'video' 
+                            ? 'Para vídeos, a IA usará a URL base com extensão .jpg para a thumbnail (ex: foto1.jpg).'
+                            : 'Para fotos, a URL da mídia é usada como thumbnail.'
+                        }
+                    </p>
                     <select value={batchProductId} onChange={e => setBatchProductId(e.target.value)} className={inputStyle}>
                         <option value="">Vincular a um produto (Opcional)</option>
                         {modelProducts.map(p => <option key={p.id} value={p.id}>{p.name}</option>)}

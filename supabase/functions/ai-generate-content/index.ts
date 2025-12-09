@@ -4,7 +4,8 @@ import { serve } from "https://deno.land/std@0.177.0/http/server.ts";
 declare const Deno: any;
 
 const OPENAI_API_KEY = Deno.env.get("OPENAI_API_KEY");
-const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini";
+// Use gpt-4o-mini para capacidades de visão
+const OPENAI_MODEL = Deno.env.get("OPENAI_MODEL") || "gpt-4o-mini"; 
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -35,10 +36,10 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { contentType, context, language } = await req.json();
+    const { contentType, context, imageUrl, language } = await req.json();
 
-    if (!context || typeof context !== 'string' || context.trim() === '') {
-      return createResponse(false, { code: 'MISSING_CONTEXT', message: "O contexto ou descrição é obrigatório." });
+    if (!context && !imageUrl) {
+      return createResponse(false, { code: 'MISSING_CONTEXT', message: "O contexto ou a URL da imagem é obrigatório." });
     }
 
     const lang = language || "pt-BR";
@@ -46,7 +47,7 @@ serve(async (req: Request) => {
     const systemPrompt = `
 Você é o AGENTE MESTRE DE COPYWRITING SAFADO do MeuPrivacy.
 
-Seu trabalho é pegar qualquer descrição simples do admin e transformar em texto que VENDE desejo no feed.
+Seu trabalho é pegar a descrição do admin e/ou a análise visual da imagem e transformar em texto que VENDE desejo no feed.
 
 Sempre gere:
 
@@ -74,6 +75,8 @@ Nunca diga que você é uma IA.
 
 Nunca explique o que está fazendo.
 
+Se uma imagem for fornecida, use a análise visual para enriquecer a copy, focando em: localização, pose, corpo, roupa, iluminação e mood sensual.
+
 Nunca devolva texto solto: SEMPRE retorne APENAS um JSON válido.
 
 Formato EXATO da resposta (JSON):
@@ -86,11 +89,30 @@ Formato EXATO da resposta (JSON):
 }
 `;
 
-    const userPrompt = `
+    const messages: any[] = [
+      { role: "system", content: systemPrompt },
+    ];
+
+    const userContent: any[] = [];
+
+    if (imageUrl) {
+        userContent.push({
+            type: "image_url",
+            image_url: {
+                url: imageUrl,
+                detail: "low", // Usando low detail para eficiência de custo
+            },
+        });
+    }
+
+    const textPrompt = `
 Tipo de conteúdo: ${contentType || 'general'}
-Contexto fornecido pelo admin: """${context}"""
+Contexto fornecido pelo admin: """${context || 'Nenhum contexto adicional.'}"""
 Gere o melhor conteúdo possível seguindo as regras do sistema.
 `;
+    userContent.push({ type: "text", text: textPrompt });
+
+    messages.push({ role: "user", content: userContent });
 
     const response = await fetch("https://api.openai.com/v1/chat/completions", {
       method: "POST",
@@ -101,10 +123,7 @@ Gere o melhor conteúdo possível seguindo as regras do sistema.
       body: JSON.stringify({
         model: OPENAI_MODEL,
         temperature: 0.9,
-        messages: [
-          { role: "system", content: systemPrompt },
-          { role: "user", content: userPrompt },
-        ],
+        messages: messages,
         response_format: { type: "json_object" }, // Solicita JSON
       }),
     });

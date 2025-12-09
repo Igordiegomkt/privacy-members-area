@@ -196,4 +196,4 @@ export const ManageProducts: React.FC = () => {
             <Link to="/admin/modelos" className="text-primary mt-4 inline-block">Voltar para Modelos</Link>
         </div>
     );
-}
+};

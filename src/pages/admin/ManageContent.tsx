@@ -40,7 +40,8 @@ const linkMediaToProduct = async (mediaIds: string[], productId: string) => {
     if (error) throw new Error(`Erro ao vincular mídia ao produto: ${error.message}`);
 };
 
-const insertFeedRecords = async (modelId: string, mediaId: string, copy: AiResult) => {
+// Função para CRIAR registros de feed (usada na inserção inicial)
+const createFeedRecords = async (modelId: string, mediaId: string, copy: AiResult) => {
     const feedPayload = {
         model_id: modelId,
         media_id: mediaId,
@@ -57,6 +58,30 @@ const insertFeedRecords = async (modelId: string, mediaId: string, copy: AiResul
     // Inserir no feed global
     const { error: globalFeedError } = await supabase.from('global_feed').insert(feedPayload);
     if (globalFeedError) console.error('Erro ao inserir no global_feed:', globalFeedError);
+};
+
+// Função para ATUALIZAR registros de feed (usada na edição manual)
+const updateFeedRecords = async (mediaId: string, updates: Partial<MediaItem>) => {
+    const feedPayload = {
+        title: updates.title,
+        subtitle: updates.subtitle,
+        description: updates.description,
+        cta: updates.cta,
+    };
+
+    // Update model_feed
+    const { error: modelFeedError } = await supabase
+        .from('model_feed')
+        .update(feedPayload)
+        .eq('media_id', mediaId);
+    if (modelFeedError) console.error('Erro ao atualizar model_feed:', modelFeedError);
+
+    // Update global_feed
+    const { error: globalFeedError } = await supabase
+        .from('global_feed')
+        .update(feedPayload)
+        .eq('media_id', mediaId);
+    if (globalFeedError) console.error('Erro ao atualizar global_feed:', globalFeedError);
 };
 
 
@@ -375,7 +400,7 @@ export const ManageContent: React.FC = () => {
             
             // 2. Inserir registros de feed se a copy da IA foi usada
             if (aiResult) {
-                await insertFeedRecords(modelId!, mediaId, aiResult);
+                await createFeedRecords(modelId!, mediaId, aiResult);
             }
 
             alert('Conteúdo adicionado!');
@@ -399,9 +424,6 @@ export const ManageContent: React.FC = () => {
         setIsGeneratingBatch(true);
         
         try {
-            const modelName = model?.name || 'a modelo';
-            const genericContext = `Conteúdo ${batchType} exclusivo de ${modelName}.`;
-            
             const newItemsPayload = Array.from({ length: batchCount }, (_, i) => ({
                 model_id: modelId,
                 type: batchType,
@@ -419,6 +441,9 @@ export const ManageContent: React.FC = () => {
                 if (batchProductId) await linkMediaToProduct(insertedItems.map(item => item.id), batchProductId);
 
                 // 3. Gerar metadados e inserir feeds em paralelo
+                const modelName = model?.name || 'a modelo';
+                const genericContext = `Conteúdo ${batchType} exclusivo de ${modelName}.`;
+                
                 const updatesAndFeeds = insertedItems.map(async (item) => {
                     const result = await generateMetadata(genericContext, item.type as 'image' | 'video');
                     
@@ -438,7 +463,7 @@ export const ManageContent: React.FC = () => {
                         }).eq('id', item.id);
 
                         // Insere nos feeds
-                        const feedPromise = insertFeedRecords(modelId!, item.id, result);
+                        const feedPromise = createFeedRecords(modelId!, item.id, result);
                         
                         return Promise.all([updatePromise, feedPromise]);
                     }
@@ -458,7 +483,7 @@ export const ManageContent: React.FC = () => {
     };
 
     const handleSaveMediaItem = async (id: string, updates: Partial<MediaItem>) => {
-        // Ao salvar manualmente, atualizamos apenas os campos principais.
+        // Ao salvar manualmente, atualizamos os campos principais e, em seguida, os feeds.
         const { error: updateError } = await supabase
             .from('media_items')
             .update(updates)
@@ -468,6 +493,9 @@ export const ManageContent: React.FC = () => {
             throw new Error(`Falha ao salvar: ${updateError.message}`);
         }
         
+        // 2. Atualizar registros de feed (model_feed e global_feed)
+        await updateFeedRecords(id, updates);
+
         // Atualiza o estado local
         setMediaItems(prev => prev.map(item => item.id === id ? { ...item, ...updates } : item));
     };
@@ -475,7 +503,6 @@ export const ManageContent: React.FC = () => {
     const handleDeleteSelected = async () => {
         if (selectedIds.size === 0) return;
         if (window.confirm(`Tem certeza que deseja excluir ${selectedIds.size} mídias?`)) {
-            // A exclusão em cascata deve cuidar dos feeds e product_media
             const { error: deleteError } = await supabase.from('media_items').delete().in('id', Array.from(selectedIds));
             if (deleteError) setError(deleteError.message);
             else {
@@ -488,7 +515,6 @@ export const ManageContent: React.FC = () => {
     
     const handleDeleteSingle = async (id: string) => {
         if (window.confirm('Tem certeza que deseja excluir esta mídia?')) {
-            // A exclusão em cascata deve cuidar dos feeds e product_media
             const { error: deleteError } = await supabase.from('media_items').delete().eq('id', id);
             if (deleteError) setError(deleteError.message);
             else {

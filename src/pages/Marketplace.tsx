@@ -1,6 +1,9 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { Product, Model } from '../types';
+import { Header } from '../components/Header';
+import { BottomNavigation } from '../components/BottomNavigation';
+import { useProtection } from '../hooks/useProtection';
 import { fetchProducts, UserPurchaseWithProduct, fetchUserPurchases, hasUserPurchasedProduct } from '../lib/marketplace';
 import { supabase } from '../lib/supabase';
 import { useCheckout } from '../contexts/CheckoutContext';
@@ -133,6 +136,7 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
 };
 
 export const Marketplace: React.FC = () => {
+  useProtection();
   const [otherProducts, setOtherProducts] = useState<Product[]>([]);
   const [baseProducts, setBaseProducts] = useState<(Product & { models: Model | null })[]>([]);
   const [purchases, setPurchases] = useState<UserPurchaseWithProduct[]>([]);
@@ -172,48 +176,52 @@ export const Marketplace: React.FC = () => {
   }, []);
 
   return (
-    <div className="w-full px-4 py-6">
-      <div className="mb-6">
-        <h1 className="text-2xl font-bold text-white mb-1">Loja de Conteúdos</h1>
-        <p className="text-sm text-privacy-text-secondary">Packs exclusivos, conteúdos avulsos e assinaturas VIP.</p>
-      </div>
+    <div className="min-h-screen bg-privacy-black text-white pb-24">
+      <Header />
+      <main className="mx-auto w-full max-w-4xl px-4 py-6">
+        <div className="mb-6">
+          <h1 className="text-2xl font-bold text-white mb-1">Loja de Conteúdos</h1>
+          <p className="text-sm text-privacy-text-secondary">Packs exclusivos, conteúdos avulsos e assinaturas VIP.</p>
+        </div>
 
-      {loading && <div className="text-center py-16 text-privacy-text-secondary">Carregando ofertas...</div>}
-      {error && <div className="text-center py-16 text-red-400">{error}</div>}
+        {loading && <div className="text-center py-16 text-privacy-text-secondary">Carregando ofertas...</div>}
+        {error && <div className="text-center py-16 text-red-400">{error}</div>}
 
-      {!loading && !error && (
-        <>
-          {baseProducts.length > 0 && (
-            <section className="mb-10">
-              <h2 className="text-xl font-bold mb-4">Modelos VIP</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {baseProducts.map(p => (
-                  <ModelVipCard 
-                    key={p.id} 
-                    product={p} 
-                    isPurchased={hasUserPurchasedProduct(purchases, p.id)}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
+        {!loading && !error && (
+          <>
+            {baseProducts.length > 0 && (
+              <section className="mb-10">
+                <h2 className="text-xl font-bold mb-4">Modelos VIP</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {baseProducts.map(p => (
+                    <ModelVipCard 
+                      key={p.id} 
+                      product={p} 
+                      isPurchased={hasUserPurchasedProduct(purchases, p.id)}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
 
-          {otherProducts.length > 0 && (
-            <section>
-              <h2 className="text-xl font-bold text-white mb-4">Packs e conteúdos exclusivos</h2>
-              <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-                {otherProducts.map((product) => (
-                  <ProductCard 
-                    key={product.id} 
-                    product={product} 
-                    isPurchased={hasUserPurchasedProduct(purchases, product.id)}
-                  />
-                ))}
-              </div>
-            </section>
-          )}
-        </>
-      )}
+            {otherProducts.length > 0 && (
+              <section>
+                <h2 className="text-xl font-bold text-white mb-4">Packs e conteúdos exclusivos</h2>
+                <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+                  {otherProducts.map((product) => (
+                    <ProductCard 
+                      key={product.id} 
+                      product={product} 
+                      isPurchased={hasUserPurchasedProduct(purchases, product.id)}
+                    />
+                  ))}
+                </div>
+              </section>
+            )}
+          </>
+        )}
+      </main>
+      <BottomNavigation />
     </div>
   );
 };

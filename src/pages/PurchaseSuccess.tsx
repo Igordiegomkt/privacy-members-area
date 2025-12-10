@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { Product, ProductWithModel } from '../types'; // Reintroduzindo Product
+import { Product } from '../types';
 import { fetchProductById } from '../lib/marketplace';
 import { supabase } from '../lib/supabase';
 
@@ -9,7 +9,7 @@ const PurchaseSuccess: React.FC = () => {
   const [searchParams] = useSearchParams();
   const navigate = useNavigate();
   const productId = searchParams.get('product_id');
-  const [product, setProduct] = useState<ProductWithModel | null>(null); // Usando ProductWithModel
+  const [product, setProduct] = useState<Product | null>(null);
   const [modelUsername, setModelUsername] = useState<string | null>(null);
   const [loading, setLoading] = useState(true);
 
@@ -20,14 +20,10 @@ const PurchaseSuccess: React.FC = () => {
     }
 
     const loadData = async () => {
-      // fetchProductById já retorna ProductWithModel (com models.username)
       const fetchedProduct = await fetchProductById(productId);
       setProduct(fetchedProduct);
 
-      if (fetchedProduct?.models?.username) {
-        setModelUsername(fetchedProduct.models.username);
-      } else if (fetchedProduct?.model_id) {
-        // Fallback para buscar username se o JOIN falhar (embora o JOIN deva funcionar agora)
+      if (fetchedProduct?.model_id) {
         const { data: model } = await supabase
           .from('models')
           .select('username')

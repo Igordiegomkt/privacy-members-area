@@ -1,6 +1,8 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
+import { Header } from '../components/Header';
+import { BottomNavigation } from '../components/BottomNavigation';
 import { PostCard } from '../components/PostCard';
 import { VideoPlayerModal } from '../components/VideoPlayerModal';
 import { MediaModal } from '../components/MediaModal';
@@ -38,34 +40,38 @@ export const GlobalFeed: React.FC = () => {
   };
 
   return (
-    <div className="w-full py-6">
-      <div className="text-center mb-6">
-        <h1 className="text-2xl font-bold text-white">Feed</h1>
-        <p className="text-sm text-privacy-text-secondary">Novos conteúdos e sugestões para você.</p>
-      </div>
-
-      {loading && <div className="text-center py-10">Carregando...</div>}
-      {error && <div className="text-center py-10 text-red-400">{error}</div>}
-      
-      {!loading && !error && feedItems.length === 0 && (
-        <div className="text-center py-10 text-privacy-text-secondary">
-          <p>Seu feed está vazio. Explore a seção "Em alta"!</p>
+    <div className="min-h-screen bg-privacy-black text-white pb-24">
+      <Header />
+      <main className="mx-auto w-full max-w-md px-2 py-6 sm:px-0">
+        <div className="text-center mb-6">
+          <h1 className="text-2xl font-bold text-white">Feed</h1>
+          <p className="text-sm text-privacy-text-secondary">Novos conteúdos e sugestões para você.</p>
         </div>
-      )}
 
-      <div className="flex flex-col items-center">
-        {feedItems.map(item => (
-          <PostCard
-            key={item.media.id}
-            media={{ ...item.media, model: item.model }}
-            onLockedClick={() => handleLockedClick(item.media)}
-            onOpenVideo={() => setOpenVideo(item.media)}
-            onOpenImage={() => setOpenImage(item.media)}
-          />
-        ))}
-      </div>
+        {loading && <div className="text-center py-10">Carregando...</div>}
+        {error && <div className="text-center py-10 text-red-400">{error}</div>}
+        
+        {!loading && !error && feedItems.length === 0 && (
+          <div className="text-center py-10 text-privacy-text-secondary">
+            <p>Seu feed está vazio. Explore a seção "Em alta"!</p>
+          </div>
+        )}
+
+        <div className="flex flex-col items-center">
+          {feedItems.map(item => (
+            <PostCard
+              key={item.media.id}
+              media={{ ...item.media, model: item.model }}
+              onLockedClick={() => handleLockedClick(item.media)}
+              onOpenVideo={() => setOpenVideo(item.media)}
+              onOpenImage={() => setOpenImage(item.media)}
+            />
+          ))}
+        </div>
+      </main>
       <VideoPlayerModal media={openVideo} isOpen={!!openVideo} onClose={() => setOpenVideo(null)} />
       <MediaModal media={openImage} isOpen={!!openImage} onClose={() => setOpenImage(null)} />
+      <BottomNavigation />
     </div>
   );
 };

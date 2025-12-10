@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Product, ProductWithModel } from '../types';
+import { ProductWithModel } from '../types';
 import { fetchProductById, hasUserPurchasedProduct } from '../lib/marketplace';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft } from 'lucide-react';

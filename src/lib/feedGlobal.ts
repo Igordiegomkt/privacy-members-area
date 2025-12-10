@@ -79,7 +79,7 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
 
     // 3. Mapear para GlobalFeedItem, determinando o status de acesso
     const feedItems = feedData
-      .filter(item => item.media && item.model) // Garantir que a mídia e a modelo existem
+      .filter(item => item.media && item.model) // Filtra itens onde o JOIN retornou dados válidos
       .map((item: any): GlobalFeedItem => {
         // Usamos 'as unknown as MediaItem' para forçar a tipagem, pois o Supabase retorna o objeto
         // aninhado, mas o TS não consegue inferir o tipo exato do objeto aninhado.

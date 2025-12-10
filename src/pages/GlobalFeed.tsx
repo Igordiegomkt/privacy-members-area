@@ -30,7 +30,8 @@ export const GlobalFeed: React.FC = () => {
     const isFirstPage = nextPage === 0;
 
     if (isFirstPage) {
-      if (!isInitialLoading && !hasMore) return;
+      // Se for a primeira página, sempre definimos loading para true, a menos que já tenhamos dados no cache.
+      // Mas se o cache estiver vazio, precisamos carregar.
       setIsInitialLoading(true);
     } else {
       if (isPageLoading || !hasMore) return;
@@ -63,7 +64,7 @@ export const GlobalFeed: React.FC = () => {
       
     } catch (e) {
       console.error('[GLOBAL FEED] loadPage error', e);
-      setError('Erro ao carregar o feed.');
+      setError('Erro ao carregar o feed. Verifique se há conteúdo cadastrado e se a Edge Function está funcionando.');
       setHasMore(false); // Parar de tentar carregar em caso de erro
     } finally {
       if (isFirstPage) {

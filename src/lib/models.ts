@@ -155,6 +155,7 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
         ...media,
         thumbnail: !isVideoThumb ? rawThumb : null, // Garante que thumbnail de vídeo não seja usada
         accessStatus: computeMediaAccessStatus(media, accessContext),
+        model: model, // Adicionando o objeto Model completo
       };
     });
     

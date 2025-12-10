@@ -1,7 +1,8 @@
 import * as React from 'react';
-import { useRef, useState } from 'react';
+import { useRef } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { Lock, Video, Camera, Play } from 'lucide-react';
+import { useVideoAutoplay } from '../hooks/useVideoAutoplay'; // Importando o novo hook
 
 interface PostMediaDisplayProps {
   media: MediaItemWithAccess;
@@ -25,47 +26,23 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
   const isVideo = media.type === 'video';
   const isLocked = media.accessStatus === 'locked';
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [isHovering, setIsHovering] = useState(false);
-  const [hasLoadedVideo, setHasLoadedVideo] = useState(false); // Controla se o elemento <video> foi montado
+
+  // Hook para autoplay
+  useVideoAutoplay(videoRef, isVideo, isLocked);
 
   // Prioriza thumbnail, depois a URL da mídia (se for imagem), senão o fallback genérico
   const imageSrc = media.thumbnail || (isVideo ? '/video-fallback.svg' : media.url);
   const backgroundSrc = imageSrc;
-
-  const startPreview = () => {
-    if (!isVideo || isLocked) return;
-    setHasLoadedVideo(true); // Monta o elemento <video>
-    setIsHovering(true);
-    // O play será chamado no useEffect do elemento <video>
-  };
-
-  const stopPreview = () => {
-    if (!isVideo || isLocked) return;
-    setIsHovering(false);
-    if (videoRef.current) {
-      videoRef.current.pause();
-      videoRef.current.currentTime = 0;
-    }
-    // Não desmonta o vídeo imediatamente para evitar flicker
-  };
-  
-  // Efeito para controlar o play/pause do vídeo
-  React.useEffect(() => {
-    if (videoRef.current) {
-      if (isHovering) {
-        videoRef.current.play().catch(() => {});
-      } else {
-        videoRef.current.pause();
-      }
-    }
-  }, [isHovering, hasLoadedVideo]);
-
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) {
       onLockedClick();
     } else {
+      // Quando clica, pausa o autoplay e abre o modal
+      if (videoRef.current) {
+        videoRef.current.pause();
+      }
       onMediaClick();
     }
   };
@@ -91,7 +68,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
         />
       </div>
       
-      {/* Ícone de tipo (apenas se não for vídeo em preview) */}
+      {/* Ícone de tipo */}
       {!isLocked && (
         <div className="absolute top-2 left-2 flex items-center gap-2 text-xs text-white/90 z-10">
           <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5">
@@ -101,8 +78,8 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
         </div>
       )}
       
-      {/* Ícone de Play para vídeos desbloqueados (se não estiver em preview) */}
-      {isVideo && !isLocked && !isHovering && (
+      {/* Ícone de Play para vídeos desbloqueados */}
+      {isVideo && !isLocked && (
         <div className="absolute inset-0 flex items-center justify-center">
             <Play size={48} className="text-white/80 drop-shadow-lg" />
         </div>
@@ -110,17 +87,19 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
     </div>
   );
 
-  // --- Renderização do Vídeo (Apenas no Hover/Preview) ---
-  const renderVideoPreview = () => {
-    if (!isVideo || isLocked || !hasLoadedVideo) return null;
+  // --- Renderização do Vídeo (Autoplay) ---
+  const renderVideoAutoplay = () => {
+    if (!isVideo || isLocked) return null;
     
+    // O vídeo é sempre renderizado para que o IntersectionObserver possa observá-lo.
+    // Ele fica por baixo da capa (renderCover) e só aparece quando o autoplay funciona.
     return (
       <video
         key={media.id}
         ref={videoRef}
         src={media.url}
         poster={imageSrc}
-        className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ${isHovering ? 'opacity-100' : 'opacity-0'}`}
+        className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300`}
         preload="metadata"
         playsInline
         muted
@@ -133,14 +112,16 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
     <div
       className="relative w-full overflow-hidden cursor-pointer aspect-[3/4] bg-privacy-surface"
       onClick={handleClick}
-      onMouseEnter={startPreview}
-      onMouseLeave={stopPreview}
     >
-      {/* Renderiza o player de vídeo (escondido) se for vídeo e tiver sido carregado */}
-      {renderVideoPreview()}
+      {/* Renderiza o player de vídeo (autoplay) */}
+      {renderVideoAutoplay()}
+      
+      {/* Renderiza a capa (thumbnail) - Fica por cima do vídeo se o vídeo não estiver tocando */}
+      {/* Se o vídeo estiver tocando, ele deve aparecer por cima da capa. */}
+      {/* Para simplificar, vamos deixar a capa por baixo do vídeo, e o vídeo deve ter object-fit: cover/contain */}
       
       {/* Renderiza a capa (thumbnail) */}
-      <div className={`w-full h-full transition-opacity duration-300 ${isVideo && isHovering ? 'opacity-0' : 'opacity-100'}`}>
+      <div className="w-full h-full">
         {renderCover()}
       </div>
 

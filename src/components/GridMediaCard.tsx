@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useRef, useState } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { Lock, Video, Camera } from 'lucide-react';
+import { useVideoAutoplay } from '../hooks/useVideoAutoplay'; // Importando o hook
 
 interface GridMediaCardProps {
   media: MediaItemWithAccess;
@@ -17,29 +18,23 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
   const isVideo = media.type === 'video';
   const isLocked = media.accessStatus === 'locked';
   const videoRef = useRef<HTMLVideoElement | null>(null);
-  const [isPreviewing, setIsPreviewing] = useState(false);
   const [thumbError, setThumbError] = useState(false);
 
-  // PosterSrc é usado como poster do vídeo ou thumbnail da imagem
+  // Hook para autoplay
+  useVideoAutoplay(videoRef, isVideo, isLocked);
+
+  // PosterSrc é usado como thumbnail da imagem ou poster do vídeo
   const posterSrc = media.thumbnail || (isVideo ? undefined : media.url);
   const imageSrc = posterSrc || '/video-fallback.svg'; // Fallback para imagem se não houver thumbnail
-
-  const startPreview = () => {
-    if (!isVideo || isLocked || !videoRef.current) return;
-    setIsPreviewing(true);
-    videoRef.current.play().catch(() => {});
-  };
-
-  const stopPreview = () => {
-    if (!isVideo || isLocked || !videoRef.current) return;
-    videoRef.current.pause();
-    videoRef.current.currentTime = 0;
-    setIsPreviewing(false);
-  };
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
     if (isLocked) return onLockedClick?.();
+    
+    // Pausa o autoplay antes de abrir o modal
+    if (videoRef.current) {
+        videoRef.current.pause();
+    }
     return onMediaClick();
   };
 
@@ -47,35 +42,27 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
     <div
       className="relative w-full overflow-hidden rounded-xl bg-privacy-surface cursor-pointer group aspect-[3/4]"
       onClick={handleClick}
-      onMouseEnter={startPreview}
-      onMouseLeave={stopPreview}
-      onTouchStart={startPreview}
-      onTouchEnd={stopPreview}
     >
-      {/* IMAGEM (ou poster de vídeo se não estiver previewing) */}
-      {!isVideo && (
-        <img
-          src={imageSrc}
-          alt={media.title || 'Conteúdo'}
-          className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${
-            isLocked ? 'blur-xl brightness-25 scale-105' : ''
-          }`}
-          loading="lazy"
-          draggable={false}
-          onError={() => setThumbError(true)}
-        />
-      )}
+      {/* IMAGEM (ou poster de vídeo) */}
+      <img
+        src={imageSrc}
+        alt={media.title || 'Conteúdo'}
+        className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${
+          isLocked ? 'blur-xl brightness-25 scale-105' : ''
+        }`}
+        loading="lazy"
+        draggable={false}
+        onError={() => setThumbError(true)}
+      />
       
-      {/* VÍDEO */}
-      {isVideo && (
+      {/* VÍDEO (Autoplay) - Fica por cima da imagem se estiver tocando */}
+      {isVideo && !isLocked && (
         <video
           ref={videoRef}
           src={media.url}
-          poster={posterSrc} // Usa thumbnail real como poster, se existir
-          className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            isLocked ? 'blur-xl brightness-25 scale-105' : ''
-          }`}
-          preload="none"
+          poster={imageSrc}
+          className={`absolute inset-0 w-full h-full object-cover`}
+          preload="metadata"
           playsInline
           muted
           loop

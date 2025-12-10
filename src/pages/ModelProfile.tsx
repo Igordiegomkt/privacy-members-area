@@ -157,7 +157,7 @@ export const ModelProfile: React.FC = () => {
             
             // Atualizar cache após o carregamento bem-sucedido
             feedCache.model[modelId] = {
-                items: isFirstPage ? newMedia : [...mediaRef.current, ...newMedia], // <-- CORRIGIDO: Usando mediaRef.current
+                items: isFirstPage ? newMedia : [...mediaRef.current, ...newMedia], // CORREÇÃO APLICADA AQUI
                 hasMore: nextHasMore,
                 lastPage: nextPage,
             };

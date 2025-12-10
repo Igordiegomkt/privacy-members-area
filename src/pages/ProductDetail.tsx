@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Product, Model } from '../types';
-import { fetchProductById, fetchUserPurchases, hasUserPurchasedProduct } from '../lib/marketplace';
+import { fetchProductById, fetchUserPurchases, hasUserPurchasedProduct, getProductImageSrc } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { supabase } from '../lib/supabase';
@@ -12,15 +12,6 @@ import { useCheckout } from '../contexts/CheckoutContext';
 
 const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-};
-
-// Helper function para padronizar a fonte da imagem do produto
-const getProductImageSrc = (product: Product, model?: Model | null): string => {
-  return (
-    product.cover_thumbnail ??
-    model?.cover_url ??
-    '/video-fallback.svg' // Usando o fallback genérico existente
-  );
 };
 
 export const ProductDetail: React.FC = () => {
@@ -116,7 +107,7 @@ export const ProductDetail: React.FC = () => {
     );
   }
   
-  const productImageSrc = getProductImageSrc(product, product.is_base_membership ? model : null);
+  const productImageSrc = getProductImageSrc(product, model);
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">

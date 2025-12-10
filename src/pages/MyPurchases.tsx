@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
-import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
+import { fetchUserPurchases, UserPurchaseWithProduct, getProductImageSrc } from '../lib/marketplace';
 
 const formatPrice = (cents: number | null | undefined) => {
   if (cents == null) return '';
@@ -80,6 +80,7 @@ export const MyPurchases: React.FC = () => {
                   {vipPurchases.map((p) => {
                     const product = p.products;
                     const model = product.models;
+                    const productImageSrc = getProductImageSrc(product, model);
 
                     return (
                       <button
@@ -89,10 +90,10 @@ export const MyPurchases: React.FC = () => {
                         className="bg-privacy-surface rounded-lg overflow-hidden text-left group"
                       >
                         <div className="relative aspect-[3/4]">
-                          {model?.avatar_url ? (
+                          {productImageSrc ? (
                             <img
-                              src={model.avatar_url}
-                              alt={model.name || 'Modelo'}
+                              src={productImageSrc}
+                              alt={model?.name || 'Modelo'}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
                           ) : (
@@ -124,6 +125,7 @@ export const MyPurchases: React.FC = () => {
                   {packPurchases.map((p) => {
                     const product = p.products;
                     const model = product.models;
+                    const productImageSrc = getProductImageSrc(product, model);
 
                     return (
                       <button
@@ -133,9 +135,9 @@ export const MyPurchases: React.FC = () => {
                         className="bg-privacy-surface rounded-lg overflow-hidden text-left group"
                       >
                         <div className="relative aspect-[3/4]">
-                          {product.cover_thumbnail ? (
+                          {productImageSrc ? (
                             <img
-                              src={product.cover_thumbnail}
+                              src={productImageSrc}
                               alt={product.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
@@ -171,6 +173,7 @@ export const MyPurchases: React.FC = () => {
                   {singlePurchases.map((p) => {
                     const product = p.products;
                     const model = product.models;
+                    const productImageSrc = getProductImageSrc(product, model);
 
                     return (
                       <button
@@ -180,9 +183,9 @@ export const MyPurchases: React.FC = () => {
                         className="bg-privacy-surface rounded-lg overflow-hidden text-left group"
                       >
                         <div className="relative aspect-[3/4]">
-                          {product.cover_thumbnail ? (
+                          {productImageSrc ? (
                             <img
-                              src={product.cover_thumbnail}
+                              src={productImageSrc}
                               alt={product.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />

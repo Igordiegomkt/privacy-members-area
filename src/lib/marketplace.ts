@@ -24,6 +24,20 @@ export type PixCheckoutData = {
 
 const PRODUCT_COLUMNS = 'id, name, description, price_cents, type, status, cover_thumbnail, created_at, model_id, is_base_membership';
 
+/**
+ * Helper function para padronizar a fonte da imagem do produto
+ */
+export function getProductImageSrc(
+  product: { cover_thumbnail?: string | null },
+  model?: { cover_url?: string | null } | null
+): string {
+  return (
+    product.cover_thumbnail ??
+    model?.cover_url ??
+    '/video-fallback.svg' // Usando o fallback genérico existente
+  );
+}
+
 export const fetchProducts = async (): Promise<Product[]> => {
   const { data, error } = await supabase
     .from('products')
@@ -85,7 +99,8 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
           id,
           name,
           username,
-          avatar_url
+          avatar_url,
+          cover_url
         )
       )
     `

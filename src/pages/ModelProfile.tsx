@@ -3,7 +3,7 @@ import { useEffect, useState } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { Model, Product } from '../types';
 import { fetchModelByUsername, fetchMediaForModel, fetchProductsForModel, MediaItemWithAccess } from '../lib/models';
-import { UserPurchaseWithProduct } from '../lib/marketplace';
+import { UserPurchaseWithProduct, getProductImageSrc } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { MediaGrid } from '../components/MediaGrid';
@@ -16,15 +16,6 @@ import { usePurchases } from '../contexts/PurchaseContext';
 import { useCheckout } from '../contexts/CheckoutContext';
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
-
-// Helper function para padronizar a fonte da imagem do produto
-const getProductImageSrc = (product: Product, modelCoverUrl?: string | null): string => {
-  return (
-    product.cover_thumbnail ??
-    modelCoverUrl ??
-    '/video-fallback.svg' // Usando o fallback genérico existente
-  );
-};
 
 interface ProductCardProps {
     product: Product;
@@ -48,7 +39,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelNa
         }
     };
     
-    const productImageSrc = getProductImageSrc(product, modelCoverUrl);
+    const productImageSrc = getProductImageSrc(product, { cover_url: modelCoverUrl });
 
     return (
         <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">

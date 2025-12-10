@@ -4,7 +4,7 @@ import { Product, Model } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { useProtection } from '../hooks/useProtection';
-import { fetchProducts, UserPurchaseWithProduct, fetchUserPurchases, hasUserPurchasedProduct } from '../lib/marketplace';
+import { fetchProducts, UserPurchaseWithProduct, fetchUserPurchases, hasUserPurchasedProduct, getProductImageSrc } from '../lib/marketplace';
 import { supabase } from '../lib/supabase';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { useNavigate } from 'react-router-dom';
@@ -14,15 +14,6 @@ const formatPrice = (cents: number) => {
     style: 'currency',
     currency: 'BRL',
   });
-};
-
-// Helper function para padronizar a fonte da imagem do produto
-const getProductImageSrc = (product: Product, model?: Model | null): string => {
-  return (
-    product.cover_thumbnail ??
-    model?.cover_url ??
-    '/video-fallback.svg' // Usando o fallback genérico existente
-  );
 };
 
 interface ProductCardProps {
@@ -42,8 +33,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: Produ
     }
   };
   
-  // Para produtos avulsos/packs, usamos apenas o cover_thumbnail
-  const imageSrc = product.cover_thumbnail || '/video-fallback.svg'; 
+  // Usando o helper. Como não temos o objeto model aqui, o fallback será o padrão.
+  const imageSrc = getProductImageSrc(product, null); 
 
   return (
     <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">

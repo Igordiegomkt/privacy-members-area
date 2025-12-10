@@ -153,6 +153,13 @@ export const ModelProfile: React.FC = () => {
             setMediaPage(nextPage);
             setMediaHasMore(nextHasMore);
             
+            // Atualizar cache após o carregamento bem-sucedido
+            feedCache.model[modelId] = {
+                items: isFirstPage ? newMedia : [...mediaPageRef.current, ...newMedia],
+                hasMore: nextHasMore,
+                lastPage: nextPage,
+            };
+            
         } catch (e) {
             console.error("Error loading media page:", e);
             setMuralError('Erro ao carregar o mural.');
@@ -160,9 +167,9 @@ export const ModelProfile: React.FC = () => {
         } finally {
             setMuralLoading(false);
         }
-    }, []); // Removidas dependências de estado para garantir que o IntersectionObserver chame a função
+    }, []); // Dependências removidas para garantir que o IntersectionObserver chame a função
 
-    // 1. Efeito para carregar o PERFIL (Model + Products + Counts)
+    // 1. Efeito para carregar o PERFIL (Model + Products + Counts) E O MURAL INICIAL
     useEffect(() => {
         console.log('[MODEL PROFILE] useEffect loadModel start', { username });
         if (!username) { 
@@ -180,6 +187,7 @@ export const ModelProfile: React.FC = () => {
                 if (!fetchedModel) {
                     setProfileError('Modelo não encontrada.');
                     setModel(null);
+                    setProfileLoading(false);
                     return;
                 }
                 
@@ -205,11 +213,25 @@ export const ModelProfile: React.FC = () => {
                 setHasAccess(userHasAnyProduct || isCarolinaWelcome);
                 
                 console.log('[MODEL PROFILE] useEffect loadModel done', { modelId: fetchedModel.id });
+                
+                // --- CARREGAMENTO INICIAL DO MURAL (PÁGINA 0) ---
+                const cached = feedCache.model[fetchedModel.id];
+                if (cached && cached.items.length > 0) {
+                    console.log('[MODEL PROFILE] Loading mural from cache.');
+                    setMedia(cached.items);
+                    setMediaHasMore(cached.hasMore);
+                    setMediaPage(cached.lastPage);
+                    setMuralLoading(false);
+                } else {
+                    // Se não houver cache, carrega a primeira página
+                    await loadMediaPage(0, fetchedModel.id);
+                }
 
             } catch (e) {
                 console.error('[MODEL PROFILE] loadProfileData error:', e);
                 setProfileError('Erro ao carregar dados do perfil.');
                 setModel(null);
+                setMuralLoading(false);
             } finally {
                 setProfileLoading(false);
             }
@@ -222,41 +244,13 @@ export const ModelProfile: React.FC = () => {
         setMuralLoading(true); // Reset mural loading state
         
         loadProfileData();
-    }, [username, purchases]); // Depende de username e purchases (para recalcular hasAccess)
-    
-    // 2. Efeito para carregar o MURAL (Página 0) - Com Cache
-    useEffect(() => {
-        if (!model?.id) return;
-        
-        const cached = feedCache.model[model.id];
-        if (cached && cached.items.length > 0) {
-            console.log('[MODEL PROFILE] Loading mural from cache.');
-            setMedia(cached.items);
-            setMediaHasMore(cached.hasMore);
-            setMediaPage(cached.lastPage);
-            setMuralLoading(false);
-            return;
-        }
-        
-        console.log('[MODEL PROFILE] useEffect loadMuralPage(0) triggered', { modelId: model.id });
-        loadMediaPage(0, model.id);
-        
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [model?.id]); // Depende apenas do ID da modelo (carregamento inicial)
-    
-    // 3. Atualizar cache sempre que o mural mudar
-    useEffect(() => {
-        if (model?.id && (media.length > 0 || !muralLoading)) {
-            feedCache.model[model.id] = {
-                items: media,
-                hasMore: mediaHasMore,
-                lastPage: mediaPage,
-            };
-        }
-    }, [model?.id, media, mediaHasMore, mediaPage, muralLoading]);
+    }, [username, purchases, loadMediaPage]); // Adicionado loadMediaPage como dependência
+
+    // 2. Efeito para atualizar cache (removido, agora está dentro de loadMediaPage)
+    // O useEffect anterior (3) foi removido para evitar corridas de estado.
 
 
-    // 4. Intersection Observer for infinite scroll (Mural)
+    // 3. Intersection Observer for infinite scroll (Mural)
     useEffect(() => {
         if (!sentinelRef.current || !model?.id) return;
 

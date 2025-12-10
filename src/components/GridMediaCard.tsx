@@ -66,6 +66,7 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
           playsInline
           muted
           loop
+          // REMOVIDO: controls
         />
       )}
 

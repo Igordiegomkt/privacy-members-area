@@ -81,7 +81,8 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
       {/* Ícone de Play para vídeos desbloqueados */}
       {isVideo && !isLocked && (
         <div className="absolute inset-0 flex items-center justify-center">
-            <Play size={48} className="text-white/80 drop-shadow-lg" />
+            {/* Usando a cor primária (laranja) para o ícone de play manual */}
+            <Play size={48} className="text-primary drop-shadow-lg" fill="currentColor" />
         </div>
       )}
     </div>
@@ -92,7 +93,6 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
     if (!isVideo || isLocked) return null;
     
     // O vídeo é sempre renderizado para que o IntersectionObserver possa observá-lo.
-    // Ele fica por baixo da capa (renderCover) e só aparece quando o autoplay funciona.
     return (
       <video
         key={media.id}
@@ -104,6 +104,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
         playsInline
         muted
         loop
+        // REMOVIDO: controls
       />
     );
   };
@@ -115,10 +116,6 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
     >
       {/* Renderiza o player de vídeo (autoplay) */}
       {renderVideoAutoplay()}
-      
-      {/* Renderiza a capa (thumbnail) - Fica por cima do vídeo se o vídeo não estiver tocando */}
-      {/* Se o vídeo estiver tocando, ele deve aparecer por cima da capa. */}
-      {/* Para simplificar, vamos deixar a capa por baixo do vídeo, e o vídeo deve ter object-fit: cover/contain */}
       
       {/* Renderiza a capa (thumbnail) */}
       <div className="w-full h-full">

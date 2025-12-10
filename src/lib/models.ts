@@ -73,6 +73,25 @@ export const fetchProductsForModel = async (modelId: string): Promise<Product[]>
   return data;
 };
 
+export const fetchModelMediaCounts = async (modelId: string): Promise<{ totalPosts: number; totalPhotos: number; totalVideos: number }> => {
+  try {
+    const [totalRes, photosRes, videosRes] = await Promise.all([
+      supabase.from('media_items').select('id', { count: 'exact', head: true }).eq('model_id', modelId),
+      supabase.from('media_items').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('type', 'image'),
+      supabase.from('media_items').select('id', { count: 'exact', head: true }).eq('model_id', modelId).eq('type', 'video'),
+    ]);
+
+    return {
+      totalPosts: totalRes.count ?? 0,
+      totalPhotos: photosRes.count ?? 0,
+      totalVideos: videosRes.count ?? 0,
+    };
+  } catch (error) {
+    console.error('Error fetching media counts:', error);
+    return { totalPosts: 0, totalPhotos: 0, totalVideos: 0 };
+  }
+};
+
 // Renomeando e paginando a função de fetch de mídia da modelo
 export const fetchMediaForModelPage = async (params: { modelId: string, page: number, pageSize?: number }): Promise<{ items: MediaItemWithAccess[], hasMore: boolean }> => {
   const { modelId, page, pageSize = PAGE_SIZE } = params;

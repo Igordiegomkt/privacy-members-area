@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useEffect, useState, useRef, useCallback } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Product, Model } from '../types';
-import { fetchModelByUsername, fetchProductsForModel, fetchMediaForModelPage, MediaItemWithAccess } from '../lib/models';
+import { fetchModelByUsername, fetchProductsForModel, fetchMediaForModelPage, MediaItemWithAccess, fetchModelMediaCounts } from '../lib/models';
 import { UserPurchaseWithProduct, getProductImageSrc } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
@@ -15,6 +15,7 @@ import { ArrowLeft, MessageCircle, Gift, CheckCircle } from 'lucide-react';
 import { usePurchases } from '../contexts/PurchaseContext';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { trackViewContent, trackAddToCart } from '../lib/tracking'; // Importando trackAddToCart
+import { feedCache } from '../lib/feedCache'; // Importando cache
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -93,6 +94,7 @@ export const ModelProfile: React.FC = () => {
     const [profileError, setProfileError] = useState<string | null>(null);
     const [products, setProducts] = useState<Product[]>([]);
     const [hasAccess, setHasAccess] = useState(false);
+    const [mediaCounts, setMediaCounts] = useState<{ totalPosts: number; totalPhotos: number; totalVideos: number } | null>(null);
     
     // Estados de Paginação do Mural
     const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
@@ -144,9 +146,10 @@ export const ModelProfile: React.FC = () => {
         } finally {
             setMuralLoading(false);
         }
-    }, [muralLoading, mediaHasMore]); // Depende apenas dos estados de paginação/loading do mural
+    }, [muralLoading, mediaHasMore]);
 
-    // 1. Efeito para carregar o PERFIL (Model + Products)
+
+    // 1. Efeito para carregar o PERFIL (Model + Products + Counts)
     useEffect(() => {
         console.log('[MODEL PROFILE] useEffect loadModel start', { username });
         if (!username) { 
@@ -178,6 +181,10 @@ export const ModelProfile: React.FC = () => {
                 // Fetch products once (not paginated)
                 const fetchedProducts = await fetchProductsForModel(fetchedModel.id);
                 setProducts(fetchedProducts);
+                
+                // Fetch total counts
+                const counts = await fetchModelMediaCounts(fetchedModel.id);
+                setMediaCounts(counts);
 
                 const modelProductIds = new Set(fetchedProducts.map(p => p.id));
                 const userHasAnyProduct = purchases.some((p: UserPurchaseWithProduct) => modelProductIds.has(p.product_id));
@@ -204,9 +211,19 @@ export const ModelProfile: React.FC = () => {
         loadProfileData();
     }, [username, purchases]); // Depende de username e purchases (para recalcular hasAccess)
     
-    // 2. Efeito para carregar o MURAL (Página 0)
+    // 2. Efeito para carregar o MURAL (Página 0) - Com Cache
     useEffect(() => {
         if (!model?.id) return;
+        
+        const cached = feedCache.model[model.id];
+        if (cached && cached.items.length > 0) {
+            console.log('[MODEL PROFILE] Loading mural from cache.');
+            setMedia(cached.items);
+            setMediaHasMore(cached.hasMore);
+            setMediaPage(cached.lastPage);
+            setMuralLoading(false);
+            return;
+        }
         
         console.log('[MODEL PROFILE] useEffect loadMuralPage(0) triggered', { modelId: model.id });
         loadMediaPage(0, model.id);
@@ -214,7 +231,19 @@ export const ModelProfile: React.FC = () => {
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [model?.id]); // Depende apenas do ID da modelo (carregamento inicial)
     
-    // 3. Intersection Observer for infinite scroll (Mural)
+    // 3. Atualizar cache sempre que o mural mudar
+    useEffect(() => {
+        if (model?.id && (media.length > 0 || !muralLoading)) {
+            feedCache.model[model.id] = {
+                items: media,
+                hasMore: mediaHasMore,
+                lastPage: mediaPage,
+            };
+        }
+    }, [model?.id, media, mediaHasMore, mediaPage, muralLoading]);
+
+
+    // 4. Intersection Observer for infinite scroll (Mural)
     useEffect(() => {
         if (!sentinelRef.current || muralLoading || !mediaHasMore || !model?.id) return;
 
@@ -285,11 +314,8 @@ export const ModelProfile: React.FC = () => {
     // Garantimos que model é Model aqui
     const currentModel = model as Model;
 
-    const stats = {
-        posts: media.length, // Now reflects loaded posts
-        photos: media.filter(m => m.type === 'image').length,
-        videos: media.filter(m => m.type === 'video').length,
-    };
+    // Usando os contadores totais (fix)
+    const stats = mediaCounts || { totalPosts: 0, totalPhotos: 0, totalVideos: 0 };
     
     // Media for Feed/Viewer (only unlocked/free)
     const feedMedia = media.filter(m => m.accessStatus === 'free' || m.accessStatus === 'unlocked');
@@ -327,9 +353,9 @@ export const ModelProfile: React.FC = () => {
                         </div>
 
                         <div className="mt-4 flex items-center justify-center gap-6 text-sm text-privacy-text-secondary">
-                            <span><strong className="text-white">{stats.posts}</strong> posts</span>
-                            <span><strong className="text-white">{stats.photos}</strong> fotos</span>
-                            <span><strong className="text-white">{stats.videos}</strong> vídeos</span>
+                            <span><strong className="text-white">{stats.totalPosts}</strong> posts</span>
+                            <span><strong className="text-white">{stats.totalPhotos}</strong> fotos</span>
+                            <span><strong className="text-white">{stats.totalVideos}</strong> vídeos</span>
                         </div>
                     </div>
                 </div>

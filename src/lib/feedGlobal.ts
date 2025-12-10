@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Model } from '../types';
+import { Model, MediaItem } from '../types';
 import { MediaItemWithAccess } from './models';
 import { fetchUserPurchases } from './marketplace';
 
@@ -24,19 +24,30 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
     const purchasedModelIds = new Set(userPurchases.map(p => p.products?.model_id).filter(Boolean));
     const hasWelcomeCarolina = localStorage.getItem('welcomePurchaseCarolina') === 'true';
 
-    // 2. Buscar mídias paginadas com os dados de suas modelos e produtos base
-    const { data: mediaWithModels, error } = await supabase
-      .from('media_items')
+    // 2. Buscar itens do global_feed paginados, fazendo JOIN com media_items e models
+    const { data: feedData, error } = await supabase
+      .from('global_feed')
       .select(`
-        *, 
-        model:models(*),
-        ai_title,
-        ai_subtitle,
-        ai_description,
-        ai_cta,
-        ai_tags,
-        products ( id, is_base_membership, price_cents )
-      `) // Incluindo todos os campos de copy e IA + produtos
+        id,
+        model_id,
+        media_id,
+        title,
+        subtitle,
+        description,
+        cta,
+        media:media_id (
+          *,
+          ai_title,
+          ai_subtitle,
+          ai_description,
+          ai_cta,
+          ai_tags
+        ),
+        model:models (
+          *,
+          products ( id, is_base_membership, price_cents )
+        )
+      `)
       .order('created_at', { ascending: false })
       .range(from, to);
 
@@ -51,7 +62,7 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
       return { items: [], hasMore: false };
     }
 
-    const count = mediaWithModels?.length ?? 0;
+    const count = feedData?.length ?? 0;
     
     if (count === 0) {
       console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage result', {
@@ -67,12 +78,12 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
     const modelPriceMap = new Map<string, { price: number, productId: string }>();
 
     // 3. Mapear para GlobalFeedItem, determinando o status de acesso
-    const feedItems = mediaWithModels
-      .filter(item => item.model) // Garantir que a mídia tem uma modelo associada
+    const feedItems = feedData
+      .filter(item => item.media && item.model) // Garantir que a mídia e a modelo existem
       .map((item): GlobalFeedItem => {
-        const media = item as any; // Cast para simplificar o acesso
-        const model = media.model as Model;
-        const products = media.products || [];
+        const mediaItem = item.media as MediaItem;
+        const model = item.model as Model & { products: any[] };
+        const products = model.products || [];
         
         let accessStatus: 'unlocked' | 'free' | 'locked' = 'locked';
         const isCarolina = model.username === 'carolina-andrade';
@@ -86,7 +97,6 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
             if (baseProduct && baseProduct.id) {
                 mainProductPriceCents = baseProduct.price_cents;
                 mainProductId = baseProduct.id;
-                // Garantindo que productId é string antes de setar no Map
                 modelPriceMap.set(model.id, { price: mainProductPriceCents, productId: mainProductId as string });
             }
         } else {
@@ -95,18 +105,25 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
             mainProductId = cached.productId;
         }
 
-
-        if (media.is_free) {
+        if (mediaItem.is_free) {
           accessStatus = 'free';
         } else if ((isCarolina && hasWelcomeCarolina) || purchasedModelIds.has(model.id)) {
           accessStatus = 'unlocked';
         }
+        
+        // Usar a copy do feed se existir, senão a da mídia
+        const finalMedia: MediaItemWithAccess = {
+            ...mediaItem,
+            title: item.title || mediaItem.title,
+            subtitle: item.subtitle || mediaItem.subtitle,
+            description: item.description || mediaItem.description,
+            cta: item.cta || mediaItem.cta,
+            accessStatus,
+        };
+
 
         return {
-          media: {
-            ...media,
-            accessStatus,
-          },
+          media: finalMedia,
           model: {
               ...model,
               mainProductPriceCents, // Attach price to model object

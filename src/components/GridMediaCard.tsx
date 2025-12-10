@@ -20,7 +20,9 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [thumbError, setThumbError] = useState(false);
 
-  const posterSrc = thumbError || !media.thumbnail ? '/video-fallback.svg' : media.thumbnail;
+  // PosterSrc é usado como poster do vídeo ou thumbnail da imagem
+  const posterSrc = media.thumbnail || (isVideo ? undefined : media.url);
+  const imageSrc = posterSrc || '/video-fallback.svg'; // Fallback para imagem se não houver thumbnail
 
   const startPreview = () => {
     if (!isVideo || isLocked || !videoRef.current) return;
@@ -50,23 +52,28 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
       onTouchStart={startPreview}
       onTouchEnd={stopPreview}
     >
-      <img
-        src={posterSrc}
-        alt={media.title || 'Conteúdo'}
-        className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${
-          isLocked ? 'blur-xl brightness-25 scale-105' : ''
-        } ${isPreviewing ? 'opacity-0' : 'opacity-100'}`}
-        loading="lazy"
-        draggable={false}
-        onError={() => setThumbError(true)}
-      />
-
-      {isVideo && !isLocked && (
+      {/* IMAGEM (ou poster de vídeo se não estiver previewing) */}
+      {!isVideo && (
+        <img
+          src={imageSrc}
+          alt={media.title || 'Conteúdo'}
+          className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${
+            isLocked ? 'blur-xl brightness-25 scale-105' : ''
+          }`}
+          loading="lazy"
+          draggable={false}
+          onError={() => setThumbError(true)}
+        />
+      )}
+      
+      {/* VÍDEO */}
+      {isVideo && (
         <video
           ref={videoRef}
           src={media.url}
+          poster={posterSrc} // Usa thumbnail real como poster, se existir
           className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 ${
-            isPreviewing ? 'opacity-100' : 'opacity-0'
+            isLocked ? 'blur-xl brightness-25 scale-105' : ''
           }`}
           preload="none"
           playsInline

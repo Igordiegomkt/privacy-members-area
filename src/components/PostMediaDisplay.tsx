@@ -28,9 +28,9 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
   const [isPreviewing, setIsPreviewing] = useState(false);
   const [thumbError, setThumbError] = useState(false);
 
-  // Use media.thumbnail if available, otherwise fallback to media.url (if image) or generic fallback
-  const posterSrc = media.thumbnail || (isVideo ? '/video-fallback.svg' : media.url);
-  const backgroundSrc = thumbError || !posterSrc ? '/video-fallback.svg' : posterSrc;
+  // PosterSrc é usado apenas para o fundo blur ou como poster do vídeo (se thumbnail existir)
+  const posterSrc = media.thumbnail || (isVideo ? undefined : media.url);
+  const backgroundSrc = posterSrc || '/video-fallback.svg'; // Fallback genérico para o fundo blur
 
   const startPreview = () => {
     if (!isVideo || isLocked || !videoRef.current) return;
@@ -54,7 +54,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
     }
   };
 
-  // --- Visual Effect Logic (Requirement 2) ---
+  // --- Visual Effect Logic ---
   const renderImageDisplay = () => (
     <div className="relative w-full h-full">
       {/* Fundo espelhado/blur para IMAGENS */}
@@ -80,29 +80,25 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
 
   const renderVideoDisplay = () => (
     <div className="relative w-full h-full bg-privacy-black">
-      {/* Fundo leve de thumbnail para VÍDEOS (se existir) */}
-      {posterSrc && posterSrc !== '/video-fallback.svg' && (
+      {/* Fundo leve de thumbnail (se existir) */}
+      {posterSrc && (
         <div
           className={`absolute inset-0 bg-center bg-cover blur-md scale-105 opacity-30`}
           style={{ backgroundImage: `url(${posterSrc})` }}
         />
       )}
       
-      {/* Player de preview (se não estiver bloqueado) */}
-      {!isLocked && (
-        <video
-          ref={videoRef}
-          src={media.url}
-          poster={posterSrc}
-          className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 ${
-            isPreviewing ? 'opacity-100' : 'opacity-100'
-          }`}
-          preload="metadata" // Não carregar o vídeo inteiro
-          playsInline
-          muted
-          loop
-        />
-      )}
+      {/* Player de preview (sempre renderizado para vídeo) */}
+      <video
+        ref={videoRef}
+        src={media.url}
+        poster={posterSrc} // Usa thumbnail real como poster, se existir
+        className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300`}
+        preload="metadata"
+        playsInline
+        muted
+        loop
+      />
       
       {/* Ícone de play/tipo */}
       <div className="absolute top-2 left-2 flex items-center gap-2 text-xs text-white/90 z-10">
@@ -122,7 +118,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
     >
       {isVideo ? renderVideoDisplay() : renderImageDisplay()}
 
-      {/* Overlay de Bloqueio (Requirement 2C) */}
+      {/* Overlay de Bloqueio */}
       {isLocked && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-center px-3 z-20">
           <Lock className="w-8 h-8 text-primary mb-2" />

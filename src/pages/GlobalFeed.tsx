@@ -9,6 +9,7 @@ import { fetchGlobalFeedItemsPage, GlobalFeedItem } from '../lib/feedGlobal';
 import { MediaViewerFullscreen } from '../components/MediaViewerFullscreen';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { trackAddToCart } from '../lib/tracking'; // Importando tracking
+import { feedCache } from '../lib/feedCache'; // Importando cache
 
 const PAGE_SIZE = 10;
 
@@ -73,14 +74,37 @@ export const GlobalFeed: React.FC = () => {
     }
   }, [isInitialLoading, isPageLoading, hasMore]);
 
-  // 1. Carregamento inicial
+  // 1. Carregamento inicial (com cache)
   useEffect(() => {
-    console.log('[GLOBAL FEED] useEffect initial, calling loadPage(0)');
+    console.log('[GLOBAL FEED] useEffect initial, checking cache...');
+    
+    if (feedCache.global && feedCache.global.items.length > 0) {
+        console.log('[GLOBAL FEED] Loading from cache.');
+        setFeedItems(feedCache.global.items);
+        setHasMore(feedCache.global.hasMore);
+        setPage(feedCache.global.lastPage);
+        setIsInitialLoading(false);
+        return;
+    }
+
+    console.log('[GLOBAL FEED] Cache empty, calling loadPage(0)');
     loadPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+  
+  // 2. Atualizar cache sempre que o feed mudar
+  useEffect(() => {
+    if (feedItems.length > 0 || !isInitialLoading) {
+        feedCache.global = {
+            items: feedItems,
+            hasMore: hasMore,
+            lastPage: page,
+        };
+    }
+  }, [feedItems, hasMore, page, isInitialLoading]);
 
-  // 2. Intersection Observer para scroll infinito
+
+  // 3. Intersection Observer para scroll infinito
   useEffect(() => {
     // Usamos isPageLoading aqui para evitar chamadas duplicadas
     if (!sentinelRef.current || isInitialLoading || isPageLoading || !hasMore) return;

@@ -79,6 +79,8 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
   const from = page * pageSize;
   const to = from + pageSize - 1;
 
+  console.log('[MODEL PROFILE] fetchMediaForModelPage called', { page, pageSize, modelId });
+
   try {
     // 1. Fetch media items paginated
     const { data: mediaItems, error: mediaError } = await supabase
@@ -99,14 +101,23 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
       console.error('Error fetching media for model page:', mediaError);
       return { items: [], hasMore: false };
     }
-    
+
     if (!mediaItems || mediaItems.length === 0) {
+      console.log('[MODEL PROFILE] fetchMediaForModelPage result', {
+        page,
+        pageSize,
+        count: 0,
+        error: null,
+      });
       return { items: [], hasMore: false };
     }
 
     // 2. Fetch context data (model, purchases, products)
     const { data: model, error: modelError } = await supabase.from('models').select('*').eq('id', modelId).single();
-    if (modelError || !model) return { items: [], hasMore: false };
+    if (modelError || !model) {
+      console.error('Error fetching model context:', modelError);
+      return { items: [], hasMore: false };
+    }
 
     const purchases = await fetchUserPurchases();
     const productsForModel = await fetchProductsForModel(modelId);
@@ -127,10 +138,18 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
     });
     
     const hasMore = mediaItems.length === pageSize;
+    
+    console.log('[MODEL PROFILE] fetchMediaForModelPage result', {
+      page,
+      pageSize,
+      count: mediaItems.length,
+      error: null,
+    });
 
     return { items: mediaWithAccess, hasMore };
   } catch (e) {
-    console.error('Unexpected error in fetchMediaForModelPage:', e);
+    const error = e as Error;
+    console.error('Unexpected error in fetchMediaForModelPage:', error);
     return { items: [], hasMore: false };
   }
 };

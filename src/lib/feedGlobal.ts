@@ -16,6 +16,8 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
   const from = page * pageSize;
   const to = from + pageSize - 1;
 
+  console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage called', { page, pageSize });
+
   try {
     // 1. Identificar modelos que o usuário já tem acesso
     const userPurchases = await fetchUserPurchases();
@@ -40,10 +42,22 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
 
     if (error) {
       console.error('Error fetching global feed page:', error);
+      console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage result', {
+        page,
+        pageSize,
+        count: 0,
+        error: error.message,
+      });
       return { items: [], hasMore: false };
     }
 
     if (!mediaWithModels || mediaWithModels.length === 0) {
+      console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage result', {
+        page,
+        pageSize,
+        count: 0,
+        error: null,
+      });
       return { items: [], hasMore: false };
     }
 
@@ -101,10 +115,24 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
 
     // Determine if there are more items to load
     const hasMore = mediaWithModels.length === pageSize;
+    
+    console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage result', {
+      page,
+      pageSize,
+      count: mediaWithModels.length,
+      error: null,
+    });
 
     return { items: feedItems, hasMore };
   } catch (e) {
-    console.error('Unexpected error in fetchGlobalFeedItemsPage:', e);
+    const error = e as Error;
+    console.error('Unexpected error in fetchGlobalFeedItemsPage:', error);
+    console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage result', {
+      page,
+      pageSize,
+      count: 0,
+      error: error.message,
+    });
     return { items: [], hasMore: false };
   }
 };

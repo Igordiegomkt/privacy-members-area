@@ -86,62 +86,83 @@ export const ModelProfile: React.FC = () => {
     const { username } = useParams<{ username: string }>();
     const navigate = useNavigate();
     const { openCheckoutForProduct } = useCheckout();
-    const [model, setModel] = useState<Model | null>(null);
     
-    // State for Media Pagination
+    // Estados de Carregamento e Dados do Perfil
+    const [model, setModel] = useState<Model | null>(null);
+    const [profileLoading, setProfileLoading] = useState(true);
+    const [profileError, setProfileError] = useState<string | null>(null);
+    const [products, setProducts] = useState<Product[]>([]);
+    const [hasAccess, setHasAccess] = useState(false);
+    
+    // Estados de Paginação do Mural
     const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
     const [mediaPage, setMediaPage] = useState(0);
-    const [mediaLoading, setMediaLoading] = useState(true);
+    const [muralLoading, setMuralLoading] = useState(true);
     const [mediaHasMore, setMediaHasMore] = useState(true);
+    const [muralError, setMuralError] = useState<string | null>(null);
     
-    const [products, setProducts] = useState<Product[]>([]);
     const [openMediaIndex, setOpenMediaIndex] = useState<number | null>(null);
-    const [hasAccess, setHasAccess] = useState(false);
     const { purchases } = usePurchases();
     
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
     // Function to load media page
     const loadMediaPage = useCallback(async (nextPage: number, modelId: string) => {
-        // Se já estamos carregando ou não há mais, saímos.
-        if (mediaLoading || !mediaHasMore) return;
+        const isFirstPage = nextPage === 0;
         
-        // Apenas mostramos o loading se for a primeira página ou se já houver conteúdo
-        if (nextPage === 0) setMediaLoading(true);
+        if (!isFirstPage && (muralLoading || !mediaHasMore)) return;
+        
+        if (isFirstPage) {
+            setMuralLoading(true);
+            setMuralError(null);
+        }
 
         try {
+            console.log('[MODEL PROFILE] loadMediaPage called', { nextPage, modelId });
+            
             const { items: newMedia, hasMore: nextHasMore } = await fetchMediaForModelPage({
                 modelId,
                 page: nextPage,
                 pageSize: PAGE_SIZE,
             });
             
-            setMedia(prev => nextPage === 0 ? newMedia : [...prev, ...newMedia]);
+            console.log('[MODEL PROFILE] loadMediaPage result', {
+                nextPage,
+                received: newMedia.length,
+                nextHasMore,
+            });
+            
+            setMedia(prev => isFirstPage ? newMedia : [...prev, ...newMedia]);
             setMediaPage(nextPage);
             setMediaHasMore(nextHasMore);
             
-            if (nextPage === 0 && newMedia.length === 0) {
-                setMediaHasMore(false); // Não tentar carregar mais se a primeira página for vazia
-            }
-            
         } catch (e) {
             console.error("Error loading media page:", e);
+            setMuralError('Erro ao carregar o mural.');
             setMediaHasMore(false); // Parar de tentar carregar em caso de erro
         } finally {
-            setMediaLoading(false);
+            setMuralLoading(false);
         }
-    }, [mediaLoading, mediaHasMore]);
+    }, [muralLoading, mediaHasMore]);
 
 
+    // 1. Carregamento do Perfil (Model + Products)
     useEffect(() => {
-        if (!username) { setMediaLoading(false); return; }
+        if (!username) { setProfileLoading(false); return; }
         
         const loadProfileData = async () => {
-            // O loading inicial é para o perfil inteiro (model + produtos)
-            setMediaLoading(true); 
+            setProfileLoading(true); 
+            setProfileError(null);
             
-            const fetchedModel = await fetchModelByUsername(username);
-            if (fetchedModel) {
+            try {
+                const fetchedModel = await fetchModelByUsername(username);
+                
+                if (!fetchedModel) {
+                    setProfileError('Modelo não encontrada.');
+                    setModel(null);
+                    return;
+                }
+                
                 setModel(fetchedModel);
                 
                 trackViewContent({
@@ -159,28 +180,31 @@ export const ModelProfile: React.FC = () => {
                 const isCarolinaWelcome = fetchedModel.username === 'carolina-andrade' && localStorage.getItem('welcomePurchaseCarolina') === 'true';
                 setHasAccess(userHasAnyProduct || isCarolinaWelcome);
                 
-                // Start loading the first page of media
+                // Reset media state and trigger mural load
+                setMedia([]);
+                setMediaPage(0);
+                setMediaHasMore(true);
                 loadMediaPage(0, fetchedModel.id);
-            } else {
-                setMediaLoading(false);
+
+            } catch (e) {
+                console.error('[MODEL PROFILE] loadProfileData error:', e);
+                setProfileError('Erro ao carregar dados do perfil.');
+                setModel(null);
+            } finally {
+                setProfileLoading(false);
             }
         };
-        
-        // Reset state when username changes
-        setMedia([]);
-        setMediaPage(0);
-        setMediaHasMore(true);
         
         loadProfileData();
     }, [username, purchases, loadMediaPage]);
     
-    // Intersection Observer for infinite scroll
+    // 2. Intersection Observer for infinite scroll (Mural)
     useEffect(() => {
-        if (!sentinelRef.current || mediaLoading || !mediaHasMore || !model?.id) return;
+        if (!sentinelRef.current || muralLoading || !mediaHasMore || !model?.id) return;
 
         const observer = new IntersectionObserver(entries => {
             const [entry] = entries;
-            if (entry.isIntersecting && !mediaLoading && mediaHasMore) {
+            if (entry.isIntersecting && !muralLoading && mediaHasMore) {
                 loadMediaPage(mediaPage + 1, model.id);
             }
         }, {
@@ -192,7 +216,7 @@ export const ModelProfile: React.FC = () => {
         observer.observe(sentinelRef.current);
 
         return () => observer.disconnect();
-    }, [mediaPage, mediaHasMore, mediaLoading, model?.id, loadMediaPage]);
+    }, [mediaPage, mediaHasMore, muralLoading, model?.id, loadMediaPage]);
 
 
     const mainProduct = products.find(p => p.is_base_membership) || products[0];
@@ -225,13 +249,24 @@ export const ModelProfile: React.FC = () => {
         }
     };
 
-    // Se o modelo não foi encontrado, mostramos a mensagem de erro
-    if (!model && !mediaLoading) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Modelo não encontrada.</div>;
-    
-    // Se estiver carregando a primeira página, mostramos o loading inicial
-    if (mediaLoading && media.length === 0) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Carregando perfil...</div>;
+    // Tratamento de estados de carregamento e erro do Perfil
+    if (profileLoading) {
+        return (
+            <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">
+                <p className="text-sm text-privacy-text-secondary">Carregando perfil...</p>
+            </div>
+        );
+    }
 
-    // Garantimos que model é Model aqui, pois as verificações acima garantem que não é null
+    if (profileError || !model) {
+        return (
+            <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">
+                <p className="text-sm text-red-400">{profileError || 'Modelo não encontrada.'}</p>
+            </div>
+        );
+    }
+
+    // Garantimos que model é Model aqui
     const currentModel = model as Model;
 
     const stats = {
@@ -344,7 +379,16 @@ export const ModelProfile: React.FC = () => {
                         <TabsTrigger value="loja">Loja</TabsTrigger>
                     </TabsList>
                     <TabsContent value="mural" className="mt-6">
-                        {media.length === 0 && !mediaLoading ? (
+                        {muralError && (
+                            <p className="text-sm text-red-400 text-center mt-4">
+                                {muralError}
+                            </p>
+                        )}
+                        {muralLoading && media.length === 0 && !muralError ? (
+                            <p className="text-sm text-privacy-text-secondary text-center mt-4">
+                                Carregando mural...
+                            </p>
+                        ) : media.length === 0 && !muralError ? (
                             <p className="text-center text-privacy-text-secondary py-10">
                                 Esta modelo ainda não postou nenhum conteúdo no mural.
                             </p>
@@ -355,7 +399,7 @@ export const ModelProfile: React.FC = () => {
                                 {/* Sentinela para Scroll Infinito do Mural */}
                                 {mediaHasMore && <div ref={sentinelRef} className="h-10" />}
                                 
-                                {mediaLoading && media.length > 0 && (
+                                {muralLoading && media.length > 0 && (
                                     <p className="text-center text-xs text-privacy-text-secondary py-2">Carregando mais do mural...</p>
                                 )}
                                 {!mediaHasMore && media.length > 0 && (
@@ -365,7 +409,7 @@ export const ModelProfile: React.FC = () => {
                         )}
                     </TabsContent>
                     <TabsContent value="feed" className="mt-6 px-2 sm:px-0">
-                        {feedMedia.length === 0 && !mediaLoading ? (
+                        {feedMedia.length === 0 && !muralLoading ? (
                             <p className="text-center text-privacy-text-secondary py-10">Ainda não há posts no feed desta modelo.</p>
                         ) : (
                             <div className="flex flex-col items-center">
@@ -379,10 +423,6 @@ export const ModelProfile: React.FC = () => {
                                         onOpenImage={() => handleOpenMedia(index)}
                                     />
                                 ))}
-                                {/* O sentinela já está no Mural, mas se o feed for muito longo, ele pode não ser suficiente.
-                                    Para simplificar, vamos usar o mesmo sentinela, mas o ideal seria um para cada tab.
-                                    Como o Mural e o Feed usam a mesma lista 'media', o sentinela no Mural é suficiente.
-                                */}
                             </div>
                         )}
                     </TabsContent>

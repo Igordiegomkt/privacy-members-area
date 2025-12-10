@@ -51,7 +51,9 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
       return { items: [], hasMore: false };
     }
 
-    if (!mediaWithModels || mediaWithModels.length === 0) {
+    const count = mediaWithModels?.length ?? 0;
+    
+    if (count === 0) {
       console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage result', {
         page,
         pageSize,
@@ -114,12 +116,12 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
       });
 
     // Determine if there are more items to load
-    const hasMore = mediaWithModels.length === pageSize;
+    const hasMore = count === pageSize;
     
     console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage result', {
       page,
       pageSize,
-      count: mediaWithModels.length,
+      count: count,
       error: null,
     });
 

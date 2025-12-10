@@ -102,7 +102,9 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
       return { items: [], hasMore: false };
     }
 
-    if (!mediaItems || mediaItems.length === 0) {
+    const count = mediaItems?.length ?? 0;
+
+    if (count === 0) {
       console.log('[MODEL PROFILE] fetchMediaForModelPage result', {
         page,
         pageSize,
@@ -137,12 +139,12 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
       };
     });
     
-    const hasMore = mediaItems.length === pageSize;
+    const hasMore = count === pageSize;
     
     console.log('[MODEL PROFILE] fetchMediaForModelPage result', {
       page,
       pageSize,
-      count: mediaItems.length,
+      count: count,
       error: null,
     });
 

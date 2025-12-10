@@ -106,10 +106,11 @@ export const ModelProfile: React.FC = () => {
     
     const sentinelRef = useRef<HTMLDivElement | null>(null);
 
-    // Function to load media page
+    // Function to load media page (Memoized)
     const loadMediaPage = useCallback(async (nextPage: number, modelId: string) => {
         const isFirstPage = nextPage === 0;
         
+        // Prevenção de chamadas duplicadas
         if (!isFirstPage && (muralLoading || !mediaHasMore)) return;
         
         if (isFirstPage) {
@@ -118,7 +119,7 @@ export const ModelProfile: React.FC = () => {
         }
 
         try {
-            console.log('[MODEL PROFILE] loadMediaPage called', { nextPage, modelId });
+            console.log('[MODEL PROFILE] loadMuralPage called', { nextPage, modelId });
             
             const { items: newMedia, hasMore: nextHasMore } = await fetchMediaForModelPage({
                 modelId,
@@ -126,7 +127,7 @@ export const ModelProfile: React.FC = () => {
                 pageSize: PAGE_SIZE,
             });
             
-            console.log('[MODEL PROFILE] loadMediaPage result', {
+            console.log('[MODEL PROFILE] loadMuralPage result', {
                 nextPage,
                 received: newMedia.length,
                 nextHasMore,
@@ -143,12 +144,15 @@ export const ModelProfile: React.FC = () => {
         } finally {
             setMuralLoading(false);
         }
-    }, [muralLoading, mediaHasMore]);
+    }, [muralLoading, mediaHasMore]); // Depende apenas dos estados de paginação/loading do mural
 
-
-    // 1. Carregamento do Perfil (Model + Products)
+    // 1. Efeito para carregar o PERFIL (Model + Products)
     useEffect(() => {
-        if (!username) { setProfileLoading(false); return; }
+        console.log('[MODEL PROFILE] useEffect loadModel start', { username });
+        if (!username) { 
+            setProfileLoading(false); 
+            return; 
+        }
         
         const loadProfileData = async () => {
             setProfileLoading(true); 
@@ -180,11 +184,7 @@ export const ModelProfile: React.FC = () => {
                 const isCarolinaWelcome = fetchedModel.username === 'carolina-andrade' && localStorage.getItem('welcomePurchaseCarolina') === 'true';
                 setHasAccess(userHasAnyProduct || isCarolinaWelcome);
                 
-                // Reset media state and trigger mural load
-                setMedia([]);
-                setMediaPage(0);
-                setMediaHasMore(true);
-                loadMediaPage(0, fetchedModel.id);
+                console.log('[MODEL PROFILE] useEffect loadModel done', { modelId: fetchedModel.id });
 
             } catch (e) {
                 console.error('[MODEL PROFILE] loadProfileData error:', e);
@@ -195,10 +195,26 @@ export const ModelProfile: React.FC = () => {
             }
         };
         
+        // Reset media state when profile changes
+        setMedia([]);
+        setMediaPage(0);
+        setMediaHasMore(true);
+        setMuralLoading(true); // Reset mural loading state
+        
         loadProfileData();
-    }, [username, purchases, loadMediaPage]);
+    }, [username, purchases]); // Depende de username e purchases (para recalcular hasAccess)
     
-    // 2. Intersection Observer for infinite scroll (Mural)
+    // 2. Efeito para carregar o MURAL (Página 0)
+    useEffect(() => {
+        if (!model?.id) return;
+        
+        console.log('[MODEL PROFILE] useEffect loadMuralPage(0) triggered', { modelId: model.id });
+        loadMediaPage(0, model.id);
+        
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, [model?.id]); // Depende apenas do ID da modelo (carregamento inicial)
+    
+    // 3. Intersection Observer for infinite scroll (Mural)
     useEffect(() => {
         if (!sentinelRef.current || muralLoading || !mediaHasMore || !model?.id) return;
 

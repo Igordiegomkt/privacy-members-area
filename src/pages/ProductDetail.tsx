@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Product } from '../types';
+import { Product, Model } from '../types';
 import { fetchProductById, fetchUserPurchases, hasUserPurchasedProduct } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
@@ -14,11 +14,21 @@ const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 };
 
+// Helper function para padronizar a fonte da imagem do produto
+const getProductImageSrc = (product: Product, model?: Model | null): string => {
+  return (
+    product.cover_thumbnail ??
+    model?.cover_url ??
+    '/video-fallback.svg' // Usando o fallback genérico existente
+  );
+};
+
 export const ProductDetail: React.FC = () => {
   const { id } = useParams<{ id: string }>();
   const navigate = useNavigate();
   const { openCheckoutForProduct } = useCheckout();
   const [product, setProduct] = useState<Product | null>(null);
+  const [model, setModel] = useState<Model | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -42,6 +52,15 @@ export const ProductDetail: React.FC = () => {
         setError(null);
         const fetchedProduct = await fetchProductById(id);
         setProduct(fetchedProduct);
+
+        if (fetchedProduct?.model_id) {
+            const { data: fetchedModel } = await supabase
+                .from('models')
+                .select('*')
+                .eq('id', fetchedProduct.model_id)
+                .single();
+            setModel(fetchedModel);
+        }
       } catch (e) {
         setError('Não foi possível carregar o produto.');
       } finally {
@@ -97,7 +116,7 @@ export const ProductDetail: React.FC = () => {
     );
   }
   
-  const productImageSrc = product.cover_thumbnail ?? '/video-fallback.svg';
+  const productImageSrc = getProductImageSrc(product, product.is_base_membership ? model : null);
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">
@@ -126,9 +145,9 @@ export const ProductDetail: React.FC = () => {
                   <div className="w-full mt-4 bg-green-500/20 text-green-400 font-semibold py-3 rounded-lg text-center">
                     ✅ Conteúdo desbloqueado!
                   </div>
-                  {product.is_base_membership && (
+                  {product.is_base_membership && model?.username && (
                     <button 
-                      onClick={() => navigate(`/modelo/${product.model_id}`)} // Assumindo que model_id pode ser usado para buscar o username ou que o produto tem o username
+                      onClick={() => navigate(`/modelo/${model.username}`)}
                       className="w-full mt-2 bg-primary hover:opacity-90 text-privacy-black font-semibold py-3 rounded-lg transition-opacity"
                     >
                       Ir para o Perfil VIP

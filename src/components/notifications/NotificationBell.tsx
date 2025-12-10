@@ -202,6 +202,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
             )}
 
             {notifications.map((n) => {
+                // Usando product_thumbnail (que é products.cover_thumbnail) com fallback
                 const thumbSrc = n.product_thumbnail ?? '/video-fallback.svg';
                 
                 return (

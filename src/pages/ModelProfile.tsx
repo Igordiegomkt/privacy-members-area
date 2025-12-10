@@ -17,12 +17,21 @@ import { useCheckout } from '../contexts/CheckoutContext';
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
+// Helper function para padronizar a fonte da imagem do produto
+const getProductImageSrc = (product: Product, modelCoverUrl?: string | null): string => {
+  return (
+    product.cover_thumbnail ??
+    modelCoverUrl ??
+    '/video-fallback.svg' // Usando o fallback genérico existente
+  );
+};
+
 interface ProductCardProps {
     product: Product;
     isPurchased: boolean;
     modelName: string;
     isFirst: boolean;
-    modelCoverUrl?: string | null; // Adicionado para fallback
+    modelCoverUrl?: string | null;
 }
 
 const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelName, isFirst, modelCoverUrl }: ProductCardProps) => {
@@ -39,7 +48,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelNa
         }
     };
     
-    const productImageSrc = product.cover_thumbnail ?? modelCoverUrl ?? '/video-fallback.svg';
+    const productImageSrc = getProductImageSrc(product, modelCoverUrl);
 
     return (
         <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">

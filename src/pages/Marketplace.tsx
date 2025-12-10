@@ -16,6 +16,15 @@ const formatPrice = (cents: number) => {
   });
 };
 
+// Helper function para padronizar a fonte da imagem do produto
+const getProductImageSrc = (product: Product, model?: Model | null): string => {
+  return (
+    product.cover_thumbnail ??
+    model?.cover_url ??
+    '/video-fallback.svg' // Usando o fallback genérico existente
+  );
+};
+
 interface ProductCardProps {
   product: Product;
   isPurchased: boolean;
@@ -33,7 +42,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: Produ
     }
   };
   
-  const imageSrc = product.cover_thumbnail || '/video-fallback.svg'; // Fallback genérico
+  // Para produtos avulsos/packs, usamos apenas o cover_thumbnail
+  const imageSrc = product.cover_thumbnail || '/video-fallback.svg'; 
 
   return (
     <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
@@ -102,7 +112,8 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
     }
   };
   
-  const imageSrc = model.avatar_url || '/video-fallback.svg';
+  // Usando a função helper para garantir a fonte de verdade
+  const imageSrc = getProductImageSrc(product, model);
 
   return (
     <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
@@ -157,7 +168,7 @@ export const Marketplace: React.FC = () => {
           fetchProducts(),
           supabase
             .from('products')
-            .select('id, name, price_cents, model_id, is_base_membership, cover_thumbnail, models ( id, name, username, avatar_url )') // Added cover_thumbnail here
+            .select('id, name, price_cents, model_id, is_base_membership, cover_thumbnail, models ( id, name, username, avatar_url, cover_url )') // Adicionado cover_url da modelo
             .eq('status', 'active')
             .eq('is_base_membership', true),
           fetchUserPurchases(),

@@ -2,7 +2,6 @@ import * as React from 'react';
 import { useState, useEffect } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { saveUTMsToLocalStorage } from '../utils/utmParser';
-import { TrackingScripts } from '../components/TrackingScripts';
 import { registerFirstAccess } from '../lib/accessLogger';
 import { Logo } from '../components/Logo';
 
@@ -75,7 +74,6 @@ export const Login: React.FC = () => {
 
   return (
     <div className="min-h-screen bg-privacy-black flex items-center justify-center px-4">
-      <TrackingScripts />
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
           <Logo textSize="text-4xl" />

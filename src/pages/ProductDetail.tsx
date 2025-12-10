@@ -2,14 +2,14 @@ import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
 import { Product, Model } from '../types';
-import { fetchProductById, fetchUserPurchases, hasUserPurchasedProduct, getProductImageSrc } from '../lib/marketplace';
+import { fetchProductById, hasUserPurchasedProduct, getProductImageSrc } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft } from 'lucide-react';
 import { usePurchases } from '../contexts/PurchaseContext';
 import { useCheckout } from '../contexts/CheckoutContext';
-import { trackViewContent, trackAddToCart, trackPurchase } from '../lib/tracking'; // Importando tracking
+import { trackViewContent, trackAddToCart } from '../lib/tracking'; // Importando tracking
 
 const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -74,7 +74,9 @@ export const ProductDetail: React.FC = () => {
     loadProductData();
   }, [id]);
   
-  // Rastreamento de Purchase (se o status mudar para comprado)
+  // A lógica de rastreamento Purchase foi movida para PurchaseContext.
+  // Este useEffect agora é desnecessário.
+  /*
   useEffect(() => {
     if (isPurchased && product) {
         const purchaseRecord = purchases.find(p => p.product_id === product.id);
@@ -89,6 +91,7 @@ export const ProductDetail: React.FC = () => {
         }
     }
   }, [isPurchased, product, purchases]);
+  */
 
 
   const handlePurchase = async () => {

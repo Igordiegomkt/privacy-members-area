@@ -3,6 +3,7 @@ import { createContext, useContext, useState, useEffect, useCallback } from 'rea
 import { supabase } from '../lib/supabase';
 import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
 import { Session } from '@supabase/supabase-js';
+import { trackPurchase } from '../lib/tracking'; // Importando tracking
 
 interface PurchaseContextType {
   purchases: UserPurchaseWithProduct[];
@@ -22,6 +23,30 @@ export const PurchaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     try {
       const userPurchases = await fetchUserPurchases();
       setPurchases(userPurchases);
+      
+      // --- LÓGICA DE RASTREAMENTO PURCHASE (DEDUPLICADA) ---
+      userPurchases.forEach(p => {
+        if (p.status === 'paid' && p.products) {
+            const purchaseId = p.id;
+            const productId = p.product_id;
+            const priceCents = p.price_paid_cents;
+            
+            // Usamos o ID da compra (user_purchases.id) para garantir unicidade
+            const storageKey = `purchased-sent-${purchaseId}`; 
+
+            if (!localStorage.getItem(storageKey)) {
+                trackPurchase({
+                    content_ids: [productId],
+                    value: priceCents / 100,
+                    currency: 'BRL',
+                    eventID: `purchase-${purchaseId}`
+                });
+                localStorage.setItem(storageKey, '1');
+            }
+        }
+      });
+      // -----------------------------------------------------
+
     } catch (error) {
       console.error("Failed to load purchases:", error);
     } finally {

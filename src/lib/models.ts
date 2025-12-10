@@ -12,6 +12,7 @@ export interface ModelWithStats extends Model {
 }
 
 const BASE_MODEL_USERNAME = 'carolina-andrade';
+const PAGE_SIZE = 10; // Define page size here for consistency
 
 interface AccessContext {
   purchases: UserPurchaseWithProduct[];
@@ -72,7 +73,13 @@ export const fetchProductsForModel = async (modelId: string): Promise<Product[]>
   return data;
 };
 
-export const fetchMediaForModel = async (modelId: string): Promise<MediaItemWithAccess[]> => {
+// Renomeando e paginando a função de fetch de mídia da modelo
+export const fetchMediaForModelPage = async (params: { modelId: string, page: number, pageSize?: number }): Promise<{ items: MediaItemWithAccess[], hasMore: boolean }> => {
+  const { modelId, page, pageSize = PAGE_SIZE } = params;
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+
+  // 1. Fetch media items paginated
   const { data: mediaItems, error: mediaError } = await supabase
     .from('media_items')
     .select(`
@@ -84,21 +91,24 @@ export const fetchMediaForModel = async (modelId: string): Promise<MediaItemWith
       ai_tags
     `) // Incluindo todos os campos de copy e IA
     .eq('model_id', modelId)
-    .order('created_at', { ascending: false });
+    .order('created_at', { ascending: false })
+    .range(from, to);
 
   if (mediaError) {
-    console.error('Error fetching media for model:', mediaError);
-    return [];
+    console.error('Error fetching media for model page:', mediaError);
+    return { items: [], hasMore: false };
   }
 
+  // 2. Fetch context data (model, purchases, products)
   const { data: model, error: modelError } = await supabase.from('models').select('*').eq('id', modelId).single();
-  if (modelError || !model) return [];
+  if (modelError || !model) return { items: [], hasMore: false };
 
   const purchases = await fetchUserPurchases();
   const productsForModel = await fetchProductsForModel(modelId);
   const accessContext: AccessContext = { purchases, productsForModel, model };
 
-  return mediaItems.map(media => {
+  // 3. Compute access status
+  const mediaWithAccess = mediaItems.map(media => {
     const rawThumb = media.thumbnail;
     const isVideoThumb =
       typeof rawThumb === 'string' &&
@@ -110,7 +120,12 @@ export const fetchMediaForModel = async (modelId: string): Promise<MediaItemWith
       accessStatus: computeMediaAccessStatus(media, accessContext),
     };
   });
+  
+  const hasMore = mediaWithAccess.length === pageSize;
+
+  return { items: mediaWithAccess, hasMore };
 };
+
 
 export const fetchTrendingModels = async (): Promise<ModelWithStats[]> => {
   const { data, error } = await supabase.functions.invoke('get-trending-models', {

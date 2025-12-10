@@ -9,13 +9,19 @@ export interface GlobalFeedItem {
   mainProductId?: string | null; // For redirection to purchase
 }
 
-export const fetchGlobalFeedItems = async (): Promise<GlobalFeedItem[]> => {
+const PAGE_SIZE = 10;
+
+export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?: number }): Promise<{ items: GlobalFeedItem[], hasMore: boolean }> => {
+  const { page, pageSize = PAGE_SIZE } = params;
+  const from = page * pageSize;
+  const to = from + pageSize - 1;
+
   // 1. Identificar modelos que o usuário já tem acesso
   const userPurchases = await fetchUserPurchases();
   const purchasedModelIds = new Set(userPurchases.map(p => p.products?.model_id).filter(Boolean));
   const hasWelcomeCarolina = localStorage.getItem('welcomePurchaseCarolina') === 'true';
 
-  // 2. Buscar todas as mídias com os dados de suas modelos e produtos base
+  // 2. Buscar mídias paginadas com os dados de suas modelos e produtos base
   const { data: mediaWithModels, error } = await supabase
     .from('media_items')
     .select(`
@@ -29,11 +35,11 @@ export const fetchGlobalFeedItems = async (): Promise<GlobalFeedItem[]> => {
       products ( id, is_base_membership, price_cents )
     `) // Incluindo todos os campos de copy e IA + produtos
     .order('created_at', { ascending: false })
-    .limit(100); // Limitar para performance inicial
+    .range(from, to);
 
   if (error || !mediaWithModels) {
-    console.error('Error fetching global feed:', error);
-    return [];
+    console.error('Error fetching global feed page:', error);
+    return { items: [], hasMore: false };
   }
 
   // Map to store model prices to avoid re-calculating
@@ -88,6 +94,8 @@ export const fetchGlobalFeedItems = async (): Promise<GlobalFeedItem[]> => {
       };
     });
 
-  // Embaralhar para uma experiência mais dinâmica
-  return feedItems.sort(() => Math.random() - 0.5);
+  // Determine if there are more items to load
+  const hasMore = feedItems.length === pageSize;
+
+  return { items: feedItems, hasMore };
 };

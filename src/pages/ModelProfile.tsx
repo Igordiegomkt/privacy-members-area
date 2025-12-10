@@ -1,8 +1,8 @@
 import * as React from 'react';
-import { useEffect, useState } from 'react';
-import { useParams, useNavigate } from 'react-router-dom';
-import { Model, Product } from '../types';
-import { fetchModelByUsername, fetchMediaForModel, fetchProductsForModel, MediaItemWithAccess } from '../lib/models';
+import { useEffect, useState, useRef, useCallback } from 'react';
+import { useParams, Link, useNavigate } from 'react-router-dom';
+import { Product, Model } from '../types';
+import { fetchModelByUsername, fetchProductsForModel, fetchMediaForModelPage, MediaItemWithAccess } from '../lib/models';
 import { UserPurchaseWithProduct, getProductImageSrc } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
@@ -79,57 +79,120 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelNa
     );
 };
 
+const PAGE_SIZE = 10;
+
 export const ModelProfile: React.FC = () => {
     useProtection();
     const { username } = useParams<{ username: string }>();
     const navigate = useNavigate();
     const { openCheckoutForProduct } = useCheckout();
     const [model, setModel] = useState<Model | null>(null);
+    
+    // State for Media Pagination
     const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
+    const [mediaPage, setMediaPage] = useState(0);
+    const [mediaLoading, setMediaLoading] = useState(true);
+    const [mediaHasMore, setMediaHasMore] = useState(true);
+    
     const [products, setProducts] = useState<Product[]>([]);
-    const [loading, setLoading] = useState(true);
     const [openMediaIndex, setOpenMediaIndex] = useState<number | null>(null);
     const [hasAccess, setHasAccess] = useState(false);
     const { purchases } = usePurchases();
+    
+    const sentinelRef = useRef<HTMLDivElement | null>(null);
+
+    // Function to load media page
+    const loadMediaPage = useCallback(async (nextPage: number, modelId: string) => {
+        if (mediaLoading || !mediaHasMore) return;
+        
+        if (nextPage === 0) setMediaLoading(true);
+
+        try {
+            const { items: newMedia, hasMore: nextHasMore } = await fetchMediaForModelPage({
+                modelId,
+                page: nextPage,
+                pageSize: PAGE_SIZE,
+            });
+            
+            setMedia(prev => nextPage === 0 ? newMedia : [...prev, ...newMedia]);
+            setMediaPage(nextPage);
+            setMediaHasMore(nextHasMore);
+            
+        } catch (e) {
+            console.error("Error loading media page:", e);
+            // If error on subsequent pages, stop trying to load more
+            if (nextPage > 0) setMediaHasMore(false);
+        } finally {
+            setMediaLoading(false);
+        }
+    }, [mediaLoading, mediaHasMore]);
+
 
     useEffect(() => {
-        if (!username) { setLoading(false); return; }
+        if (!username) { setMediaLoading(false); return; }
+        
         const loadProfileData = async () => {
-            setLoading(true);
+            setMediaLoading(true); // Start loading for initial profile data
+            
             const fetchedModel = await fetchModelByUsername(username);
             if (fetchedModel) {
                 setModel(fetchedModel);
                 
-                // Disparar ViewContent para o perfil da modelo
                 trackViewContent({
                     content_type: 'model_profile',
                     content_ids: [fetchedModel.id],
                     model_id: fetchedModel.id
                 });
 
-                const [fetchedMedia, fetchedProducts] = await Promise.all([
-                    fetchMediaForModel(fetchedModel.id),
-                    fetchProductsForModel(fetchedModel.id)
-                ]);
-                
-                setMedia(fetchedMedia);
+                // Fetch products once (not paginated)
+                const fetchedProducts = await fetchProductsForModel(fetchedModel.id);
                 setProducts(fetchedProducts);
 
                 const modelProductIds = new Set(fetchedProducts.map(p => p.id));
                 const userHasAnyProduct = purchases.some((p: UserPurchaseWithProduct) => modelProductIds.has(p.product_id));
                 const isCarolinaWelcome = fetchedModel.username === 'carolina-andrade' && localStorage.getItem('welcomePurchaseCarolina') === 'true';
                 setHasAccess(userHasAnyProduct || isCarolinaWelcome);
+                
+                // Start loading the first page of media
+                loadMediaPage(0, fetchedModel.id);
+            } else {
+                setMediaLoading(false);
             }
-            setLoading(false);
         };
+        
+        // Reset state when username changes
+        setMedia([]);
+        setMediaPage(0);
+        setMediaHasMore(true);
+        
         loadProfileData();
-    }, [username, purchases]);
+    }, [username, purchases, loadMediaPage]);
+    
+    // Intersection Observer for infinite scroll
+    useEffect(() => {
+        if (!sentinelRef.current || mediaLoading || !mediaHasMore || !model?.id) return;
+
+        const observer = new IntersectionObserver(entries => {
+            const [entry] = entries;
+            if (entry.isIntersecting && !mediaLoading && mediaHasMore) {
+                loadMediaPage(mediaPage + 1, model.id);
+            }
+        }, {
+            root: null,
+            rootMargin: '0px 0px 300px 0px',
+            threshold: 0.1,
+        });
+
+        observer.observe(sentinelRef.current);
+
+        return () => observer.disconnect();
+    }, [mediaPage, mediaHasMore, mediaLoading, model?.id, loadMediaPage]);
+
 
     const mainProduct = products.find(p => p.is_base_membership) || products[0];
 
     const handleLockedClick = () => {
         if (mainProduct) {
-            // ADDTOCART: Clicou em desbloquear VIP
             trackAddToCart({
                 content_ids: [mainProduct.id],
                 value: mainProduct.price_cents / 100,
@@ -139,7 +202,6 @@ export const ModelProfile: React.FC = () => {
             
             openCheckoutForProduct(mainProduct.id);
         } else {
-            // Se não houver produto base, redireciona para a loja
             navigate('/loja');
         }
     };
@@ -157,11 +219,11 @@ export const ModelProfile: React.FC = () => {
         }
     };
 
-    if (loading) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Carregando perfil...</div>;
+    if (mediaLoading && media.length === 0) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Carregando perfil...</div>;
     if (!model) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Modelo não encontrada.</div>;
 
     const stats = {
-        posts: media.length,
+        posts: media.length, // Now reflects loaded posts
         photos: media.filter(m => m.type === 'image').length,
         videos: media.filter(m => m.type === 'video').length,
     };
@@ -271,9 +333,20 @@ export const ModelProfile: React.FC = () => {
                     </TabsList>
                     <TabsContent value="mural" className="mt-6">
                         <MediaGrid media={media} onLockedClick={handleLockedClick} />
+                        
+                        {/* Sentinela para Scroll Infinito do Mural */}
+                        <div ref={sentinelRef} className="h-10" />
+                        
+                        {mediaLoading && media.length > 0 && (
+                            <p className="text-center text-xs text-privacy-text-secondary py-2">Carregando mais do mural...</p>
+                        )}
+                        {!mediaHasMore && media.length > 0 && (
+                            <p className="text-center text-xs text-privacy-text-secondary py-2">Você já viu todo o mural 👀</p>
+                        )}
+                        
                     </TabsContent>
                     <TabsContent value="feed" className="mt-6 px-2 sm:px-0">
-                        {feedMedia.length === 0 ? (
+                        {feedMedia.length === 0 && !mediaLoading ? (
                             <p className="text-center text-privacy-text-secondary py-10">Ainda não há posts no feed desta modelo.</p>
                         ) : (
                             <div className="flex flex-col items-center">
@@ -287,6 +360,10 @@ export const ModelProfile: React.FC = () => {
                                         onOpenImage={() => handleOpenMedia(index)}
                                     />
                                 ))}
+                                {/* O sentinela já está no Mural, mas se o feed for muito longo, ele pode não ser suficiente.
+                                    Para simplificar, vamos usar o mesmo sentinela, mas o ideal seria um para cada tab.
+                                    Como o Mural e o Feed usam a mesma lista 'media', o sentinela no Mural é suficiente.
+                                */}
                             </div>
                         )}
                     </TabsContent>

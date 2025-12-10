@@ -1,9 +1,6 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Header } from '../components/Header';
-import { BottomNavigation } from '../components/BottomNavigation';
-import { useProtection } from '../hooks/useProtection';
 import { fetchTrendingModels, ModelWithStats } from '../lib/models';
 import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
 
@@ -54,7 +51,6 @@ const TrendingModelCard: React.FC<TrendingModelCardProps> = ({ model, rank, isVi
 };
 
 export const TrendingModels: React.FC = () => {
-  useProtection();
   const [trendingModels, setTrendingModels] = useState<ModelWithStats[]>([]);
   const [userPurchases, setUserPurchases] = useState<UserPurchaseWithProduct[]>([]);
   const [loading, setLoading] = useState(true);
@@ -83,37 +79,33 @@ export const TrendingModels: React.FC = () => {
   const purchasedModelIds = new Set(userPurchases.map(p => p.products?.model_id).filter(Boolean));
 
   return (
-    <div className="min-h-screen bg-privacy-black text-white pb-24">
-      <Header />
-      <main className="mx-auto w-full max-w-2xl px-4 py-6">
-        <div className="text-center mb-6">
-          <h1 className="text-2xl font-bold text-white">Em alta 🔥</h1>
-          <p className="text-sm text-privacy-text-secondary">As modelos mais compradas e desejadas do momento.</p>
+    <div className="w-full max-w-2xl mx-auto px-4 py-6">
+      <div className="text-center mb-6">
+        <h1 className="text-2xl font-bold text-white">Em alta 🔥</h1>
+        <p className="text-sm text-privacy-text-secondary">As modelos mais compradas e desejadas do momento.</p>
+      </div>
+
+      {loading && <div className="text-center py-10">Carregando ranking...</div>}
+      {error && <div className="text-center py-10 text-red-400">{error}</div>}
+
+      {!loading && !error && trendingModels.length === 0 && (
+        <div className="text-center py-10 text-privacy-text-secondary">
+          <p>O ranking ainda está sendo formado.</p>
+          <p>Volte mais tarde!</p>
         </div>
+      )}
 
-        {loading && <div className="text-center py-10">Carregando ranking...</div>}
-        {error && <div className="text-center py-10 text-red-400">{error}</div>}
-
-        {!loading && !error && trendingModels.length === 0 && (
-          <div className="text-center py-10 text-privacy-text-secondary">
-            <p>O ranking ainda está sendo formado.</p>
-            <p>Volte mais tarde!</p>
-          </div>
-        )}
-
-        <div className="space-y-3">
-          {trendingModels.map((model, index) => (
-            <TrendingModelCard 
-                key={model.id} 
-                model={model} 
-                rank={index + 1}
-                isVip={model.username === BASE_MODEL_USERNAME}
-                isPurchased={purchasedModelIds.has(model.id)}
-            />
-          ))}
-        </div>
-      </main>
-      <BottomNavigation />
+      <div className="space-y-3">
+        {trendingModels.map((model, index) => (
+          <TrendingModelCard 
+              key={model.id} 
+              model={model} 
+              rank={index + 1}
+              isVip={model.username === BASE_MODEL_USERNAME}
+              isPurchased={purchasedModelIds.has(model.id)}
+          />
+        ))}
+      </div>
     </div>
   );
 };

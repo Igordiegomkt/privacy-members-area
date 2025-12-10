@@ -1,10 +1,23 @@
 import * as React from 'react';
 import { Outlet } from 'react-router-dom';
 import { useRealtimeTracker } from '../hooks/useRealtimeTracker';
+import { Header } from './Header';
+import { BottomNavigation } from './BottomNavigation';
+import { useProtection } from '../hooks/useProtection'; // Adicionando proteção aqui
 
 export const UserLayout: React.FC = () => {
-  // This hook will run for any page wrapped by this layout
+  // Este hook rastreia a presença do usuário
   useRealtimeTracker();
+  // Este hook aplica proteções básicas
+  useProtection();
 
-  return <Outlet />;
+  return (
+    <div className="min-h-screen bg-privacy-black text-white pb-24">
+      <Header />
+      <main className="mx-auto w-full max-w-4xl">
+        <Outlet />
+      </main>
+      <BottomNavigation />
+    </div>
+  );
 };

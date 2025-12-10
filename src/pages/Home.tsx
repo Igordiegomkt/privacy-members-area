@@ -4,8 +4,6 @@ import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
 import { Model } from '../types';
 import { fetchUserPurchases } from '../lib/marketplace';
-import { Header } from '../components/Header';
-import { BottomNavigation } from '../components/BottomNavigation';
 
 interface ModelWithAccess extends Model {
   isUnlocked: boolean;
@@ -123,25 +121,21 @@ export const Home: React.FC = () => {
   }, []);
 
   return (
-    <div className="min-h-screen bg-privacy-black text-white pb-24">
-      <Header />
-      <main className="mx-auto w-full max-w-4xl px-4 py-6">
-        <div className="text-center mb-8">
-          <h1 className="text-3xl font-bold text-white">Início</h1>
-          <p className="text-privacy-text-secondary mt-1">Explore os perfis das modelos.</p>
-        </div>
+    <div className="py-6">
+      <div className="text-center mb-8">
+        <h1 className="text-3xl font-bold text-white">Início</h1>
+        <p className="text-privacy-text-secondary mt-1">Explore os perfis das modelos.</p>
+      </div>
 
-        {loading ? (
-          <div className="text-center py-10">Carregando modelos...</div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {models.map(model => (
-              <ModelCard key={model.id} model={model} />
-            ))}
-          </div>
-        )}
-      </main>
-      <BottomNavigation />
+      {loading ? (
+        <div className="text-center py-10">Carregando modelos...</div>
+      ) : (
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4 px-4">
+          {models.map(model => (
+            <ModelCard key={model.id} model={model} />
+          ))}
+        </div>
+      )}
     </div>
   );
 };

@@ -90,6 +90,17 @@ export interface Product {
   is_base_membership?: boolean;
 }
 
+// Novos tipos para joins
+export interface JoinedModel {
+  id: string;
+  name: string;
+  username: string;
+}
+
+export interface ProductWithModel extends Product {
+  models: JoinedModel | null;
+}
+
 export interface ProductMedia {
   id: string;
   product_id: string;

@@ -1,5 +1,5 @@
 import { supabase } from './supabase';
-import { Product, Model } from '../types';
+import { Product, Model, ProductWithModel } from '../types';
 
 export interface UserPurchaseWithProduct {
   id: string;
@@ -35,15 +35,18 @@ export const fetchProducts = async (): Promise<Product[]> => {
   return data || [];
 };
 
-export const fetchProductById = async (id: string): Promise<Product | null> => {
+export const fetchProductById = async (id: string): Promise<ProductWithModel | null> => {
   const { data, error } = await supabase
     .from('products')
-    .select(PRODUCT_COLUMNS)
+    .select(`
+      ${PRODUCT_COLUMNS},
+      models ( id, name, username )
+    `)
     .eq('id', id)
     .single();
 
   if (error && error.code !== 'PGRST116') console.error('Error fetching product by ID:', error.message);
-  return data || null;
+  return data as ProductWithModel | null;
 };
 
 export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> => {

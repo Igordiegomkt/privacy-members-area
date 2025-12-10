@@ -5,6 +5,7 @@
 // 2) Conferir Minhas Compras + Admin Dashboard
 
 import * as React from 'react';
+import { useState } from 'react';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { X, Clipboard, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
@@ -21,10 +22,20 @@ export const CheckoutModal: React.FC = () => {
   const { state, closeCheckout } = useCheckout();
   const navigate = useNavigate();
   const { isOpen, loading, pixCopiaCola, pixQrCodeUrl, amountCents, productName, modelName, error } = state;
+  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   const handleCopy = () => {
     if (!pixCopiaCola) return;
-    navigator.clipboard.writeText(pixCopiaCola).catch(() => {});
+    
+    navigator.clipboard.writeText(pixCopiaCola)
+      .then(() => {
+        setCopyFeedback('Código PIX copiado!');
+        setTimeout(() => setCopyFeedback(null), 2000);
+      })
+      .catch(() => {
+        setCopyFeedback('Não foi possível copiar, tente manualmente.');
+        setTimeout(() => setCopyFeedback(null), 2000);
+      });
   };
 
   const handleGoToPurchases = () => {
@@ -119,11 +130,21 @@ export const CheckoutModal: React.FC = () => {
                       Copiar
                     </button>
                   </div>
+                  {copyFeedback && (
+                    <p className={`mt-1 text-xs text-center ${copyFeedback.includes('copiado') ? 'text-green-400' : 'text-red-400'}`}>
+                      {copyFeedback}
+                    </p>
+                  )}
                 </div>
               )}
             </div>
+            
+            {/* Mensagem de pagamento seguro (Requirement 2.1) */}
+            <p className="mt-2 text-xs text-privacy-text-secondary text-center">
+              Pagamento 100% seguro via PIX pelo Mercado Pago. Assim que o banco confirmar, seu acesso é liberado automaticamente.
+            </p>
 
-            <div className="space-y-2">
+            <div className="space-y-2 mt-4">
               <button
                 onClick={handleGoToPurchases}
                 className="w-full bg-green-500 text-white font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-green-500/90"

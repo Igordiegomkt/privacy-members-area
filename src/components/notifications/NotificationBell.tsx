@@ -37,7 +37,10 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
           product_id,
           created_at,
           products:product_id (
-            cover_thumbnail
+            cover_thumbnail,
+            model:model_id (
+              avatar_url
+            )
           )
         )
       `)
@@ -60,8 +63,10 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
         product_id: row.notifications?.product_id ?? null,
         created_at: row.created_at,
         is_read: row.is_read,
-        // Extract thumbnail
+        // Extract thumbnail (products.cover_thumbnail)
         product_thumbnail: row.notifications?.products?.cover_thumbnail ?? null,
+        // Extract model avatar (products.model.avatar_url)
+        model_avatar_url: row.notifications?.products?.model?.avatar_url ?? null,
       }));
 
     setNotifications(mapped);
@@ -202,8 +207,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
             )}
 
             {notifications.map((n) => {
-                // Usando product_thumbnail (que é products.cover_thumbnail) com fallback
-                const thumbSrc = n.product_thumbnail ?? '/video-fallback.svg';
+                // Lógica de fallback: product_thumbnail > model_avatar_url > fallback genérico
+                const thumbSrc = n.product_thumbnail ?? n.model_avatar_url ?? '/video-fallback.svg';
                 
                 return (
                     <button

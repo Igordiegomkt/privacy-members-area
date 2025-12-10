@@ -35,7 +35,10 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
           title,
           body,
           product_id,
-          created_at
+          created_at,
+          products:product_id (
+            cover_thumbnail
+          )
         )
       `)
       .eq('user_id', currentUserId)
@@ -57,6 +60,8 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
         product_id: row.notifications?.product_id ?? null,
         created_at: row.created_at,
         is_read: row.is_read,
+        // Extract thumbnail
+        product_thumbnail: row.notifications?.products?.cover_thumbnail ?? null,
       }));
 
     setNotifications(mapped);
@@ -200,11 +205,18 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
               <button
                 key={n.id}
                 onClick={() => handleClickNotification(n)}
-                className={`w-full text-left px-4 py-3 border-b border-privacy-border/40 text-sm transition-colors ${
+                className={`w-full text-left px-4 py-3 border-b border-privacy-border/40 text-sm transition-colors flex items-start gap-3 ${
                   n.is_read ? 'bg-transparent' : 'bg-primary/10 hover:bg-primary/20'
                 } hover:bg-privacy-border/60`}
               >
-                <div className="flex flex-col gap-1">
+                {n.product_thumbnail && (
+                    <img 
+                        src={n.product_thumbnail} 
+                        alt="Produto" 
+                        className="w-10 h-10 object-cover rounded-md flex-shrink-0"
+                    />
+                )}
+                <div className="flex flex-col gap-1 flex-1">
                     <p className="font-semibold text-privacy-text-primary">
                       {n.title}
                     </p>

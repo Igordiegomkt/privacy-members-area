@@ -32,13 +32,15 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: Produ
       openCheckoutForProduct(product.id);
     }
   };
+  
+  const imageSrc = product.cover_thumbnail || '/video-fallback.svg'; // Fallback genérico
 
   return (
     <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
       <div className="relative aspect-square">
-        {product.cover_thumbnail ? (
+        {imageSrc ? (
           <img
-            src={product.cover_thumbnail}
+            src={imageSrc}
             alt={product.name}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
@@ -99,11 +101,13 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
       openCheckoutForProduct(product.id);
     }
   };
+  
+  const imageSrc = model.avatar_url || '/video-fallback.svg';
 
   return (
     <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
       <div className="relative aspect-square">
-        <img src={model.avatar_url ?? ''} alt={model.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+        <img src={imageSrc} alt={model.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
         {isPurchased && (
           <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full px-2 py-1 text-[10px] font-bold">
             ✔ VIP Ativo
@@ -153,7 +157,7 @@ export const Marketplace: React.FC = () => {
           fetchProducts(),
           supabase
             .from('products')
-            .select('id, name, price_cents, model_id, is_base_membership, models ( id, name, username, avatar_url )')
+            .select('id, name, price_cents, model_id, is_base_membership, cover_thumbnail, models ( id, name, username, avatar_url )') // Added cover_thumbnail here
             .eq('status', 'active')
             .eq('is_base_membership', true),
           fetchUserPurchases(),

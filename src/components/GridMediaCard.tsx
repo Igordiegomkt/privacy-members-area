@@ -3,19 +3,17 @@ import { useRef, useState } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { Lock, Video, Camera } from 'lucide-react';
 
-interface MediaCardProps {
+interface GridMediaCardProps {
   media: MediaItemWithAccess;
   onLockedClick?: () => void;
-  onOpenVideo?: () => void;
-  onOpenImage?: () => void;
+  onMediaClick: () => void; // Unified click handler
 }
 
-export const MediaCard: React.FC<MediaCardProps> = ({
+export const GridMediaCard: React.FC<GridMediaCardProps> = ({
   media,
   onLockedClick,
-  onOpenVideo,
-  onOpenImage,
-}: MediaCardProps) => {
+  onMediaClick,
+}: GridMediaCardProps) => {
   const isVideo = media.type === 'video';
   const isLocked = media.accessStatus === 'locked';
   const videoRef = useRef<HTMLVideoElement | null>(null);
@@ -37,10 +35,10 @@ export const MediaCard: React.FC<MediaCardProps> = ({
     setIsPreviewing(false);
   };
 
-  const handleClick = () => {
+  const handleClick = (e: React.MouseEvent) => {
+    e.stopPropagation();
     if (isLocked) return onLockedClick?.();
-    if (isVideo) return onOpenVideo?.();
-    return onOpenImage?.();
+    return onMediaClick();
   };
 
   return (

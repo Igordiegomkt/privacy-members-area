@@ -4,18 +4,18 @@ import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { PostCard } from '../components/PostCard';
-import { VideoPlayerModal } from '../components/VideoPlayerModal';
-import { MediaModal } from '../components/MediaModal';
 import { MediaItemWithAccess } from '../lib/models';
 import { fetchGlobalFeedItems, GlobalFeedItem } from '../lib/feedGlobal';
+import { MediaViewerFullscreen } from '../components/MediaViewerFullscreen';
+import { useCheckout } from '../contexts/CheckoutContext';
 
 export const GlobalFeed: React.FC = () => {
   const [feedItems, setFeedItems] = useState<GlobalFeedItem[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [openVideo, setOpenVideo] = useState<MediaItemWithAccess | null>(null);
-  const [openImage, setOpenImage] = useState<MediaItemWithAccess | null>(null);
+  const [openMediaIndex, setOpenMediaIndex] = useState<number | null>(null);
   const navigate = useNavigate();
+  const { openCheckoutForProduct } = useCheckout();
 
   useEffect(() => {
     const loadFeed = async () => {
@@ -33,11 +33,34 @@ export const GlobalFeed: React.FC = () => {
     loadFeed();
   }, []);
 
-  const handleLockedClick = (media: MediaItemWithAccess) => {
-    if (media.model?.username) {
-      navigate(`/modelo/${media.model.username}`);
+  const handleLockedClick = (item: GlobalFeedItem) => {
+    // If the item has a mainProductId, open checkout directly
+    if (item.mainProductId) {
+        openCheckoutForProduct(item.mainProductId);
+    } else if (item.model?.username) {
+      // Otherwise, navigate to the model profile to see products
+      navigate(`/modelo/${item.model.username}`);
     }
   };
+  
+  const handleOpenMedia = (index: number) => {
+    const mediaItem = feedItems[index].media;
+    if (mediaItem.accessStatus === 'locked') {
+        // Should not happen if PostCard is implemented correctly, but safety check
+        handleLockedClick(feedItems[index]);
+        return;
+    }
+    setOpenMediaIndex(index);
+  };
+  
+  // Filter unlocked media for the viewer
+  const unlockedMedia = feedItems
+    .filter(item => item.media.accessStatus !== 'locked')
+    .map(item => item.media);
+
+  const currentMediaIndexInUnlockedList = openMediaIndex !== null 
+    ? unlockedMedia.findIndex(m => m.id === feedItems[openMediaIndex].media.id)
+    : 0;
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">
@@ -58,19 +81,28 @@ export const GlobalFeed: React.FC = () => {
         )}
 
         <div className="flex flex-col items-center">
-          {feedItems.map(item => (
+          {feedItems.map((item, index) => (
             <PostCard
               key={item.media.id}
               media={{ ...item.media, model: item.model }}
-              onLockedClick={() => handleLockedClick(item.media)}
-              onOpenVideo={() => setOpenVideo(item.media)}
-              onOpenImage={() => setOpenImage(item.media)}
+              priceCents={item.model.mainProductPriceCents}
+              onLockedClick={() => handleLockedClick(item)}
+              onOpenVideo={() => handleOpenMedia(index)}
+              onOpenImage={() => handleOpenMedia(index)}
             />
           ))}
         </div>
       </main>
-      <VideoPlayerModal media={openVideo} isOpen={!!openVideo} onClose={() => setOpenVideo(null)} />
-      <MediaModal media={openImage} isOpen={!!openImage} onClose={() => setOpenImage(null)} />
+      
+      {openMediaIndex !== null && unlockedMedia.length > 0 && (
+        <MediaViewerFullscreen 
+          mediaList={unlockedMedia} 
+          initialIndex={currentMediaIndexInUnlockedList} 
+          isOpen={openMediaIndex !== null} 
+          onClose={() => setOpenMediaIndex(null)} 
+        />
+      )}
+      
       <BottomNavigation />
     </div>
   );

@@ -8,11 +8,10 @@ import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { MediaGrid } from '../components/MediaGrid';
 import { PostCard } from '../components/PostCard';
-import { VideoPlayerModal } from '../components/VideoPlayerModal';
-import { MediaModal } from '../components/MediaModal';
+import { MediaViewerFullscreen } from '../components/MediaViewerFullscreen';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useProtection } from '../hooks/useProtection';
-import { ArrowLeft, MessageCircle, Gift } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Gift, CheckCircle } from 'lucide-react';
 import { usePurchases } from '../contexts/PurchaseContext';
 import { useCheckout } from '../contexts/CheckoutContext';
 
@@ -31,8 +30,8 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelNa
 
     const handleCtaClick = () => {
         if (isPurchased) {
-            // Se já comprou, navega para o perfil (ou para a página de compras)
-            navigate(`/minhas-compras?highlight=${product.id}`);
+            // Se já comprou, navega para o detalhe do produto
+            navigate(`/produto/${product.id}`);
         } else {
             // Se não comprou, abre o modal de checkout
             openCheckoutForProduct(product.id);
@@ -42,7 +41,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelNa
     return (
         <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
             <div className="relative aspect-square cursor-pointer" onClick={() => navigate(`/produto/${product.id}`)}>
-                <img src={product.cover_thumbnail} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                <img 
+                    src={product.cover_thumbnail || '/video-fallback.svg'} // Fallback genérico
+                    alt={product.name} 
+                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
+                />
                 {isFirst && !isPurchased && (
                     <div className="absolute top-2 left-2 bg-primary text-privacy-black rounded-full px-2 py-1 text-xs font-bold">
                         🔥 Mais vendido de {modelName.split(' ')[0]}
@@ -81,8 +84,7 @@ export const ModelProfile: React.FC = () => {
     const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
-    const [openVideo, setOpenVideo] = useState<MediaItemWithAccess | null>(null);
-    const [openImage, setOpenImage] = useState<MediaItemWithAccess | null>(null);
+    const [openMediaIndex, setOpenMediaIndex] = useState<number | null>(null);
     const [hasAccess, setHasAccess] = useState(false);
     const { purchases } = usePurchases();
 
@@ -121,6 +123,19 @@ export const ModelProfile: React.FC = () => {
             navigate('/loja');
         }
     };
+    
+    const handleOpenMedia = (index: number) => {
+        const mediaItem = media[index];
+        if (mediaItem.accessStatus === 'locked') {
+            handleLockedClick();
+            return;
+        }
+        // Find index in the unlocked list
+        const unlockedIndex = unlockedMedia.findIndex(m => m.id === mediaItem.id);
+        if (unlockedIndex !== -1) {
+            setOpenMediaIndex(unlockedIndex);
+        }
+    };
 
     if (loading) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Carregando perfil...</div>;
     if (!model) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Modelo não encontrada.</div>;
@@ -130,7 +145,11 @@ export const ModelProfile: React.FC = () => {
         photos: media.filter(m => m.type === 'image').length,
         videos: media.filter(m => m.type === 'video').length,
     };
+    
+    // Media for Feed/Viewer (only unlocked/free)
     const feedMedia = media.filter(m => m.accessStatus === 'free' || m.accessStatus === 'unlocked');
+    const unlockedMedia = media.filter(m => m.accessStatus !== 'locked');
+    
     const purchasedProductIds = new Set(purchases.map((p: UserPurchaseWithProduct) => p.product_id));
     
 
@@ -170,30 +189,38 @@ export const ModelProfile: React.FC = () => {
                     </div>
                 </div>
 
-                {!hasAccess && mainProduct && (
+                {/* CTA Principal VIP (Requirement 9B) */}
+                {mainProduct && (
                   <div className="px-4 sm:px-6 my-6">
-                    <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3">
+                    <div className={`rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3 ${hasAccess ? 'bg-green-500/10 border border-green-500/30' : 'bg-primary/10 border border-primary/30'}`}>
                       <div className="text-center sm:text-left">
-                        <p className="font-semibold text-primary">
-                          Você ainda não tem acesso ao conteúdo exclusivo de {model.name}.
-                        </p>
-                        <p className="text-privacy-text-secondary mt-1">
-                          Acesse vídeos privados, mural VIP e conteúdos completos.
-                        </p>
-                        <p className="text-privacy-text-secondary mt-1">
-                          Acesso VIP por{' '}
-                          <span className="text-primary font-semibold">
-                            {formatPrice(mainProduct.price_cents)}
-                          </span>
-                        </p>
+                        {hasAccess ? (
+                            <p className="font-semibold text-green-400 flex items-center gap-2">
+                                <CheckCircle size={16} /> Acesso VIP de {model.name} liberado!
+                            </p>
+                        ) : (
+                            <>
+                                <p className="font-semibold text-primary">
+                                    Desbloqueie o conteúdo exclusivo de {model.name}.
+                                </p>
+                                <p className="text-privacy-text-secondary mt-1">
+                                    Acesso VIP por{' '}
+                                    <span className="text-primary font-semibold">
+                                        {formatPrice(mainProduct.price_cents)}
+                                    </span>
+                                </p>
+                            </>
+                        )}
                       </div>
 
-                      <button
-                        onClick={handleLockedClick}
-                        className="w-full sm:w-auto bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg hover:opacity-90"
-                      >
-                        🔓 Desbloquear conteúdo VIP
-                      </button>
+                      {!hasAccess && (
+                        <button
+                          onClick={handleLockedClick}
+                          className="w-full sm:w-auto bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg hover:opacity-90"
+                        >
+                          🔓 Desbloquear VIP agora
+                        </button>
+                      )}
                     </div>
                   </div>
                 )}
@@ -230,13 +257,14 @@ export const ModelProfile: React.FC = () => {
                             <p className="text-center text-privacy-text-secondary py-10">Ainda não há posts no feed desta modelo.</p>
                         ) : (
                             <div className="flex flex-col items-center">
-                                {feedMedia.map(item => (
+                                {feedMedia.map((item, index) => (
                                     <PostCard
                                         key={item.id}
                                         media={{...item, model: model}}
+                                        priceCents={mainProduct?.price_cents || 0}
                                         onLockedClick={handleLockedClick}
-                                        onOpenVideo={() => setOpenVideo(item)}
-                                        onOpenImage={() => setOpenImage(item)}
+                                        onOpenVideo={() => handleOpenMedia(index)}
+                                        onOpenImage={() => handleOpenMedia(index)}
                                     />
                                 ))}
                             </div>
@@ -261,8 +289,16 @@ export const ModelProfile: React.FC = () => {
                     </TabsContent>
                 </Tabs>
             </main>
-            <VideoPlayerModal media={openVideo} isOpen={!!openVideo} onClose={() => setOpenVideo(null)} />
-            <MediaModal media={openImage} isOpen={!!openImage} onClose={() => setOpenImage(null)} />
+            
+            {openMediaIndex !== null && unlockedMedia.length > 0 && (
+                <MediaViewerFullscreen 
+                    mediaList={unlockedMedia} 
+                    initialIndex={openMediaIndex} 
+                    isOpen={openMediaIndex !== null} 
+                    onClose={() => setOpenMediaIndex(null)} 
+                />
+            )}
+            
             <BottomNavigation />
         </div>
     );

@@ -6,4 +6,5 @@ export interface NotificationWithStatus {
   product_id: string | null;
   created_at: string;
   is_read: boolean;
+  product_thumbnail?: string | null; // Added thumbnail
 }

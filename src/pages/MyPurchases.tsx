@@ -4,6 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { fetchUserPurchases, UserPurchaseWithProduct, getProductImageSrc } from '../lib/marketplace';
+import { trackPurchase } from '../lib/tracking'; // Importando tracking
 
 const formatPrice = (cents: number | null | undefined) => {
   if (cents == null) return '';
@@ -24,6 +25,25 @@ export const MyPurchases: React.FC = () => {
       const data = await fetchUserPurchases();
       setPurchases(data);
       setLoading(false);
+      
+      // Rastreamento de Purchase (deduplicado)
+      data.forEach(p => {
+        if (p.status === 'paid' && p.products) {
+            const purchaseId = p.id;
+            const productId = p.product_id;
+            const priceCents = p.price_paid_cents;
+
+            if (!localStorage.getItem(`purchased-${purchaseId}`)) {
+                trackPurchase({
+                    content_ids: [productId],
+                    value: priceCents / 100,
+                    currency: 'BRL',
+                    eventID: `purchase-${purchaseId}`
+                });
+                localStorage.setItem(`purchased-${purchaseId}`, '1');
+            }
+        }
+      });
     };
     load();
   }, []);

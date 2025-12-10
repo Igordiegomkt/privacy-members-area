@@ -87,16 +87,24 @@ const initializeFacebookPixels = (win: TrackingWindow, doc: Document): void => {
   const fbq = getOrCreateFacebookPixel(win, doc);
 
   FACEBOOK_PIXEL_IDS.forEach((id) => fbq('init', id));
+  
+  // Dispara PageView para o Pixel
   fbq('track', 'PageView');
+  
+  // Dispara PageView para o GTM/dataLayer
+  if (win.dataLayer) {
+    win.dataLayer.push({ event: 'page_view' });
+  }
 
+  // Lógica de Purchase único (mantida, mas será substituída pelo evento Purchase real)
   FACEBOOK_PIXEL_IDS.forEach((id) => {
     const storageKey = `fbq_purchase_fired_${id}`;
     if (!localStorage.getItem(storageKey)) {
       fbq('track', 'Purchase', { value: 10, currency: 'BRL' });
       localStorage.setItem(storageKey, 'true');
-      console.log(`Facebook Pixel ${id}: Evento Purchase disparado pela primeira vez para este navegador.`);
+      console.log(`Facebook Pixel ${id}: Evento Purchase disparado pela primeira vez para este navegador. (Legacy)`);
     } else {
-      console.log(`Facebook Pixel ${id}: Evento Purchase já foi disparado anteriormente para este navegador. Ignorando.`);
+      console.log(`Facebook Pixel ${id}: Evento Purchase já foi disparado anteriormente para este navegador. Ignorando. (Legacy)`);
     }
   });
 };

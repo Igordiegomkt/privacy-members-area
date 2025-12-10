@@ -1,8 +1,10 @@
 import * as React from 'react';
+import { useEffect, useRef } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { PostMediaDisplay } from './PostMediaDisplay';
 import { PostHeader } from './PostHeader';
 import { ShowMoreText } from './ShowMoreText';
+import { trackViewContent } from '../lib/tracking'; // Importando tracking
 
 interface PostCardProps {
   media: MediaItemWithAccess;
@@ -20,6 +22,8 @@ export const PostCard: React.FC<PostCardProps> = ({
   priceCents = 0,
 }: PostCardProps) => {
   const model = media.model;
+  const cardRef = useRef<HTMLElement>(null);
+  const hasTrackedView = useRef(false);
   
   if (!model) return null;
 
@@ -32,8 +36,41 @@ export const PostCard: React.FC<PostCardProps> = ({
 
   const handleMediaClick = media.type === 'video' ? onOpenVideo : onOpenImage;
 
+  // Rastreamento ViewContent quando o post entra na viewport
+  useEffect(() => {
+    if (!cardRef.current || hasTrackedView.current) return;
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry.isIntersecting && !hasTrackedView.current) {
+          trackViewContent({
+            content_type: 'media_item',
+            content_ids: [media.id],
+            model_id: media.model_id ?? undefined, // Corrigido: null -> undefined
+          });
+          hasTrackedView.current = true;
+          observer.unobserve(entry.target);
+        }
+      },
+      {
+        root: null, // viewport
+        rootMargin: '0px 0px -100px 0px', // 100px antes de sair da tela
+        threshold: 0.1,
+      }
+    );
+
+    observer.observe(cardRef.current);
+
+    return () => {
+      if (cardRef.current) {
+        observer.unobserve(cardRef.current);
+      }
+    };
+  }, [media.id, media.model_id]);
+
+
   return (
-    <article className="w-full max-w-xl mx-auto bg-privacy-surface rounded-2xl overflow-hidden mb-4 border border-privacy-border">
+    <article ref={cardRef} className="w-full max-w-xl mx-auto bg-privacy-surface rounded-2xl overflow-hidden mb-4 border border-privacy-border">
       
       {/* 1. HEADER */}
       <PostHeader model={model} createdAt={media.created_at || new Date().toISOString()} />

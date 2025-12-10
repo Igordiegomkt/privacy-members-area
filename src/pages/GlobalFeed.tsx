@@ -8,6 +8,7 @@ import { MediaItemWithAccess } from '../lib/models';
 import { fetchGlobalFeedItems, GlobalFeedItem } from '../lib/feedGlobal';
 import { MediaViewerFullscreen } from '../components/MediaViewerFullscreen';
 import { useCheckout } from '../contexts/CheckoutContext';
+import { trackAddToCart } from '../lib/tracking'; // Importando tracking
 
 export const GlobalFeed: React.FC = () => {
   const [feedItems, setFeedItems] = useState<GlobalFeedItem[]>([]);
@@ -34,11 +35,17 @@ export const GlobalFeed: React.FC = () => {
   }, []);
 
   const handleLockedClick = (item: GlobalFeedItem) => {
-    // If the item has a mainProductId, open checkout directly
-    if (item.mainProductId) {
+    // Se o item tem um produto principal, rastreia AddToCart e abre checkout
+    if (item.mainProductId && item.model.mainProductPriceCents) {
+        trackAddToCart({
+            content_ids: [item.mainProductId],
+            value: item.model.mainProductPriceCents / 100,
+            currency: 'BRL',
+            model_id: item.model.id
+        });
         openCheckoutForProduct(item.mainProductId);
     } else if (item.model?.username) {
-      // Otherwise, navigate to the model profile to see products
+      // Caso contrário, navega para o perfil da modelo
       navigate(`/modelo/${item.model.username}`);
     }
   };

@@ -9,6 +9,7 @@ import { useState } from 'react';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { X, Clipboard, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
+import { trackAddPaymentInfo } from '../lib/tracking'; // Importando tracking
 
 const formatPrice = (cents?: number) =>
   cents != null
@@ -21,14 +22,23 @@ const formatPrice = (cents?: number) =>
 export const CheckoutModal: React.FC = () => {
   const { state, closeCheckout } = useCheckout();
   const navigate = useNavigate();
-  const { isOpen, loading, pixCopiaCola, pixQrCodeUrl, amountCents, productName, modelName, error } = state;
+  const { isOpen, loading, pixCopiaCola, pixQrCodeUrl, amountCents, productId, productName, modelName, error } = state;
   const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
   const handleCopy = () => {
-    if (!pixCopiaCola) return;
+    if (!pixCopiaCola || !productId || amountCents == null) return;
     
     navigator.clipboard.writeText(pixCopiaCola)
       .then(() => {
+        // --- RASTREAMENTO: AddPaymentInfo ---
+        trackAddPaymentInfo({
+            content_type: 'pix',
+            content_ids: [productId],
+            value: amountCents / 100,
+            currency: 'BRL'
+        });
+        // -----------------------------------
+
         setCopyFeedback('Código PIX copiado!');
         setTimeout(() => setCopyFeedback(null), 2000);
       })

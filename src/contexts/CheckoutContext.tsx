@@ -8,6 +8,7 @@
 import * as React from 'react';
 import { createContext, useContext, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { trackInitiateCheckout } from '../lib/tracking'; // Importando tracking
 
 type CheckoutState = {
   isOpen: boolean;
@@ -70,6 +71,22 @@ export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       modelName: undefined,
       error: null,
     }));
+    
+    // --- RASTREAMENTO: InitiateCheckout ---
+    // Nota: O valor exato será atualizado na resposta da Edge Function, mas disparamos o evento aqui.
+    // Para obter o valor, precisamos buscar o produto.
+    const { data: productData } = await supabase.from('products').select('price_cents, model_id').eq('id', productId).single();
+    
+    if (productData) {
+        trackInitiateCheckout({
+            content_ids: [productId],
+            value: productData.price_cents / 100,
+            currency: 'BRL',
+            model_id: productData.model_id
+        });
+    }
+    // --------------------------------------
+
 
     // 2) Chamar a Edge Function passando productId + userId
     supabase.functions

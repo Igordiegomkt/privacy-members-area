@@ -8,6 +8,7 @@ import { fetchProducts, UserPurchaseWithProduct, fetchUserPurchases, hasUserPurc
 import { supabase } from '../lib/supabase';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { useNavigate } from 'react-router-dom';
+import { trackAddToCart } from '../lib/tracking'; // Importando tracking
 
 const formatPrice = (cents: number) => {
   return (cents / 100).toLocaleString('pt-BR', {
@@ -29,6 +30,13 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: Produ
     if (isPurchased) {
       navigate(`/produto/${product.id}`);
     } else {
+      // ADDTOCART
+      trackAddToCart({
+        content_ids: [product.id],
+        value: product.price_cents / 100,
+        currency: 'BRL',
+        model_id: product.model_id
+      });
       openCheckoutForProduct(product.id);
     }
   };
@@ -99,6 +107,13 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
     if (isPurchased) {
       navigate(`/modelo/${model.username}`);
     } else {
+      // ADDTOCART
+      trackAddToCart({
+        content_ids: [product.id],
+        value: product.price_cents / 100,
+        currency: 'BRL',
+        model_id: product.model_id
+      });
       openCheckoutForProduct(product.id);
     }
   };

@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { ArrowLeft } from 'lucide-react';
 import { usePurchases } from '../contexts/PurchaseContext';
 import { useCheckout } from '../contexts/CheckoutContext';
+import { trackViewContent, trackAddToCart, trackPurchase } from '../lib/tracking'; // Importando tracking
 
 const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -44,13 +45,24 @@ export const ProductDetail: React.FC = () => {
         const fetchedProduct = await fetchProductById(id);
         setProduct(fetchedProduct);
 
-        if (fetchedProduct?.model_id) {
-            const { data: fetchedModel } = await supabase
-                .from('models')
-                .select('*')
-                .eq('id', fetchedProduct.model_id)
-                .single();
-            setModel(fetchedModel);
+        if (fetchedProduct) {
+            // ViewContent
+            trackViewContent({
+                content_type: 'product',
+                content_ids: [fetchedProduct.id],
+                value: fetchedProduct.price_cents / 100,
+                currency: 'BRL',
+                model_id: fetchedProduct.model_id
+            });
+            
+            if (fetchedProduct.model_id) {
+                const { data: fetchedModel } = await supabase
+                    .from('models')
+                    .select('*')
+                    .eq('id', fetchedProduct.model_id)
+                    .single();
+                setModel(fetchedModel);
+            }
         }
       } catch (e) {
         setError('Não foi possível carregar o produto.');
@@ -61,6 +73,23 @@ export const ProductDetail: React.FC = () => {
 
     loadProductData();
   }, [id]);
+  
+  // Rastreamento de Purchase (se o status mudar para comprado)
+  useEffect(() => {
+    if (isPurchased && product) {
+        const purchaseRecord = purchases.find(p => p.product_id === product.id);
+        if (purchaseRecord && !localStorage.getItem(`purchased-${purchaseRecord.id}`)) {
+            trackPurchase({
+                content_ids: [product.id],
+                value: product.price_cents / 100,
+                currency: 'BRL',
+                eventID: `purchase-${purchaseRecord.id}`
+            });
+            localStorage.setItem(`purchased-${purchaseRecord.id}`, '1');
+        }
+    }
+  }, [isPurchased, product, purchases]);
+
 
   const handlePurchase = async () => {
     if (!product || !id) return;
@@ -69,6 +98,14 @@ export const ProductDetail: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Sessão inválida. Por favor, faça login novamente.");
+
+      // ADDTOCART: Clicou em desbloquear
+      trackAddToCart({
+        content_ids: [product.id],
+        value: product.price_cents / 100,
+        currency: 'BRL',
+        model_id: product.model_id
+      });
 
       // Chama o modal centralizado do CheckoutContext
       openCheckoutForProduct(id);

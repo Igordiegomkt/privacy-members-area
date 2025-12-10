@@ -14,6 +14,7 @@ import { useProtection } from '../hooks/useProtection';
 import { ArrowLeft, MessageCircle, Gift, CheckCircle } from 'lucide-react';
 import { usePurchases } from '../contexts/PurchaseContext';
 import { useCheckout } from '../contexts/CheckoutContext';
+import { trackViewContent, trackAddToCart } from '../lib/tracking'; // Importando trackAddToCart
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -98,6 +99,14 @@ export const ModelProfile: React.FC = () => {
             const fetchedModel = await fetchModelByUsername(username);
             if (fetchedModel) {
                 setModel(fetchedModel);
+                
+                // Disparar ViewContent para o perfil da modelo
+                trackViewContent({
+                    content_type: 'model_profile',
+                    content_ids: [fetchedModel.id],
+                    model_id: fetchedModel.id
+                });
+
                 const [fetchedMedia, fetchedProducts] = await Promise.all([
                     fetchMediaForModel(fetchedModel.id),
                     fetchProductsForModel(fetchedModel.id)
@@ -120,6 +129,14 @@ export const ModelProfile: React.FC = () => {
 
     const handleLockedClick = () => {
         if (mainProduct) {
+            // ADDTOCART: Clicou em desbloquear VIP
+            trackAddToCart({
+                content_ids: [mainProduct.id],
+                value: mainProduct.price_cents / 100,
+                currency: 'BRL',
+                model_id: model?.id
+            });
+            
             openCheckoutForProduct(mainProduct.id);
         } else {
             // Se não houver produto base, redireciona para a loja

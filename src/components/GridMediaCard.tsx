@@ -43,11 +43,11 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
       className="relative w-full overflow-hidden rounded-xl bg-privacy-surface cursor-pointer group aspect-[3/4]"
       onClick={handleClick}
     >
-      {/* IMAGEM (ou poster de vídeo) */}
+      {/* IMAGEM (ou poster de vídeo) - Z-index 5 */}
       <img
         src={imageSrc}
         alt={media.title || 'Conteúdo'}
-        className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 ${
+        className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 z-5 ${
           isLocked ? 'blur-xl brightness-25 scale-105' : ''
         }`}
         loading="lazy"
@@ -55,22 +55,21 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
         onError={() => setThumbError(true)}
       />
       
-      {/* VÍDEO (Autoplay) - Fica por cima da imagem se estiver tocando */}
+      {/* VÍDEO (Autoplay) - Z-index 10 */}
       {isVideo && !isLocked && (
         <video
           ref={videoRef}
           src={media.url}
           poster={imageSrc}
-          className={`absolute inset-0 w-full h-full object-cover`}
+          className={`absolute inset-0 w-full h-full object-cover z-10`}
           preload="metadata"
           playsInline
           muted
           loop
-          // REMOVIDO: controls
         />
       )}
 
-      <div className="absolute bottom-2 left-2 flex items-center gap-2 text-xs text-white/90 z-10">
+      <div className="absolute bottom-2 left-2 flex items-center gap-2 text-xs text-white/90 z-20">
         <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5">
           {isVideo ? <Video size={12} /> : <Camera size={12} />}
           {isVideo ? 'Vídeo' : 'Foto'}
@@ -78,7 +77,7 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
       </div>
 
       {isLocked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-center px-3 z-20">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-center px-3 z-30">
           <Lock className="w-8 h-8 text-white/80 mb-2" />
           <p className="text-sm text-white font-semibold mb-3">
             Conteúdo bloqueado

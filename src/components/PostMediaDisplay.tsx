@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useRef } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { Lock, Video, Camera, Play } from 'lucide-react';
-import { useVideoAutoplay } from '../hooks/useVideoAutoplay'; // Importando o novo hook
+import { useVideoAutoplay } from '../hooks/useVideoAutoplay';
 
 interface PostMediaDisplayProps {
   media: MediaItemWithAccess;
@@ -49,7 +49,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
 
   // --- Renderização da Capa (Thumbnail) ---
   const renderCover = () => (
-    <div className="relative w-full h-full">
+    <div className="relative w-full h-full z-5">
       {/* Fundo espelhado/blur */}
       <div
         className={`absolute inset-0 bg-center bg-cover blur-lg scale-110 opacity-60 transition-opacity duration-500`}
@@ -78,11 +78,10 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
         </div>
       )}
       
-      {/* Ícone de Play para vídeos desbloqueados */}
+      {/* Ícone de Play para vídeos desbloqueados (Apenas se o autoplay falhar) */}
       {isVideo && !isLocked && (
-        <div className="absolute inset-0 flex items-center justify-center">
-            {/* Usando a cor primária (laranja) para o ícone de play manual */}
-            <Play size={48} className="text-primary drop-shadow-lg" fill="currentColor" />
+        <div className="absolute inset-0 flex items-center justify-center z-10">
+            {/* Removido o ícone de play manual para evitar sobreposição. O clique abre o modal. */}
         </div>
       )}
     </div>
@@ -92,19 +91,18 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
   const renderVideoAutoplay = () => {
     if (!isVideo || isLocked) return null;
     
-    // O vídeo é sempre renderizado para que o IntersectionObserver possa observá-lo.
+    // O vídeo é renderizado com z-index maior para aparecer por cima da thumbnail
     return (
       <video
         key={media.id}
         ref={videoRef}
         src={media.url}
         poster={imageSrc}
-        className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300`}
+        className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-10`}
         preload="metadata"
         playsInline
         muted
         loop
-        // REMOVIDO: controls
       />
     );
   };
@@ -117,8 +115,8 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
       {/* Renderiza o player de vídeo (autoplay) */}
       {renderVideoAutoplay()}
       
-      {/* Renderiza a capa (thumbnail) */}
-      <div className="w-full h-full">
+      {/* Renderiza a capa (thumbnail) - Fica por baixo do vídeo (z-index 5) */}
+      <div className="w-full h-full z-5">
         {renderCover()}
       </div>
 

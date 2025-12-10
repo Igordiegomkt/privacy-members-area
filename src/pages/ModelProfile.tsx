@@ -107,17 +107,31 @@ export const ModelProfile: React.FC = () => {
     const { purchases } = usePurchases();
     
     const sentinelRef = useRef<HTMLDivElement | null>(null);
+    
+    // Refs para acessar o estado mais recente dentro do useCallback
+    const mediaPageRef = useRef(mediaPage);
+    const mediaHasMoreRef = useRef(mediaHasMore);
+    const muralLoadingRef = useRef(muralLoading);
+
+    useEffect(() => {
+        mediaPageRef.current = mediaPage;
+        mediaHasMoreRef.current = mediaHasMore;
+        muralLoadingRef.current = muralLoading;
+    }, [mediaPage, mediaHasMore, muralLoading]);
+
 
     // Function to load media page (Memoized)
     const loadMediaPage = useCallback(async (nextPage: number, modelId: string) => {
         const isFirstPage = nextPage === 0;
         
-        // Prevenção de chamadas duplicadas
-        if (!isFirstPage && (muralLoading || !mediaHasMore)) return;
+        // Prevenção de chamadas duplicadas (usando refs para o estado mais recente)
+        if (!isFirstPage && (muralLoadingRef.current || !mediaHasMoreRef.current)) return;
         
         if (isFirstPage) {
             setMuralLoading(true);
             setMuralError(null);
+        } else {
+            setMuralLoading(true); // Define loading para true para a próxima página
         }
 
         try {
@@ -146,8 +160,7 @@ export const ModelProfile: React.FC = () => {
         } finally {
             setMuralLoading(false);
         }
-    }, [muralLoading, mediaHasMore]);
-
+    }, []); // Removidas dependências de estado para garantir que o IntersectionObserver chame a função
 
     // 1. Efeito para carregar o PERFIL (Model + Products + Counts)
     useEffect(() => {
@@ -245,12 +258,13 @@ export const ModelProfile: React.FC = () => {
 
     // 4. Intersection Observer for infinite scroll (Mural)
     useEffect(() => {
-        if (!sentinelRef.current || muralLoading || !mediaHasMore || !model?.id) return;
+        if (!sentinelRef.current || !model?.id) return;
 
         const observer = new IntersectionObserver(entries => {
             const [entry] = entries;
-            if (entry.isIntersecting && !muralLoading && mediaHasMore) {
-                loadMediaPage(mediaPage + 1, model.id);
+            // Usamos refs para acessar o estado mais recente
+            if (entry.isIntersecting && !muralLoadingRef.current && mediaHasMoreRef.current) {
+                loadMediaPage(mediaPageRef.current + 1, model.id);
             }
         }, {
             root: null,
@@ -261,7 +275,7 @@ export const ModelProfile: React.FC = () => {
         observer.observe(sentinelRef.current);
 
         return () => observer.disconnect();
-    }, [mediaPage, mediaHasMore, muralLoading, model?.id, loadMediaPage]);
+    }, [model?.id, loadMediaPage]);
 
 
     const mainProduct = products.find(p => p.is_base_membership) || products[0];

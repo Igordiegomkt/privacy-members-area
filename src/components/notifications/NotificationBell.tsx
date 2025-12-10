@@ -201,34 +201,36 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
               </p>
             )}
 
-            {notifications.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => handleClickNotification(n)}
-                className={`w-full text-left px-4 py-3 border-b border-privacy-border/40 text-sm transition-colors flex items-start gap-3 ${
-                  n.is_read ? 'bg-transparent' : 'bg-primary/10 hover:bg-primary/20'
-                } hover:bg-privacy-border/60`}
-              >
-                {n.product_thumbnail && (
-                    <img 
-                        src={n.product_thumbnail} 
-                        alt="Produto" 
-                        className="w-10 h-10 object-cover rounded-md flex-shrink-0"
-                    />
-                )}
-                <div className="flex flex-col gap-1 flex-1">
-                    <p className="font-semibold text-privacy-text-primary">
-                      {n.title}
-                    </p>
-                    <p className="text-xs text-privacy-text-secondary">
-                      {n.body}
-                    </p>
-                    <p className="text-[10px] text-privacy-text-secondary/70 mt-1">
-                        {new Date(n.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                </div>
-              </button>
-            ))}
+            {notifications.map((n) => {
+                const thumbSrc = n.product_thumbnail ?? '/video-fallback.svg';
+                
+                return (
+                    <button
+                        key={n.id}
+                        onClick={() => handleClickNotification(n)}
+                        className={`w-full text-left px-4 py-3 border-b border-privacy-border/40 text-sm transition-colors flex items-start gap-3 ${
+                        n.is_read ? 'bg-transparent' : 'bg-primary/10 hover:bg-primary/20'
+                        } hover:bg-privacy-border/60`}
+                    >
+                        <img 
+                            src={thumbSrc} 
+                            alt="Produto" 
+                            className="w-10 h-10 object-cover rounded-md flex-shrink-0"
+                        />
+                        <div className="flex flex-col gap-1 flex-1">
+                            <p className="font-semibold text-privacy-text-primary">
+                            {n.title}
+                            </p>
+                            <p className="text-xs text-privacy-text-secondary">
+                            {n.body}
+                            </p>
+                            <p className="text-[10px] text-privacy-text-secondary/70 mt-1">
+                                {new Date(n.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                        </div>
+                    </button>
+                );
+            })}
           </div>
         </div>
       )}

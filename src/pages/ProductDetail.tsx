@@ -96,6 +96,8 @@ export const ProductDetail: React.FC = () => {
       </div>
     );
   }
+  
+  const productImageSrc = product.cover_thumbnail ?? '/video-fallback.svg';
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">
@@ -106,7 +108,7 @@ export const ProductDetail: React.FC = () => {
         </button>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
-            <img src={product.cover_thumbnail} alt={product.name} className="w-full aspect-square object-cover rounded-lg" />
+            <img src={productImageSrc} alt={product.name} className="w-full aspect-square object-cover rounded-lg" />
           </div>
           <div className="flex flex-col">
             <span className="text-sm text-primary font-semibold capitalize">

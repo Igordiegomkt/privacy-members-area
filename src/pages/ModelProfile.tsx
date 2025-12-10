@@ -22,9 +22,10 @@ interface ProductCardProps {
     isPurchased: boolean;
     modelName: string;
     isFirst: boolean;
+    modelCoverUrl?: string | null; // Adicionado para fallback
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelName, isFirst }: ProductCardProps) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelName, isFirst, modelCoverUrl }: ProductCardProps) => {
     const navigate = useNavigate();
     const { openCheckoutForProduct } = useCheckout();
 
@@ -37,12 +38,14 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelNa
             openCheckoutForProduct(product.id);
         }
     };
+    
+    const productImageSrc = product.cover_thumbnail ?? modelCoverUrl ?? '/video-fallback.svg';
 
     return (
         <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
             <div className="relative aspect-square cursor-pointer" onClick={() => navigate(`/produto/${product.id}`)}>
                 <img 
-                    src={product.cover_thumbnail || '/video-fallback.svg'} // Fallback genérico
+                    src={productImageSrc}
                     alt={product.name} 
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
                 />
@@ -280,6 +283,7 @@ export const ModelProfile: React.FC = () => {
                                         isPurchased={purchasedProductIds.has(p.id) || !!p.is_base_membership}
                                         modelName={model.name}
                                         isFirst={index === 0}
+                                        modelCoverUrl={model.cover_url}
                                     />
                                 ))}
                             </div>

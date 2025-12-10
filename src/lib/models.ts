@@ -79,51 +79,60 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
   const from = page * pageSize;
   const to = from + pageSize - 1;
 
-  // 1. Fetch media items paginated
-  const { data: mediaItems, error: mediaError } = await supabase
-    .from('media_items')
-    .select(`
-      *,
-      ai_title,
-      ai_subtitle,
-      ai_description,
-      ai_cta,
-      ai_tags
-    `) // Incluindo todos os campos de copy e IA
-    .eq('model_id', modelId)
-    .order('created_at', { ascending: false })
-    .range(from, to);
+  try {
+    // 1. Fetch media items paginated
+    const { data: mediaItems, error: mediaError } = await supabase
+      .from('media_items')
+      .select(`
+        *,
+        ai_title,
+        ai_subtitle,
+        ai_description,
+        ai_cta,
+        ai_tags
+      `) // Incluindo todos os campos de copy e IA
+      .eq('model_id', modelId)
+      .order('created_at', { ascending: false })
+      .range(from, to);
 
-  if (mediaError) {
-    console.error('Error fetching media for model page:', mediaError);
+    if (mediaError) {
+      console.error('Error fetching media for model page:', mediaError);
+      return { items: [], hasMore: false };
+    }
+    
+    if (!mediaItems || mediaItems.length === 0) {
+      return { items: [], hasMore: false };
+    }
+
+    // 2. Fetch context data (model, purchases, products)
+    const { data: model, error: modelError } = await supabase.from('models').select('*').eq('id', modelId).single();
+    if (modelError || !model) return { items: [], hasMore: false };
+
+    const purchases = await fetchUserPurchases();
+    const productsForModel = await fetchProductsForModel(modelId);
+    const accessContext: AccessContext = { purchases, productsForModel, model };
+
+    // 3. Compute access status
+    const mediaWithAccess = mediaItems.map(media => {
+      const rawThumb = media.thumbnail;
+      const isVideoThumb =
+        typeof rawThumb === 'string' &&
+        (rawThumb.endsWith('.mp4') || rawThumb.endsWith('.mov') || rawThumb.endsWith('.webm'));
+      
+      return {
+        ...media,
+        thumbnail: !isVideoThumb ? rawThumb : null, // Garante que thumbnail de vídeo não seja usada
+        accessStatus: computeMediaAccessStatus(media, accessContext),
+      };
+    });
+    
+    const hasMore = mediaItems.length === pageSize;
+
+    return { items: mediaWithAccess, hasMore };
+  } catch (e) {
+    console.error('Unexpected error in fetchMediaForModelPage:', e);
     return { items: [], hasMore: false };
   }
-
-  // 2. Fetch context data (model, purchases, products)
-  const { data: model, error: modelError } = await supabase.from('models').select('*').eq('id', modelId).single();
-  if (modelError || !model) return { items: [], hasMore: false };
-
-  const purchases = await fetchUserPurchases();
-  const productsForModel = await fetchProductsForModel(modelId);
-  const accessContext: AccessContext = { purchases, productsForModel, model };
-
-  // 3. Compute access status
-  const mediaWithAccess = mediaItems.map(media => {
-    const rawThumb = media.thumbnail;
-    const isVideoThumb =
-      typeof rawThumb === 'string' &&
-      (rawThumb.endsWith('.mp4') || rawThumb.endsWith('.mov') || rawThumb.endsWith('.webm'));
-    
-    return {
-      ...media,
-      thumbnail: !isVideoThumb ? rawThumb : null, // Garante que thumbnail de vídeo não seja usada
-      accessStatus: computeMediaAccessStatus(media, accessContext),
-    };
-  });
-  
-  const hasMore = mediaWithAccess.length === pageSize;
-
-  return { items: mediaWithAccess, hasMore };
 };
 
 

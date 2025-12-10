@@ -103,8 +103,10 @@ export const ModelProfile: React.FC = () => {
 
     // Function to load media page
     const loadMediaPage = useCallback(async (nextPage: number, modelId: string) => {
+        // Se já estamos carregando ou não há mais, saímos.
         if (mediaLoading || !mediaHasMore) return;
         
+        // Apenas mostramos o loading se for a primeira página ou se já houver conteúdo
         if (nextPage === 0) setMediaLoading(true);
 
         try {
@@ -118,10 +120,13 @@ export const ModelProfile: React.FC = () => {
             setMediaPage(nextPage);
             setMediaHasMore(nextHasMore);
             
+            if (nextPage === 0 && newMedia.length === 0) {
+                setMediaHasMore(false); // Não tentar carregar mais se a primeira página for vazia
+            }
+            
         } catch (e) {
             console.error("Error loading media page:", e);
-            // If error on subsequent pages, stop trying to load more
-            if (nextPage > 0) setMediaHasMore(false);
+            setMediaHasMore(false); // Parar de tentar carregar em caso de erro
         } finally {
             setMediaLoading(false);
         }
@@ -132,7 +137,8 @@ export const ModelProfile: React.FC = () => {
         if (!username) { setMediaLoading(false); return; }
         
         const loadProfileData = async () => {
-            setMediaLoading(true); // Start loading for initial profile data
+            // O loading inicial é para o perfil inteiro (model + produtos)
+            setMediaLoading(true); 
             
             const fetchedModel = await fetchModelByUsername(username);
             if (fetchedModel) {
@@ -219,8 +225,14 @@ export const ModelProfile: React.FC = () => {
         }
     };
 
+    // Se o modelo não foi encontrado, mostramos a mensagem de erro
+    if (!model && !mediaLoading) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Modelo não encontrada.</div>;
+    
+    // Se estiver carregando a primeira página, mostramos o loading inicial
     if (mediaLoading && media.length === 0) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Carregando perfil...</div>;
-    if (!model) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Modelo não encontrada.</div>;
+
+    // Garantimos que model é Model aqui, pois as verificações acima garantem que não é null
+    const currentModel = model as Model;
 
     const stats = {
         posts: media.length, // Now reflects loaded posts
@@ -245,18 +257,18 @@ export const ModelProfile: React.FC = () => {
                 
                 <div className="relative w-full">
                     <div className="h-40 sm:h-56 w-full overflow-hidden bg-privacy-surface">
-                        {model.cover_url && <img src={model.cover_url} alt={`${model.name} cover`} className="w-full h-full object-cover" />}
+                        {currentModel.cover_url && <img src={currentModel.cover_url} alt={`${currentModel.name} cover`} className="w-full h-full object-cover" />}
                     </div>
                     <div className="flex flex-col items-center -mt-12 sm:-mt-16">
                         <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-privacy-black overflow-hidden bg-privacy-surface">
-                            {model.avatar_url && <img src={model.avatar_url} alt={model.name} className="w-full h-full object-cover" />}
+                            {currentModel.avatar_url && <img src={currentModel.avatar_url} alt={currentModel.name} className="w-full h-full object-cover" />}
                         </div>
                         <div className="flex items-center gap-1.5 mt-2">
-                            <h1 className="text-xl sm:text-2xl font-bold text-white">{model.name}</h1>
-                            {model.is_verified && <span className="inline-flex items-center justify-center rounded-full bg-blue-500 w-4 h-4 text-[10px] text-white">✓</span>}
+                            <h1 className="text-xl sm:text-2xl font-bold text-white">{currentModel.name}</h1>
+                            {currentModel.is_verified && <span className="inline-flex items-center justify-center rounded-full bg-blue-500 w-4 h-4 text-[10px] text-white">✓</span>}
                         </div>
-                        <p className="text-sm text-privacy-text-secondary">@{model.username}</p>
-                        {model.bio && <p className="mt-3 px-6 text-center text-sm text-privacy-text-secondary max-w-lg">{model.bio}</p>}
+                        <p className="text-sm text-privacy-text-secondary">@{currentModel.username}</p>
+                        {currentModel.bio && <p className="mt-3 px-6 text-center text-sm text-privacy-text-secondary max-w-lg">{currentModel.bio}</p>}
                         
                         <div className="mt-4 flex items-center justify-center gap-4">
                             <button className="bg-privacy-surface border border-privacy-border rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2"><MessageCircle size={16}/> Chat</button>
@@ -278,12 +290,12 @@ export const ModelProfile: React.FC = () => {
                       <div className="text-center sm:text-left">
                         {hasAccess ? (
                             <p className="font-semibold text-green-400 flex items-center gap-2">
-                                <CheckCircle size={16} /> Acesso VIP de {model.name} liberado!
+                                <CheckCircle size={16} /> Acesso VIP de {currentModel.name} liberado!
                             </p>
                         ) : (
                             <>
                                 <p className="font-semibold text-primary">
-                                    Desbloqueie o conteúdo exclusivo de {model.name}.
+                                    Desbloqueie o conteúdo exclusivo de {currentModel.name}.
                                 </p>
                                 <p className="text-privacy-text-secondary mt-1">
                                     Acesso VIP por{' '}
@@ -332,18 +344,25 @@ export const ModelProfile: React.FC = () => {
                         <TabsTrigger value="loja">Loja</TabsTrigger>
                     </TabsList>
                     <TabsContent value="mural" className="mt-6">
-                        <MediaGrid media={media} onLockedClick={handleLockedClick} />
-                        
-                        {/* Sentinela para Scroll Infinito do Mural */}
-                        <div ref={sentinelRef} className="h-10" />
-                        
-                        {mediaLoading && media.length > 0 && (
-                            <p className="text-center text-xs text-privacy-text-secondary py-2">Carregando mais do mural...</p>
+                        {media.length === 0 && !mediaLoading ? (
+                            <p className="text-center text-privacy-text-secondary py-10">
+                                Esta modelo ainda não postou nenhum conteúdo no mural.
+                            </p>
+                        ) : (
+                            <>
+                                <MediaGrid media={media} onLockedClick={handleLockedClick} />
+                                
+                                {/* Sentinela para Scroll Infinito do Mural */}
+                                {mediaHasMore && <div ref={sentinelRef} className="h-10" />}
+                                
+                                {mediaLoading && media.length > 0 && (
+                                    <p className="text-center text-xs text-privacy-text-secondary py-2">Carregando mais do mural...</p>
+                                )}
+                                {!mediaHasMore && media.length > 0 && (
+                                    <p className="text-center text-xs text-privacy-text-secondary py-2">Você já viu todo o mural 👀</p>
+                                )}
+                            </>
                         )}
-                        {!mediaHasMore && media.length > 0 && (
-                            <p className="text-center text-xs text-privacy-text-secondary py-2">Você já viu todo o mural 👀</p>
-                        )}
-                        
                     </TabsContent>
                     <TabsContent value="feed" className="mt-6 px-2 sm:px-0">
                         {feedMedia.length === 0 && !mediaLoading ? (
@@ -353,7 +372,7 @@ export const ModelProfile: React.FC = () => {
                                 {feedMedia.map((item, index) => (
                                     <PostCard
                                         key={item.id}
-                                        media={{...item, model: model}}
+                                        media={{...item, model: currentModel}}
                                         priceCents={mainProduct?.price_cents || 0}
                                         onLockedClick={handleLockedClick}
                                         onOpenVideo={() => handleOpenMedia(index)}
@@ -375,9 +394,9 @@ export const ModelProfile: React.FC = () => {
                                         key={p.id} 
                                         product={p} 
                                         isPurchased={purchasedProductIds.has(p.id) || !!p.is_base_membership}
-                                        modelName={model.name}
+                                        modelName={currentModel.name}
                                         isFirst={index === 0}
-                                        modelCoverUrl={model.cover_url}
+                                        modelCoverUrl={currentModel.cover_url}
                                     />
                                 ))}
                             </div>

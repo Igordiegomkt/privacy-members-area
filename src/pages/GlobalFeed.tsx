@@ -42,8 +42,13 @@ export const GlobalFeed: React.FC = () => {
       setPage(nextPage);
       setHasMore(nextHasMore);
       
+      if (nextPage === 0 && newItems.length === 0) {
+        setHasMore(false); // Não tentar carregar mais se a primeira página for vazia
+      }
+      
     } catch (e) {
       setError('Não foi possível carregar o feed.');
+      setHasMore(false); // Parar de tentar carregar em caso de erro
     } finally {
       setLoading(false);
     }
@@ -124,7 +129,8 @@ export const GlobalFeed: React.FC = () => {
         
         {!loading && !error && feedItems.length === 0 && (
           <div className="text-center py-10 text-privacy-text-secondary">
-            <p>Seu feed está vazio. Explore a seção "Em alta"!</p>
+            <p>Ainda não há conteúdos no feed.</p>
+            <p className="text-sm mt-1">Explore a seção "Em alta"!</p>
           </div>
         )}
 
@@ -141,8 +147,8 @@ export const GlobalFeed: React.FC = () => {
           ))}
         </div>
         
-        {/* Sentinela para Scroll Infinito */}
-        <div ref={sentinelRef} className="h-10" />
+        {/* Sentinela para Scroll Infinito - Renderiza apenas se houver mais itens */}
+        {hasMore && <div ref={sentinelRef} className="h-10" />}
         
         {loading && feedItems.length > 0 && (
             <p className="text-center text-xs text-privacy-text-secondary py-2">Carregando mais posts...</p>

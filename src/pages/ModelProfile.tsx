@@ -112,12 +112,14 @@ export const ModelProfile: React.FC = () => {
     const mediaPageRef = useRef(mediaPage);
     const mediaHasMoreRef = useRef(mediaHasMore);
     const muralLoadingRef = useRef(muralLoading);
+    const mediaRef = useRef(media); // <-- Novo ref para o array de mídias
 
     useEffect(() => {
         mediaPageRef.current = mediaPage;
         mediaHasMoreRef.current = mediaHasMore;
         muralLoadingRef.current = muralLoading;
-    }, [mediaPage, mediaHasMore, muralLoading]);
+        mediaRef.current = media; // <-- Atualiza o ref do array
+    }, [mediaPage, mediaHasMore, muralLoading, media]);
 
 
     // Function to load media page (Memoized)
@@ -155,7 +157,7 @@ export const ModelProfile: React.FC = () => {
             
             // Atualizar cache após o carregamento bem-sucedido
             feedCache.model[modelId] = {
-                items: isFirstPage ? newMedia : [...mediaPageRef.current, ...newMedia],
+                items: isFirstPage ? newMedia : [...mediaRef.current, ...newMedia], // <-- CORRIGIDO: Usando mediaRef.current
                 hasMore: nextHasMore,
                 lastPage: nextPage,
             };

@@ -25,20 +25,32 @@ export const GlobalFeed: React.FC = () => {
   const { openCheckoutForProduct } = useCheckout();
   
   const sentinelRef = useRef<HTMLDivElement | null>(null);
+  
+  // Refs para acessar o estado mais recente dentro do useCallback
+  const pageRef = useRef(page);
+  const hasMoreRef = useRef(hasMore);
+  const isPageLoadingRef = useRef(isPageLoading);
+
+  useEffect(() => {
+    pageRef.current = page;
+    hasMoreRef.current = hasMore;
+    isPageLoadingRef.current = isPageLoading;
+  }, [page, hasMore, isPageLoading]);
+
 
   const loadPage = useCallback(async (nextPage: number) => {
     const isFirstPage = nextPage === 0;
 
+    // Prevenção de chamadas duplicadas usando refs
+    if (!isFirstPage && (isPageLoadingRef.current || !hasMoreRef.current)) return;
+
     if (isFirstPage) {
-      // Se for a primeira página, sempre definimos loading para true, a menos que já tenhamos dados no cache.
-      // Mas se o cache estiver vazio, precisamos carregar.
       setIsInitialLoading(true);
     } else {
-      if (isPageLoading || !hasMore) return;
       setIsPageLoading(true);
     }
     
-    console.log('[GLOBAL FEED] loadPage called', { nextPage, isInitialLoading, isPageLoading, hasMore });
+    console.log('[GLOBAL FEED] loadPage called', { nextPage });
     setError(null);
 
     try {
@@ -53,12 +65,7 @@ export const GlobalFeed: React.FC = () => {
         nextHasMore,
       });
       
-      if (isFirstPage) {
-        setFeedItems(newItems);
-      } else {
-        setFeedItems(prev => [...prev, ...newItems]);
-      }
-      
+      setFeedItems(prev => isFirstPage ? newItems : [...prev, ...newItems]);
       setPage(nextPage);
       setHasMore(nextHasMore);
       
@@ -73,14 +80,11 @@ export const GlobalFeed: React.FC = () => {
         setIsPageLoading(false);
       }
     }
-  }, [isInitialLoading, isPageLoading, hasMore]);
+  }, []); // Dependências removidas para garantir que o IntersectionObserver chame a função
 
   // 1. Carregamento inicial (com cache)
   useEffect(() => {
-    console.log('[GLOBAL FEED] useEffect initial, checking cache...');
-    
     if (feedCache.global && feedCache.global.items.length > 0) {
-        console.log('[GLOBAL FEED] Loading from cache.');
         setFeedItems(feedCache.global.items);
         setHasMore(feedCache.global.hasMore);
         setPage(feedCache.global.lastPage);
@@ -88,7 +92,6 @@ export const GlobalFeed: React.FC = () => {
         return;
     }
 
-    console.log('[GLOBAL FEED] Cache empty, calling loadPage(0)');
     loadPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
@@ -107,13 +110,13 @@ export const GlobalFeed: React.FC = () => {
 
   // 3. Intersection Observer para scroll infinito
   useEffect(() => {
-    // Usamos isPageLoading aqui para evitar chamadas duplicadas
-    if (!sentinelRef.current || isInitialLoading || isPageLoading || !hasMore) return;
+    if (!sentinelRef.current || isInitialLoading) return;
 
     const observer = new IntersectionObserver(entries => {
       const [entry] = entries;
-      if (entry.isIntersecting && !isPageLoading && hasMore) {
-        loadPage(page + 1);
+      // Usamos refs para o estado mais recente
+      if (entry.isIntersecting && !isPageLoadingRef.current && hasMoreRef.current) {
+        loadPage(pageRef.current + 1);
       }
     }, {
       root: null,
@@ -124,7 +127,7 @@ export const GlobalFeed: React.FC = () => {
     observer.observe(sentinelRef.current);
 
     return () => observer.disconnect();
-  }, [page, hasMore, isInitialLoading, isPageLoading, loadPage]);
+  }, [isInitialLoading, loadPage]);
 
 
   const handleLockedClick = (item: GlobalFeedItem) => {

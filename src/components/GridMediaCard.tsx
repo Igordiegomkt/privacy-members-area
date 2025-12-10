@@ -43,11 +43,11 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
       className="relative w-full overflow-hidden rounded-xl bg-privacy-surface cursor-pointer group aspect-[3/4]"
       onClick={handleClick}
     >
-      {/* IMAGEM (ou poster de vídeo) - Z-index 5 */}
+      {/* IMAGEM (ou poster de vídeo) - Z-index 10 */}
       <img
         src={imageSrc}
         alt={media.title || 'Conteúdo'}
-        className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 z-5 ${
+        className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 z-10 ${
           isLocked ? 'blur-xl brightness-25 scale-105' : ''
         }`}
         loading="lazy"
@@ -55,13 +55,13 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
         onError={() => setThumbError(true)}
       />
       
-      {/* VÍDEO (Autoplay) - Z-index 10 */}
+      {/* VÍDEO (Autoplay) - Z-index 20 */}
       {isVideo && !isLocked && (
         <video
           ref={videoRef}
           src={media.url}
           poster={imageSrc}
-          className={`absolute inset-0 w-full h-full object-cover z-10`}
+          className={`absolute inset-0 w-full h-full object-cover z-20`}
           preload="metadata"
           playsInline
           muted
@@ -69,7 +69,7 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
         />
       )}
 
-      <div className="absolute bottom-2 left-2 flex items-center gap-2 text-xs text-white/90 z-20">
+      <div className="absolute bottom-2 left-2 flex items-center gap-2 text-xs text-white/90 z-30">
         <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5">
           {isVideo ? <Video size={12} /> : <Camera size={12} />}
           {isVideo ? 'Vídeo' : 'Foto'}

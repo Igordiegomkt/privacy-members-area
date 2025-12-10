@@ -49,7 +49,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
 
   // --- Renderização da Capa (Thumbnail) ---
   const renderCover = () => (
-    <div className="relative w-full h-full z-5">
+    <div className="relative w-full h-full">
       {/* Fundo espelhado/blur */}
       <div
         className={`absolute inset-0 bg-center bg-cover blur-lg scale-110 opacity-60 transition-opacity duration-500`}
@@ -70,7 +70,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
       
       {/* Ícone de tipo */}
       {!isLocked && (
-        <div className="absolute top-2 left-2 flex items-center gap-2 text-xs text-white/90 z-10">
+        <div className="absolute top-2 left-2 flex items-center gap-2 text-xs text-white/90 z-30">
           <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5">
             {isVideo ? <Video size={12} /> : <Camera size={12} />}
             {isVideo ? 'Vídeo' : 'Foto'}
@@ -80,8 +80,8 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
       
       {/* Ícone de Play para vídeos desbloqueados (Apenas se o autoplay falhar) */}
       {isVideo && !isLocked && (
-        <div className="absolute inset-0 flex items-center justify-center z-10">
-            {/* Removido o ícone de play manual para evitar sobreposição. O clique abre o modal. */}
+        <div className="absolute inset-0 flex items-center justify-center z-30">
+            <Play size={48} className="text-primary drop-shadow-lg" fill="currentColor" />
         </div>
       )}
     </div>
@@ -98,7 +98,8 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
         ref={videoRef}
         src={media.url}
         poster={imageSrc}
-        className={`absolute inset-0 w-full h-full object-contain transition-opacity duration-300 z-10`}
+        // Usamos object-cover para garantir que o vídeo preencha o espaço, evitando bordas da imagem de fundo
+        className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 z-20`}
         preload="metadata"
         playsInline
         muted
@@ -115,14 +116,14 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
       {/* Renderiza o player de vídeo (autoplay) */}
       {renderVideoAutoplay()}
       
-      {/* Renderiza a capa (thumbnail) - Fica por baixo do vídeo (z-index 5) */}
-      <div className="w-full h-full z-5">
+      {/* Renderiza a capa (thumbnail) - Fica por baixo do vídeo (z-index 10) */}
+      <div className="w-full h-full z-10">
         {renderCover()}
       </div>
 
       {/* Overlay de Bloqueio */}
       {isLocked && (
-        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-center px-3 z-20">
+        <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-center px-3 z-30">
           <Lock className="w-8 h-8 text-primary mb-2" />
           <p className="text-sm text-white font-semibold mb-3">
             Conteúdo VIP bloqueado

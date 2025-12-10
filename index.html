@@ -32,7 +32,7 @@
       fbq('init', '1312196850345293');
       fbq('init', '1748812605764523');
       
-      // Initial PageView (will be deduplicated by GTM/dataLayer push in TrackingScripts)
+      // Initial PageView
       fbq('track', 'PageView');
     </script>
     <!-- End Facebook Pixel Code -->
@@ -50,20 +50,20 @@
     height="0" width="0" style="display:none;visibility:hidden"></iframe></noscript>
     <!-- End Google Tag Manager (noscript) -->
 
-    <!-- Facebook Pixel (noscript) -->
+    <!-- Facebook Pixel (noscript) - PageView only -->
     <noscript>
       <img
-        height={1}
-        width={1}
-        style={{ display: 'none' }}
-        src="https://www.facebook.com/tr?id=1312196850345293&ev=Purchase&value=10.00&currency=BRL&noscript=1"
+        height="1"
+        width="1"
+        style="display:none"
+        src="https://www.facebook.com/tr?id=1312196850345293&ev=PageView&noscript=1"
         alt=""
       />
       <img
-        height={1}
-        width={1}
-        style={{ display: 'none' }}
-        src="https://www.facebook.com/tr?id=1748812605764523&ev=Purchase&value=10.00&currency=BRL&noscript=1"
+        height="1"
+        width="1"
+        style="display:none"
+        src="https://www.facebook.com/tr?id=1748812605764523&ev=PageView&noscript=1"
         alt=""
       />
     </noscript>

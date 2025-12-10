@@ -1,7 +1,7 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useSearchParams, Link, useNavigate } from 'react-router-dom';
-import { ProductWithModel } from '../types'; // Importando ProductWithModel
+import { Product, ProductWithModel } from '../types'; // Reintroduzindo Product
 import { fetchProductById } from '../lib/marketplace';
 import { supabase } from '../lib/supabase';
 

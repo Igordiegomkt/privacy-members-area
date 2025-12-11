@@ -5,14 +5,14 @@ import { saveUTMsToLocalStorage } from '../utils/utmParser';
 import { registerFirstAccess } from '../lib/accessLogger';
 import { Logo } from '../components/Logo';
 import { supabase } from '../lib/supabase';
-import { normalizePhone, synthesizeEmailFromPhone } from '../utils/phoneUtils';
 import { ensureWelcomePurchaseForCarolina } from '../lib/welcomePurchase';
+import { AuthApiError } from '@supabase/supabase-js'; // Importando AuthApiError
 
 const FIXED_PASSWORD = '12345678'; // Senha fixa para todos os usuários
 
 export const Login: React.FC = () => {
   const [name, setName] = useState('');
-  const [phone, setPhone] = useState('');
+  const [email, setEmail] = useState('');
   const [isAdult, setIsAdult] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
@@ -29,17 +29,12 @@ export const Login: React.FC = () => {
     });
   }, [navigate]);
 
-  const validateName = (fullName: string): boolean => {
-    const words = fullName.trim().split(/\s+/).filter(word => word.length > 0);
-    return words.length >= 1; // Pelo menos um nome
-  };
-
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
     setError('');
 
-    if (!validateName(name)) {
-      setError('Por favor, informe seu nome.');
+    if (!email.trim()) {
+      setError('Por favor, informe seu e-mail.');
       return;
     }
 
@@ -48,49 +43,75 @@ export const Login: React.FC = () => {
       return;
     }
     
-    const normalizedPhone = normalizePhone(phone);
-    if (!normalizedPhone) {
-        setError('Por favor, insira um número de WhatsApp válido (com DDD).');
-        return;
-    }
-    
-    const synthesizedEmail = synthesizeEmailFromPhone(normalizedPhone);
-
     setIsLoading(true);
 
     try {
-      // 1. Chama a Edge Function para criar/logar o usuário e forçar a confirmação
-      const { data, error: invokeError } = await supabase.functions.invoke('create-user-and-login', {
-        body: {
-          email: synthesizedEmail,
-          password: FIXED_PASSWORD,
-          userData: {
-            first_name: name.trim().split(' ')[0],
-            last_name: name.trim().split(' ').slice(1).join(' ') || null,
-            phone: normalizedPhone,
-          },
-        },
+      let user;
+      
+      // 1. Tenta fazer login
+      let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email,
+        password: FIXED_PASSWORD,
       });
 
-      if (invokeError) {
-        console.error('Erro ao invocar Edge Function:', invokeError);
-        throw new Error(invokeError.message || 'Falha na comunicação com o servidor de autenticação.');
-      }
+      // 2. Se falhar por credenciais inválidas ou usuário não encontrado, tenta criar
+      if (signInError) {
+        const isAuthError = signInError instanceof AuthApiError;
+        const isUserNotFound = isAuthError && (signInError.message.includes('Invalid login credentials') || signInError.message.includes('User not found'));
 
-      if (!data || data.ok === false) {
-        console.error('Erro retornado pela Edge Function:', data);
-        throw new Error(data?.message || 'Falha ao autenticar. Tente novamente.');
+        if (isUserNotFound) {
+          
+          // Prepara metadados para o perfil
+          const [firstName, ...lastNameParts] = name.trim().split(' ');
+          const lastName = lastNameParts.join(' ') || null;
+
+          const { error: signUpError } = await supabase.auth.signUp({
+            email,
+            password: FIXED_PASSWORD,
+            options: {
+              data: {
+                first_name: firstName || null,
+                last_name: lastName,
+              },
+            },
+          });
+
+          if (signUpError) {
+            // Se o erro for que o usuário já existe (o que pode acontecer se o email não estiver confirmado),
+            // tentamos o login novamente. Se for outro erro, lançamos.
+            if (!signUpError.message.includes('User already exists')) {
+                throw signUpError;
+            }
+          }
+
+          // 3. Tenta login novamente após o cadastro (ou se já existia)
+          ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email,
+            password: FIXED_PASSWORD,
+          }));
+        }
       }
       
-      const { user, session } = data;
+      if (signInError) {
+        // Se o erro for 'Email not confirmed', o usuário precisa desabilitar a confirmação no painel Supabase.
+        if (signInError.message.includes('Email not confirmed')) {
+            setError('Seu e-mail não está confirmado. Por favor, peça ao administrador para desabilitar a confirmação de e-mail no painel do Supabase.');
+            setIsLoading(false);
+            return;
+        }
+        throw signInError;
+      }
       
-      // 2. Define a sessão manualmente (já que a EF retorna a sessão)
-      await supabase.auth.setSession(session);
-
-      // 3. Pós-login: Garantir compra de boas-vindas e registrar acesso
+      if (!signInData.user) {
+        throw new Error('Falha ao obter sessão após autenticação.');
+      }
+      
+      user = signInData.user;
+      
+      // 4. Pós-login: Garantir compra de boas-vindas e registrar acesso
       
       // O ID do usuário agora é o ID do Supabase Auth
-      localStorage.setItem('userName', name.trim());
+      localStorage.setItem('userName', name.trim() || user.email || 'Usuário');
       localStorage.setItem('userIsAdult', isAdult.toString());
       
       // Garante que o usuário tenha acesso ao conteúdo base da Carolina
@@ -98,7 +119,7 @@ export const Login: React.FC = () => {
       
       // Registra o primeiro acesso (para fins de analytics/tracking)
       await registerFirstAccess({
-        name: name.trim(),
+        name: name.trim() || user.email || 'Usuário',
         isAdult,
         landingPage: window.location.href,
       });
@@ -120,7 +141,7 @@ export const Login: React.FC = () => {
       <div className="w-full max-w-sm">
         <div className="text-center mb-10">
           <Logo textSize="text-4xl" />
-          <p className="text-privacy-text-secondary mt-2">Acesse com seu WhatsApp</p>
+          <p className="text-privacy-text-secondary mt-2">Acesse com seu e-mail</p>
         </div>
 
         <form onSubmit={handleAuth} className="space-y-6">
@@ -132,13 +153,13 @@ export const Login: React.FC = () => {
 
           <div>
             <input
-              id="phone"
-              type="tel"
-              value={phone}
-              onChange={(e) => setPhone(e.target.value)}
+              id="email"
+              type="email"
+              value={email}
+              onChange={(e) => setEmail(e.target.value)}
               required
               className={inputStyle}
-              placeholder="WhatsApp (DDD + Número)"
+              placeholder="seuemail@exemplo.com"
               disabled={isLoading}
             />
           </div>
@@ -149,9 +170,8 @@ export const Login: React.FC = () => {
               type="text"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              required
               className={inputStyle}
-              placeholder="Seu nome"
+              placeholder="Seu nome (opcional)"
               disabled={isLoading}
             />
           </div>
@@ -173,7 +193,7 @@ export const Login: React.FC = () => {
 
           <button
             type="submit"
-            disabled={isLoading || !isAdult || !name.trim() || !phone.trim()}
+            disabled={isLoading || !isAdult || !email.trim()}
             className="w-full bg-primary hover:opacity-90 text-privacy-black font-semibold py-3 rounded-lg transition-opacity disabled:opacity-50 disabled:cursor-not-allowed"
           >
             {isLoading ? 'Acessando...' : 'Entrar'}

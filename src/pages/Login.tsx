@@ -114,8 +114,8 @@ export const Login: React.FC = () => {
       localStorage.setItem('userName', name.trim() || user.email || 'Usuário');
       localStorage.setItem('userIsAdult', isAdult.toString());
       
-      // Garante que o usuário tenha acesso ao conteúdo base da Carolina
-      await ensureWelcomePurchaseForCarolina(supabase, user.id);
+      // GARANTIR COMPRA VIP DA CAROLINA
+      await ensureWelcomePurchaseForCarolina(user.id);
       
       // Registra o primeiro acesso (para fins de analytics/tracking)
       await registerFirstAccess({

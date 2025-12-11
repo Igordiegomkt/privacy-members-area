@@ -59,51 +59,33 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // 1. Tenta fazer login com email sintético
-      let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: synthesizedEmail, // Usando email sintético
-        password: FIXED_PASSWORD,
+      // 1. Chama a Edge Function para criar/logar o usuário e forçar a confirmação
+      const { data, error: invokeError } = await supabase.functions.invoke('create-user-and-login', {
+        body: {
+          email: synthesizedEmail,
+          password: FIXED_PASSWORD,
+          userData: {
+            first_name: name.trim().split(' ')[0],
+            last_name: name.trim().split(' ').slice(1).join(' ') || null,
+            phone: normalizedPhone,
+          },
+        },
       });
 
-      // 2. Se o usuário não existir, tenta cadastrar
-      if (signInError && signInError.message.includes('Invalid login credentials')) {
-        
-        // Tenta cadastrar
-        const { error: signUpError } = await supabase.auth.signUp({
-          email: synthesizedEmail, // Usando email sintético
-          password: FIXED_PASSWORD,
-          options: {
-            data: {
-              first_name: name.trim().split(' ')[0],
-              last_name: name.trim().split(' ').slice(1).join(' ') || null,
-              phone: normalizedPhone, // Armazenando o telefone real nos metadados
-            },
-          },
-        });
+      if (invokeError) {
+        console.error('Erro ao invocar Edge Function:', invokeError);
+        throw new Error(invokeError.message || 'Falha na comunicação com o servidor de autenticação.');
+      }
 
-        if (signUpError) {
-          // Se o erro for que o usuário já existe (race condition), tenta login novamente
-          if (signUpError.message.includes('User already exists')) {
-            ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-              email: synthesizedEmail,
-              password: FIXED_PASSWORD,
-            }));
-          } else {
-            throw signUpError;
-          }
-        } else {
-            // Cadastro bem-sucedido, tenta login novamente
-            ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-              email: synthesizedEmail,
-              password: FIXED_PASSWORD,
-            }));
-        }
+      if (!data || data.ok === false) {
+        console.error('Erro retornado pela Edge Function:', data);
+        throw new Error(data?.message || 'Falha ao autenticar. Tente novamente.');
       }
       
-      if (signInError) throw signInError;
+      const { user, session } = data;
       
-      const user = signInData.user;
-      if (!user) throw new Error("Falha ao obter usuário após login/cadastro.");
+      // 2. Define a sessão manualmente (já que a EF retorna a sessão)
+      await supabase.auth.setSession(session);
 
       // 3. Pós-login: Garantir compra de boas-vindas e registrar acesso
       
@@ -121,7 +103,7 @@ export const Login: React.FC = () => {
         landingPage: window.location.href,
       });
 
-      // Redireciona para a raiz. O ProtectedRouteUser agora usará a sessão Supabase.
+      // Redireciona para a raiz.
       navigate('/', { replace: true });
 
     } catch (err: any) {

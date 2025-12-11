@@ -300,6 +300,7 @@ export const ModelProfile: React.FC = () => {
                 model_id: model?.id
             });
             
+            // 2. Chama o fluxo de checkout PIX
             openCheckoutForProduct(mainProduct.id);
         } else {
             navigate('/loja');
@@ -308,10 +309,13 @@ export const ModelProfile: React.FC = () => {
     
     const handleOpenMedia = (index: number) => {
         const mediaItem = muralItems[index];
+        
+        // 1. Se o item estiver bloqueado, chama o fluxo de checkout PIX
         if (mediaItem.accessStatus === 'locked') {
             handleLockedClick();
             return;
         }
+        
         // Filter unlocked media for the viewer
         const unlockedMedia = muralItems.filter(m => m.accessStatus !== 'locked');
         
@@ -345,8 +349,8 @@ export const ModelProfile: React.FC = () => {
     // Usando os contadores totais (fix)
     const stats = mediaCounts || { totalPosts: 0, totalPhotos: 0, totalVideos: 0 };
     
-    // Media for Feed/Viewer (only unlocked/free)
-    const feedMedia = muralItems.filter(m => m.accessStatus === 'free' || m.accessStatus === 'unlocked');
+    // Media for Feed/Viewer (TODAS as mídias, incluindo locked)
+    const feedPosts = muralItems; // Usamos muralItems que já está paginado e ordenado
     const unlockedMedia = muralItems.filter(m => m.accessStatus !== 'locked');
     
     const purchasedProductIds = new Set(purchases.map((p: UserPurchaseWithProduct) => p.product_id));
@@ -479,11 +483,12 @@ export const ModelProfile: React.FC = () => {
                         )}
                     </TabsContent>
                     <TabsContent value="feed" className="mt-6 px-2 sm:px-0">
-                        {feedMedia.length === 0 && !muralInitialLoading ? (
+                        {/* Agora feedPosts usa muralItems, que contém todas as mídias */}
+                        {feedPosts.length === 0 && !muralInitialLoading ? (
                             <p className="text-center text-privacy-text-secondary py-10">Ainda não há posts no feed desta modelo.</p>
                         ) : (
                             <div className="flex flex-col items-center">
-                                {feedMedia.map((item, index) => (
+                                {feedPosts.map((item, index) => (
                                     <PostCard
                                         key={item.id}
                                         media={{...item, model: currentModel}}

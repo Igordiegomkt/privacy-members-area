@@ -1,6 +1,6 @@
 import { supabase } from './supabase';
-import { Model, MediaItem } from '../types';
-import { MediaItemWithAccess } from './models';
+import { Model, MediaItem, Product } from '../types'; // Importando Product
+import { MediaItemWithAccess, computeMediaAccessStatus, fetchProductsForModel } from './models';
 import { fetchUserPurchases } from './marketplace';
 
 export interface GlobalFeedItem {
@@ -11,8 +11,8 @@ export interface GlobalFeedItem {
 
 const PAGE_SIZE = 10;
 
-export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?: number }): Promise<{ items: GlobalFeedItem[], hasMore: boolean }> => {
-  const { page, pageSize = PAGE_SIZE } = params;
+export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?: number; userId: string }): Promise<{ items: GlobalFeedItem[], hasMore: boolean }> => {
+  const { page, pageSize = PAGE_SIZE, userId } = params;
   const from = page * pageSize;
   const to = from + pageSize - 1;
 
@@ -20,12 +20,20 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
 
   try {
     // 1. Identificar modelos que o usuário já tem acesso (necessário para accessStatus)
-    const userPurchases = await fetchUserPurchases();
+    const userPurchases = await fetchUserPurchases(userId); // Usando userId
     const purchasedModelIds = new Set(userPurchases.map(p => p.products?.model_id).filter(Boolean));
-    const hasWelcomeCarolina = localStorage.getItem('welcomePurchaseCarolina') === 'true';
+    
+    // Definindo o tipo correto para o cache
+    type ModelContextCacheEntry = { 
+      products: Product[], 
+      mainProductPriceCents: number, 
+      mainProductId: string,
+    };
+
+    // Map to store model prices and products for access calculation
+    const modelContextCache = new Map<string, ModelContextCacheEntry>();
 
     // 2. Buscar itens do global_feed paginados, fazendo JOIN com media_items e models
-    // A query não deve ter filtros de data ou user_id, apenas ordenação e paginação.
     const { data: feedData, error } = await supabase
       .from('global_feed')
       .select(`
@@ -75,44 +83,50 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
       return { items: [], hasMore: false };
     }
 
-    // Map to store model prices to avoid re-calculating
-    const modelPriceMap = new Map<string, { price: number, productId: string }>();
-
     // 3. Mapear para GlobalFeedItem, determinando o status de acesso
     const feedItems = feedData
-      .filter(item => item.media && item.model) // Filtra itens onde o JOIN retornou dados válidos
+      .filter(item => item.media && item.model)
       .map((item: any): GlobalFeedItem => {
-        // Usamos 'as unknown as MediaItem' para forçar a tipagem, pois o Supabase retorna o objeto
-        // aninhado, mas o TS não consegue inferir o tipo exato do objeto aninhado.
         const mediaItem = item.media as unknown as MediaItem;
         const model = item.model as unknown as Model & { products: any[] };
-        const products = model.products || [];
+        const rawProducts = model.products || [];
         
-        let accessStatus: 'unlocked' | 'free' | 'locked' = 'locked';
-        const isCarolina = model.username === 'carolina-andrade';
-        
-        // Determine main product price and ID for CTA
         let mainProductPriceCents = 0;
         let mainProductId: string | null = null;
+        let productsForModel: Product[] = [];
         
-        if (!modelPriceMap.has(model.id)) {
-            const baseProduct = products.find((p: any) => p.is_base_membership) || products[0];
+        if (!modelContextCache.has(model.id)) {
+            productsForModel = rawProducts.map((p: any) => ({
+                id: p.id,
+                is_base_membership: p.is_base_membership,
+                price_cents: p.price_cents,
+                name: '', // Placeholder, not needed for access check
+                type: 'subscription', // Placeholder
+                status: 'active', // Placeholder
+                created_at: new Date().toISOString(), // Placeholder
+            }));
+            
+            const baseProduct = productsForModel.find((p: any) => p.is_base_membership) || productsForModel[0];
             if (baseProduct && baseProduct.id) {
                 mainProductPriceCents = baseProduct.price_cents;
                 mainProductId = baseProduct.id;
-                modelPriceMap.set(model.id, { price: mainProductPriceCents, productId: mainProductId as string });
+                // Corrigido: Usando ModelContextCacheEntry
+                modelContextCache.set(model.id, { 
+                    products: productsForModel, 
+                    mainProductPriceCents: mainProductPriceCents,
+                    mainProductId: mainProductId as string 
+                });
             }
         } else {
-            const cached = modelPriceMap.get(model.id)!;
-            mainProductPriceCents = cached.price;
-            mainProductId = cached.productId;
+            const cached = modelContextCache.get(model.id)!;
+            // Corrigido: Acessando as propriedades corretas
+            mainProductPriceCents = cached.mainProductPriceCents; 
+            mainProductId = cached.mainProductId;
+            productsForModel = cached.products;
         }
 
-        if (mediaItem.is_free) {
-          accessStatus = 'free';
-        } else if ((isCarolina && hasWelcomeCarolina) || purchasedModelIds.has(model.id)) {
-          accessStatus = 'unlocked';
-        }
+        const accessContext = { purchases: userPurchases, productsForModel, model };
+        let accessStatus = computeMediaAccessStatus(mediaItem, accessContext);
         
         // Usar a copy do feed se existir, senão a da mídia
         const finalMedia: MediaItemWithAccess = {

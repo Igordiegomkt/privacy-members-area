@@ -27,17 +27,20 @@ export function computeMediaAccessStatus(
   if (media.is_free) return 'free';
 
   const isCarolina = ctx.model.username === BASE_MODEL_USERNAME;
-  const hasWelcome = localStorage.getItem('welcomePurchaseCarolina') === 'true';
-
-  if (isCarolina && hasWelcome) return 'unlocked';
+  
+  // A compra de boas-vindas agora é um registro 'paid' em user_purchases,
+  // então não precisamos mais do localStorage 'welcomePurchaseCarolina'.
+  // A lógica de acesso é unificada: se comprou o produto base, tem acesso.
 
   const baseMembership = ctx.productsForModel.find(p => p.is_base_membership);
   const purchasedIds = new Set(ctx.purchases.map(p => p.product_id));
 
+  // Se comprou o produto base (VIP)
   if (baseMembership && purchasedIds.has(baseMembership.id)) {
     return 'unlocked';
   }
   
+  // Se comprou qualquer outro produto da modelo (para packs/mídias avulsas)
   const hasAnyProductFromModel = ctx.productsForModel.some(p => purchasedIds.has(p.id));
   if (hasAnyProductFromModel) return 'unlocked';
 
@@ -93,8 +96,8 @@ export const fetchModelMediaCounts = async (modelId: string): Promise<{ totalPos
 };
 
 // Renomeando e paginando a função de fetch de mídia da modelo
-export const fetchMediaForModelPage = async (params: { modelId: string, page: number, pageSize?: number }): Promise<{ items: MediaItemWithAccess[], hasMore: boolean }> => {
-  const { modelId, page, pageSize = PAGE_SIZE } = params;
+export const fetchMediaForModelPage = async (params: { modelId: string, page: number, pageSize?: number, userId: string }): Promise<{ items: MediaItemWithAccess[], hasMore: boolean }> => {
+  const { modelId, page, pageSize = PAGE_SIZE, userId } = params;
   const from = page * pageSize;
   const to = from + pageSize; // Ajuste: Supabase range é inclusivo, mas para simular 'limit' precisamos de +10 itens para saber se há mais.
 
@@ -137,7 +140,7 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
     const itemsToProcess = mediaItems!.slice(0, pageSize);
 
     // 5. Fetch context data (purchases, products)
-    const purchases = await fetchUserPurchases();
+    const purchases = await fetchUserPurchases(userId); // Usando o userId
     const productsForModel = await fetchProductsForModel(modelId);
     const accessContext: AccessContext = { purchases, productsForModel, model };
 

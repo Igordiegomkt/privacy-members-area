@@ -8,12 +8,14 @@ import { MediaItemWithAccess } from '../lib/models';
 import { fetchGlobalFeedItemsPage, GlobalFeedItem } from '../lib/feedGlobal';
 import { MediaViewerFullscreen } from '../components/MediaViewerFullscreen';
 import { useCheckout } from '../contexts/CheckoutContext';
-import { trackAddToCart } from '../lib/tracking'; // Importando tracking
-import { feedCache } from '../lib/feedCache'; // Importando cache
+import { trackAddToCart } from '../lib/tracking';
+import { feedCache } from '../lib/feedCache';
+import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
 
 const PAGE_SIZE = 10;
 
 export const GlobalFeed: React.FC = () => {
+  const { user, isLoading: isLoadingAuth } = useAuth(); // Usando useAuth
   const [feedItems, setFeedItems] = useState<GlobalFeedItem[]>([]);
   const [page, setPage] = useState(0);
   const [isInitialLoading, setIsInitialLoading] = useState(true);
@@ -39,6 +41,8 @@ export const GlobalFeed: React.FC = () => {
 
 
   const loadPage = useCallback(async (nextPage: number) => {
+    if (!user?.id) return; // Não carrega se o usuário não estiver pronto
+
     const isFirstPage = nextPage === 0;
 
     // Prevenção de chamadas duplicadas usando refs
@@ -56,7 +60,8 @@ export const GlobalFeed: React.FC = () => {
     try {
       const { items: newItems, hasMore: nextHasMore } = await fetchGlobalFeedItemsPage({ 
         page: nextPage,
-        pageSize: PAGE_SIZE
+        pageSize: PAGE_SIZE,
+        userId: user.id, // Passando userId
       });
       
       console.log('[GLOBAL FEED] loadPage result', {
@@ -80,15 +85,17 @@ export const GlobalFeed: React.FC = () => {
         setIsPageLoading(false);
       }
     }
-  }, []); // Dependências removidas para garantir que o IntersectionObserver chame a função
+  }, [user?.id]); // Depende do user.id
 
   // 1. Carregamento inicial (Sempre carrega do servidor para garantir o histórico completo)
   useEffect(() => {
-    // Limpa o cache na inicialização para garantir que o histórico completo seja buscado
-    feedCache.global = null; 
-    loadPage(0);
+    if (user?.id) {
+        // Limpa o cache na inicialização para garantir que o histórico completo seja buscado
+        feedCache.global = null; 
+        loadPage(0);
+    }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, []);
+  }, [user?.id]); // Recarrega quando o usuário muda/loga
   
   // 2. Atualizar cache sempre que o feed mudar (para navegação rápida)
   useEffect(() => {
@@ -104,7 +111,7 @@ export const GlobalFeed: React.FC = () => {
 
   // 3. Intersection Observer para scroll infinito
   useEffect(() => {
-    if (!sentinelRef.current || isInitialLoading) return;
+    if (!sentinelRef.current || isInitialLoading || !user?.id) return;
 
     const observer = new IntersectionObserver(entries => {
       const [entry] = entries;
@@ -121,7 +128,7 @@ export const GlobalFeed: React.FC = () => {
     observer.observe(sentinelRef.current);
 
     return () => observer.disconnect();
-  }, [isInitialLoading, loadPage]);
+  }, [isInitialLoading, loadPage, user?.id]);
 
 
   const handleLockedClick = (item: GlobalFeedItem) => {
@@ -175,7 +182,7 @@ export const GlobalFeed: React.FC = () => {
       );
     }
 
-    if (isInitialLoading && feedItems.length === 0) {
+    if (isLoadingAuth || isInitialLoading || !user) {
       return <div className="text-center py-10 text-privacy-text-secondary">Carregando...</div>;
     }
     

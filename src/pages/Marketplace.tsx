@@ -9,6 +9,7 @@ import { supabase } from '../lib/supabase';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { useNavigate } from 'react-router-dom';
 import { trackAddToCart } from '../lib/tracking'; // Importando tracking
+import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
 
 const formatPrice = (cents: number) => {
   return (cents / 100).toLocaleString('pt-BR', {
@@ -158,6 +159,7 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
 
 export const Marketplace: React.FC = () => {
   useProtection();
+  const { user, isLoading: isLoadingAuth } = useAuth();
   const [otherProducts, setOtherProducts] = useState<Product[]>([]);
   const [baseProducts, setBaseProducts] = useState<(Product & { models: Model | null })[]>([]);
   const [purchases, setPurchases] = useState<UserPurchaseWithProduct[]>([]);
@@ -165,6 +167,11 @@ export const Marketplace: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
+    if (isLoadingAuth || !user?.id) {
+        if (!isLoadingAuth) setLoading(false);
+        return;
+    }
+    
     const loadData = async () => {
       try {
         setLoading(true);
@@ -177,7 +184,7 @@ export const Marketplace: React.FC = () => {
             .select('id, name, price_cents, model_id, is_base_membership, cover_thumbnail, models ( id, name, username, avatar_url, cover_url )') // Adicionado cover_url da modelo
             .eq('status', 'active')
             .eq('is_base_membership', true),
-          fetchUserPurchases(),
+          fetchUserPurchases(user.id), // Corrigido: Passando userId
         ]);
 
         if (baseProductsRes.error) throw baseProductsRes.error;
@@ -194,7 +201,7 @@ export const Marketplace: React.FC = () => {
       }
     };
     loadData();
-  }, []);
+  }, [user?.id, isLoadingAuth]);
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">

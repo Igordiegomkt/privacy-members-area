@@ -2,8 +2,8 @@ import * as React from 'react';
 import { createContext, useContext, useState, useEffect, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
 import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
-import { Session } from '@supabase/supabase-js';
-import { trackPurchase } from '../lib/tracking'; // Importando tracking
+import { trackPurchase } from '../lib/tracking';
+import { useAuth } from './AuthContext'; // Importando useAuth
 
 interface PurchaseContextType {
   purchases: UserPurchaseWithProduct[];
@@ -14,14 +14,14 @@ interface PurchaseContextType {
 const PurchaseContext = createContext<PurchaseContextType | undefined>(undefined);
 
 export const PurchaseProvider: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {
+  const { session, user, isLoading: isLoadingAuth } = useAuth(); // Usando useAuth
   const [purchases, setPurchases] = useState<UserPurchaseWithProduct[]>([]);
   const [isLoading, setIsLoading] = useState(true);
-  const [session, setSession] = useState<Session | null>(null);
 
-  const loadPurchases = useCallback(async () => {
-    // Don't set loading to true here to avoid UI flashes on re-fetch
+  const loadPurchases = useCallback(async (userId: string) => {
+    // Não setamos loading para true aqui para evitar flashes de UI em re-fetch
     try {
-      const userPurchases = await fetchUserPurchases();
+      const userPurchases = await fetchUserPurchases(userId); // Passando userId
       setPurchases(userPurchases);
       
       // --- LÓGICA DE RASTREAMENTO PURCHASE (DEDUPLICADA) ---
@@ -50,25 +50,16 @@ export const PurchaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
     } catch (error) {
       console.error("Failed to load purchases:", error);
     } finally {
-      setIsLoading(false); // Only set loading false on initial load
+      // Apenas setamos isLoading false na primeira vez que o Auth termina de carregar
+      if (!isLoadingAuth) {
+        setIsLoading(false);
+      }
     }
-  }, []);
+  }, [isLoadingAuth]);
 
   useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  useEffect(() => {
-    if (session?.user) {
-      loadPurchases();
+    if (user?.id) {
+      loadPurchases(user.id);
 
       const channel = supabase
         .channel('user_purchases_changes')
@@ -78,11 +69,11 @@ export const PurchaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             event: 'INSERT',
             schema: 'public',
             table: 'user_purchases',
-            filter: `user_id=eq.${session.user.id}`,
+            filter: `user_id=eq.${user.id}`,
           },
           (payload) => {
             console.log('Realtime purchase received!', payload);
-            loadPurchases(); // Re-fetch all purchases on new insert
+            loadPurchases(user.id); // Re-fetch all purchases on new insert
           }
         )
         .subscribe();
@@ -90,19 +81,19 @@ export const PurchaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       return () => {
         supabase.removeChannel(channel);
       };
-    } else {
-        // Clear purchases if user logs out
+    } else if (!isLoadingAuth) {
+        // Clear purchases if user logs out or is not logged in after auth loads
         setPurchases([]);
         setIsLoading(false);
     }
-  }, [session, loadPurchases]);
+  }, [user?.id, isLoadingAuth, loadPurchases]);
 
   const hasPurchase = (productId: string): boolean => {
     return purchases.some(p => p.product_id === productId);
   };
 
   return (
-    <PurchaseContext.Provider value={{ purchases, isLoading, hasPurchase }}>
+    <PurchaseContext.Provider value={{ purchases, isLoading: isLoadingAuth || isLoading, hasPurchase }}>
       {children}
     </PurchaseContext.Provider>
   );

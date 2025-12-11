@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { NotificationWithStatus } from '../../types/notifications';
 import { Bell, X } from 'lucide-react';
-import { Session } from '@supabase/supabase-js';
+import { useAuth } from '../../contexts/AuthContext'; // Importando useAuth
 
 interface NotificationBellProps {
   onNavigateToProduct: (productId: string) => void;
@@ -12,7 +12,9 @@ interface NotificationBellProps {
 export const NotificationBell: React.FC<NotificationBellProps> = ({
   onNavigateToProduct,
 }: NotificationBellProps) => {
-  const [userId, setUserId] = useState<string | null>(null);
+  const { user, isLoading: isLoadingAuth } = useAuth(); // Usando useAuth
+  const userId = user?.id ?? null;
+  
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationWithStatus[]>([]);
   const [loading, setLoading] = useState(false);
@@ -23,7 +25,6 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
   const fetchNotifications = React.useCallback(async (currentUserId: string) => {
     setLoading(true);
 
-    // A query é robusta e deve retornar [] se não houver user_notifications para o ID.
     const { data, error } = await supabase
       .from('user_notifications')
       .select(`
@@ -73,24 +74,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     setLoading(false);
   }, []);
 
-  // 1. Handle Auth State
-  useEffect(() => {
-    const updateUserId = (session: Session | null) => {
-        setUserId(session?.user?.id ?? null);
-    };
-
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      updateUserId(session);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      updateUserId(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // 2. Fetch and Realtime Subscription
+  // 1. Fetch and Realtime Subscription (Depende apenas de userId)
   useEffect(() => {
     if (!userId) {
       setNotifications([]);
@@ -110,8 +94,6 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
           filter: `user_id=eq.${userId}`,
         },
         (payload: any) => {
-          // When a new user_notification is inserted, re-fetch the list
-          // to get the full notification details (title, body, product_id) via JOIN.
           console.log('[NotificationBell] Realtime notification received, refetching...');
           fetchNotifications(userId);
         },
@@ -123,7 +105,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     };
   }, [userId, fetchNotifications]);
 
-  // 3. Handle click outside to close menu
+  // 2. Handle click outside to close menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (bellRef.current && !bellRef.current.contains(event.target as Node)) {
@@ -166,7 +148,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     }
   };
 
-  if (!userId) return null; // Renderiza apenas se houver userId
+  if (isLoadingAuth || !userId) return null; // Renderiza apenas se houver userId e Auth não estiver carregando
 
   return (
     <div className="relative" ref={bellRef}>

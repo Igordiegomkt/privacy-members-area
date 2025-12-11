@@ -26,13 +26,22 @@ import PurchaseSuccess from './pages/PurchaseSuccess';
 import PurchaseFailed from './pages/PurchaseFailed';
 import { AiTools } from './pages/admin/AiTools';
 import { CheckoutModal } from './components/CheckoutModal';
-import { AdminNotifications } from './pages/admin/AdminNotifications'; // Novo import
+import { AdminNotifications } from './pages/admin/AdminNotifications';
+import { useAuth } from './contexts/AuthContext'; // Novo import
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {
-  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
+  const { session, isLoading } = useAuth();
   
-  if (!isAuthenticated) {
+  if (isLoading) {
+    return (
+      <div className="min-h-screen bg-privacy-black flex items-center justify-center">
+        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
+      </div>
+    );
+  }
+  
+  if (!session) {
     return <Navigate to="/login" replace />;
   }
   

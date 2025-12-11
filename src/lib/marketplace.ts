@@ -60,18 +60,15 @@ export const fetchProductById = async (id: string): Promise<Product | null> => {
   return data || null;
 };
 
-export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> => {
-  const {
-    data: authData,
-    error: authError,
-  } = await supabase.auth.getUser();
-
-  if (authError || !authData?.user) {
-    console.error('[fetchUserPurchases] No authenticated user', authError);
+/**
+ * Busca as compras pagas de um usuário específico.
+ * @param userId O ID do usuário autenticado.
+ */
+export const fetchUserPurchases = async (userId: string): Promise<UserPurchaseWithProduct[]> => {
+  if (!userId) {
+    console.error('[fetchUserPurchases] userId is required.');
     return [];
   }
-
-  const user = authData.user;
 
   const { data, error } = await supabase
     .from('user_purchases')
@@ -105,7 +102,7 @@ export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> =
       )
     `
     )
-    .eq('user_id', user.id)
+    .eq('user_id', userId)
     .eq('status', 'paid')
     .order('created_at', { ascending: false });
 

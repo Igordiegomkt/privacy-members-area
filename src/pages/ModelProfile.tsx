@@ -14,8 +14,9 @@ import { useProtection } from '../hooks/useProtection';
 import { ArrowLeft, MessageCircle, Gift, CheckCircle } from 'lucide-react';
 import { usePurchases } from '../contexts/PurchaseContext';
 import { useCheckout } from '../contexts/CheckoutContext';
-import { trackViewContent, trackAddToCart } from '../lib/tracking'; // Importando trackAddToCart
-import { feedCache } from '../lib/feedCache'; // Importando cache
+import { trackViewContent, trackAddToCart } from '../lib/tracking';
+import { feedCache } from '../lib/feedCache';
+import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -87,6 +88,7 @@ export const ModelProfile: React.FC = () => {
     const { username } = useParams<{ username: string }>();
     const navigate = useNavigate();
     const { openCheckoutForProduct } = useCheckout();
+    const { user } = useAuth(); // Usando useAuth
     
     // Estados de Carregamento e Dados do Perfil
     const [model, setModel] = useState<Model | null>(null);
@@ -126,7 +128,7 @@ export const ModelProfile: React.FC = () => {
 
     // Function to load media page (Memoized)
     const loadMuralPage = useCallback(async (nextPage: number) => {
-        if (!model?.id) return;
+        if (!model?.id || !user?.id) return;
 
         const isFirstPage = nextPage === 0;
         
@@ -148,6 +150,7 @@ export const ModelProfile: React.FC = () => {
                 modelId: model.id,
                 page: nextPage,
                 pageSize: PAGE_SIZE,
+                userId: user.id, // Passando userId
             });
             
             console.log('[MODEL FEED] loadMuralPage result', {
@@ -178,7 +181,7 @@ export const ModelProfile: React.FC = () => {
                 setMuralPageLoading(false);
             }
         }
-    }, [model?.id]); // Dependências ajustadas para apenas model.id
+    }, [model?.id, user?.id]); // Dependências ajustadas para model.id e user.id
 
     // 1. Efeito para carregar o PERFIL (Model + Products + Counts)
     useEffect(() => {
@@ -220,8 +223,9 @@ export const ModelProfile: React.FC = () => {
 
                 const modelProductIds = new Set(fetchedProducts.map(p => p.id));
                 const userHasAnyProduct = purchases.some((p: UserPurchaseWithProduct) => modelProductIds.has(p.product_id));
-                const isCarolinaWelcome = fetchedModel.username === 'carolina-andrade' && localStorage.getItem('welcomePurchaseCarolina') === 'true';
-                setHasAccess(userHasAnyProduct || isCarolinaWelcome);
+                
+                // A lógica de acesso agora é unificada e baseada apenas em purchases
+                setHasAccess(userHasAnyProduct);
                 
                 console.log('[MODEL PROFILE] useEffect loadModel done', { modelId: fetchedModel.id });
                 
@@ -235,7 +239,7 @@ export const ModelProfile: React.FC = () => {
                     setMuralInitialLoading(false);
                 } else {
                     // Se não houver cache, carrega a primeira página
-                    // Chamamos loadMuralPage(0) no próximo useEffect para garantir que 'model' esteja definido
+                    // Chamamos loadMuralPage(0) no próximo useEffect para garantir que 'model' e 'user' estejam definidos
                 }
 
             } catch (e) {
@@ -256,15 +260,15 @@ export const ModelProfile: React.FC = () => {
         setMuralPageLoading(false);
         
         loadProfileData();
-    }, [username, purchases]); // loadMuralPage removido daqui
+    }, [username, purchases]); // purchases é dependência para re-calcular hasAccess
 
-    // 2. Efeito para carregar a primeira página do mural (após o modelo ser carregado)
+    // 2. Efeito para carregar a primeira página do mural (após o modelo e usuário serem carregados)
     useEffect(() => {
-        if (model?.id && muralInitialLoading && muralItems.length === 0) {
-            // Se o modelo foi carregado e o mural ainda está no estado inicial (sem cache), carrega a página 0
+        if (model?.id && user?.id && muralInitialLoading && muralItems.length === 0) {
+            // Se o modelo e o usuário foram carregados e o mural ainda está no estado inicial (sem cache), carrega a página 0
             loadMuralPage(0);
         }
-    }, [model?.id, muralInitialLoading, muralItems.length, loadMuralPage]);
+    }, [model?.id, user?.id, muralInitialLoading, muralItems.length, loadMuralPage]);
 
 
     // 3. Intersection Observer for infinite scroll (Mural)
@@ -327,7 +331,7 @@ export const ModelProfile: React.FC = () => {
     };
 
     // Tratamento de estados de carregamento e erro do Perfil
-    if (profileLoading) {
+    if (profileLoading || !user) { // Adicionado !user para esperar o Auth
         return (
             <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">
                 <p className="text-sm text-privacy-text-secondary">Carregando perfil...</p>

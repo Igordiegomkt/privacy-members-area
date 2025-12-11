@@ -6,6 +6,7 @@ import { Model } from '../types';
 import { fetchUserPurchases } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
+import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
 
 interface ModelWithAccess extends Model {
   isUnlocked: boolean;
@@ -70,18 +71,22 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: Mod
 };
 
 export const Home: React.FC = () => {
+  const { user, isLoading: isLoadingAuth } = useAuth();
   const [models, setModels] = useState<ModelWithAccess[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isLoadingAuth || !user?.id) {
+        if (!isLoadingAuth) setLoading(false);
+        return;
+    }
+    
     const loadModels = async () => {
       setLoading(true);
       
-      const hasWelcomeCarolina = localStorage.getItem('welcomePurchaseCarolina') === 'true';
-
       const [modelsRes, purchasesRes, productsRes] = await Promise.all([
         supabase.from('models').select('*'),
-        fetchUserPurchases(),
+        fetchUserPurchases(user.id), // Passando userId
         supabase.from('products').select('id, model_id, is_base_membership, price_cents')
       ]);
 
@@ -95,8 +100,8 @@ export const Home: React.FC = () => {
       const purchasedModelIds = new Set(purchasesRes.map(p => p.products?.model_id).filter(Boolean));
 
       const modelsWithAccess = modelsRes.data.map(model => {
-        const isCarolina = model.username === 'carolina-andrade';
-        const isUnlocked = (isCarolina && hasWelcomeCarolina) || purchasedModelIds.has(model.id);
+        // A lógica de acesso agora é unificada: se comprou qualquer produto da modelo, está desbloqueado.
+        const isUnlocked = purchasedModelIds.has(model.id);
         
         const modelProducts = products.filter(p => p.model_id === model.id);
         const mainProduct = modelProducts.find(p => p.is_base_membership) || modelProducts[0];
@@ -120,7 +125,11 @@ export const Home: React.FC = () => {
     };
 
     loadModels();
-  }, []);
+  }, [user?.id, isLoadingAuth]);
+
+  if (isLoadingAuth || loading) {
+    return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Carregando...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">
@@ -131,15 +140,11 @@ export const Home: React.FC = () => {
           <p className="text-privacy-text-secondary mt-1">Explore os perfis das modelos.</p>
         </div>
 
-        {loading ? (
-          <div className="text-center py-10">Carregando modelos...</div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {models.map(model => (
-              <ModelCard key={model.id} model={model} />
-            ))}
-          </div>
-        )}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {models.map(model => (
+            <ModelCard key={model.id} model={model} />
+          ))}
+        </div>
       </main>
       <BottomNavigation />
     </div>

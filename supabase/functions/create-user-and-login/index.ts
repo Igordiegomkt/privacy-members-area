@@ -54,17 +54,19 @@ serve(async (req: Request) => {
     let isNewUser = false;
 
     // 1. Tenta fazer login (usando o cliente ANÔNIMO)
-    const { data: signInData, error: signInError } = await supabaseAnon.auth.signInWithPassword({
+    let { data: signInData, error: signInError } = await supabaseAnon.auth.signInWithPassword({
       email,
       password,
     });
 
+    // 2. Se o login falhar por credenciais inválidas ou email não confirmado, tenta criar o usuário
     if (signInError) {
-      // Se o erro for credenciais inválidas, o usuário não existe ou não está confirmado.
-      if (signInError.message.includes('Invalid login credentials') || signInError.message.includes('Email not confirmed')) {
+      const isAuthError = signInError.message.includes('Invalid login credentials') || signInError.message.includes('Email not confirmed');
+
+      if (isAuthError) {
         
-        // 2. Tenta criar o usuário (usando o cliente ADMIN)
-        const { data: signUpData, error: signUpError } = await supabaseAdmin.auth.admin.createUser({
+        // Tenta criar o usuário (usando o cliente ADMIN)
+        const { error: signUpError } = await supabaseAdmin.auth.admin.createUser({
           email: email,
           password: password,
           email_confirm: true, // FORÇA A CONFIRMAÇÃO
@@ -72,44 +74,37 @@ serve(async (req: Request) => {
         });
 
         if (signUpError) {
-          // Se o erro for que o usuário já existe (race condition), tenta buscar o usuário
-          if (signUpError.message.includes('User already exists')) {
-            const { data: existingUser, error: fetchError } = await supabaseAdmin.auth.admin.getUserByEmail(email);
-            if (fetchError || !existingUser.user) throw fetchError || new Error("Usuário existente não encontrado.");
-            user = existingUser.user;
-          } else {
+          // Se o erro for que o usuário já existe, ignoramos e prosseguimos para o login.
+          // Se for outro erro (ex: senha fraca, DB down), lançamos.
+          if (!signUpError.message.includes('User already exists')) {
             console.error("[create-user-and-login] Admin SignUp Error:", signUpError);
             return createResponse(false, { code: "SIGNUP_FAILED", message: signUpError.message });
           }
+          // Se o usuário já existe, isNewUser permanece false e tentamos o login abaixo.
         } else {
-          user = signUpData.user;
           isNewUser = true;
         }
         
-        // 3. Após criar/encontrar, tenta fazer login novamente (usando o cliente ANÔNIMO)
-        const { data: finalSignInData, error: finalSignInError } = await supabaseAnon.auth.signInWithPassword({
+        // 3. Tenta fazer login novamente (agora o usuário deve estar confirmado)
+        ({ data: signInData, error: signInError } = await supabaseAnon.auth.signInWithPassword({
           email,
           password,
-        });
+        }));
 
-        if (finalSignInError) {
-            console.error("[create-user-and-login] Final SignIn Error:", finalSignInError);
-            return createResponse(false, { code: "SIGNIN_FAILED", message: finalSignInError.message });
+        if (signInError) {
+            console.error("[create-user-and-login] Final SignIn Error:", signInError);
+            return createResponse(false, { code: "SIGNIN_FAILED", message: signInError.message });
         }
-        
-        session = finalSignInData.session;
-        user = finalSignInData.user;
-
       } else {
         // Outro erro de login (ex: rate limit)
         console.error("[create-user-and-login] Initial SignIn Error:", signInError);
         return createResponse(false, { code: "SIGNIN_FAILED", message: signInError.message });
       }
-    } else {
-      // Login bem-sucedido
-      user = signInData.user;
-      session = signInData.session;
     }
+
+    // 4. Verifica o resultado final
+    user = signInData.user;
+    session = signInData.session;
 
     if (!user || !session) {
         return createResponse(false, { code: "NO_SESSION", message: "Falha ao obter sessão após autenticação." });

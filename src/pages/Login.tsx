@@ -108,6 +108,8 @@ export const Login: React.FC = () => {
       
       user = signInData.user;
       
+      console.log("[Login] logged in", { userId: user.id, email: user.email });
+      
       // 4. Pós-login: Garantir compra de boas-vindas e registrar acesso
       
       // O ID do usuário agora é o ID do Supabase Auth
@@ -115,6 +117,7 @@ export const Login: React.FC = () => {
       localStorage.setItem('userIsAdult', isAdult.toString());
       
       // GARANTIR COMPRA VIP DA CAROLINA
+      console.log("[Login] calling ensureWelcomePurchaseForCarolina");
       await ensureWelcomePurchaseForCarolina(user.id);
       
       // Registra o primeiro acesso (para fins de analytics/tracking)

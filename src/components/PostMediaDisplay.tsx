@@ -61,6 +61,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
         <img
           src={imageSrc}
           alt={media.title || 'Conteúdo'}
+          // Usamos object-contain para garantir que a imagem/poster caiba no container
           className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl`}
           loading="lazy"
           draggable={false}
@@ -110,6 +111,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
 
   return (
     <div
+      // Mantendo aspect-[3/4] para consistência do card, mas garantindo w-full
       className="relative w-full overflow-hidden cursor-pointer aspect-[3/4] bg-privacy-surface"
       onClick={handleClick}
     >

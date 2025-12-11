@@ -59,7 +59,7 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/95 backdrop-blur-sm"
       onClick={onClose}
     >
-      {/* Background Blur Effect (Requirement 2) */}
+      {/* Background Blur Effect */}
       <div
         className={`absolute inset-0 bg-center bg-cover blur-xl scale-110 opacity-30 transition-opacity duration-500`}
         style={{ backgroundImage: `url(${backgroundSrc})` }}
@@ -70,8 +70,8 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
         className="relative w-full h-full flex items-center justify-center"
         onClick={e => e.stopPropagation()}
       >
-        {/* Media Display */}
-        <div className="relative max-w-full max-h-[90vh] flex items-center justify-center">
+        {/* Media Display - Aumentando o max-w e max-h para ocupar mais espaço */}
+        <div className="relative w-full h-full max-w-xl max-h-[95vh] flex items-center justify-center p-4">
           {isVideo ? (
             <video
               key={currentMedia.id} // Key change forces re-render and re-load
@@ -82,7 +82,8 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
               autoPlay
               playsInline
               controlsList="nodownload"
-              className="max-w-full max-h-[90vh] rounded-lg object-contain"
+              // Usando w-full h-full e object-contain para maximizar o tamanho dentro do container
+              className="w-full h-full object-contain rounded-lg"
               onContextMenu={(e) => e.preventDefault()}
             >
               Seu navegador não suporta vídeos.
@@ -92,7 +93,8 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
               key={currentMedia.id} // Key change forces re-render
               src={currentMedia.url}
               alt={currentMedia.title || 'Media content'}
-              className="max-w-full max-h-[90vh] object-contain rounded-lg"
+              // Usando w-full h-full e object-contain para maximizar o tamanho dentro do container
+              className="w-full h-full object-contain rounded-lg"
               draggable={false}
               onContextMenu={(e) => e.preventDefault()}
             />

@@ -350,7 +350,7 @@ export const ModelProfile: React.FC = () => {
     const stats = mediaCounts || { totalPosts: 0, totalPhotos: 0, totalVideos: 0 };
     
     // Media for Feed/Viewer (TODAS as mídias, incluindo locked)
-    const feedPosts = muralItems; // Usamos muralItems que já está paginado e ordenado
+    const feedPosts = muralItems; // <--- CORREÇÃO: Usa todas as mídias
     const unlockedMedia = muralItems.filter(m => m.accessStatus !== 'locked');
     
     const purchasedProductIds = new Set(purchases.map((p: UserPurchaseWithProduct) => p.product_id));

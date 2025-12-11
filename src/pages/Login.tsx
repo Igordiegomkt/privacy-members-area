@@ -5,7 +5,7 @@ import { saveUTMsToLocalStorage } from '../utils/utmParser';
 import { registerFirstAccess } from '../lib/accessLogger';
 import { Logo } from '../components/Logo';
 import { supabase } from '../lib/supabase';
-import { normalizePhone } from '../utils/phoneUtils';
+import { normalizePhone, synthesizeEmailFromPhone } from '../utils/phoneUtils';
 import { ensureWelcomePurchaseForCarolina } from '../lib/welcomePurchase';
 
 const FIXED_PASSWORD = '12345678'; // Senha fixa para todos os usuários
@@ -53,13 +53,15 @@ export const Login: React.FC = () => {
         setError('Por favor, insira um número de WhatsApp válido (com DDD).');
         return;
     }
+    
+    const synthesizedEmail = synthesizeEmailFromPhone(normalizedPhone);
 
     setIsLoading(true);
 
     try {
-      // 1. Tenta fazer login
+      // 1. Tenta fazer login com email sintético
       let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        phone: normalizedPhone,
+        email: synthesizedEmail, // Usando email sintético
         password: FIXED_PASSWORD,
       });
 
@@ -68,12 +70,13 @@ export const Login: React.FC = () => {
         
         // Tenta cadastrar
         const { error: signUpError } = await supabase.auth.signUp({
-          phone: normalizedPhone,
+          email: synthesizedEmail, // Usando email sintético
           password: FIXED_PASSWORD,
           options: {
             data: {
               first_name: name.trim().split(' ')[0],
               last_name: name.trim().split(' ').slice(1).join(' ') || null,
+              phone: normalizedPhone, // Armazenando o telefone real nos metadados
             },
           },
         });
@@ -82,7 +85,7 @@ export const Login: React.FC = () => {
           // Se o erro for que o usuário já existe (race condition), tenta login novamente
           if (signUpError.message.includes('User already exists')) {
             ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-              phone: normalizedPhone,
+              email: synthesizedEmail,
               password: FIXED_PASSWORD,
             }));
           } else {
@@ -91,7 +94,7 @@ export const Login: React.FC = () => {
         } else {
             // Cadastro bem-sucedido, tenta login novamente
             ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-              phone: normalizedPhone,
+              email: synthesizedEmail,
               password: FIXED_PASSWORD,
             }));
         }

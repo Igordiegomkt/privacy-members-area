@@ -29,3 +29,15 @@ export const normalizePhone = (phone: string): string | null => {
 
   return normalized;
 };
+
+/**
+ * Cria um email sintético a partir do número de telefone normalizado.
+ * Isso é necessário quando o login por telefone está desabilitado no Supabase.
+ * @param normalizedPhone O número de telefone no formato +CCDDNNNNNNNNN.
+ * @returns Um email sintético único.
+ */
+export const synthesizeEmailFromPhone = (normalizedPhone: string): string => {
+  const cleanPhone = normalizedPhone.replace('+', '');
+  // Usamos um domínio fixo para garantir a unicidade e evitar conflitos com emails reais.
+  return `phone_${cleanPhone}@whatsapp.meuprivacy.com`;
+};

@@ -82,21 +82,15 @@ export const GlobalFeed: React.FC = () => {
     }
   }, []); // Dependências removidas para garantir que o IntersectionObserver chame a função
 
-  // 1. Carregamento inicial (com cache)
+  // 1. Carregamento inicial (Sempre carrega do servidor para garantir o histórico completo)
   useEffect(() => {
-    if (feedCache.global && feedCache.global.items.length > 0) {
-        setFeedItems(feedCache.global.items);
-        setHasMore(feedCache.global.hasMore);
-        setPage(feedCache.global.lastPage);
-        setIsInitialLoading(false);
-        return;
-    }
-
+    // Limpa o cache na inicialização para garantir que o histórico completo seja buscado
+    feedCache.global = null; 
     loadPage(0);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
   
-  // 2. Atualizar cache sempre que o feed mudar
+  // 2. Atualizar cache sempre que o feed mudar (para navegação rápida)
   useEffect(() => {
     if (feedItems.length > 0 || !isInitialLoading) {
         feedCache.global = {

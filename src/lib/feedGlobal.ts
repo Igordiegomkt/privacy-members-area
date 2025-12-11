@@ -19,12 +19,13 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
   console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage called', { page, pageSize });
 
   try {
-    // 1. Identificar modelos que o usuário já tem acesso
+    // 1. Identificar modelos que o usuário já tem acesso (necessário para accessStatus)
     const userPurchases = await fetchUserPurchases();
     const purchasedModelIds = new Set(userPurchases.map(p => p.products?.model_id).filter(Boolean));
     const hasWelcomeCarolina = localStorage.getItem('welcomePurchaseCarolina') === 'true';
 
     // 2. Buscar itens do global_feed paginados, fazendo JOIN com media_items e models
+    // A query não deve ter filtros de data ou user_id, apenas ordenação e paginação.
     const { data: feedData, error } = await supabase
       .from('global_feed')
       .select(`

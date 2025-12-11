@@ -96,12 +96,19 @@ export const fetchModelMediaCounts = async (modelId: string): Promise<{ totalPos
 export const fetchMediaForModelPage = async (params: { modelId: string, page: number, pageSize?: number }): Promise<{ items: MediaItemWithAccess[], hasMore: boolean }> => {
   const { modelId, page, pageSize = PAGE_SIZE } = params;
   const from = page * pageSize;
-  const to = from + pageSize - 1;
+  const to = from + pageSize; // Ajuste: Supabase range é inclusivo, mas para simular 'limit' precisamos de +10 itens para saber se há mais.
 
   console.log('[MODEL PROFILE] fetchMediaForModelPage called', { page, pageSize, modelId });
 
   try {
-    // 1. Fetch media items paginated
+    // 1. Fetch context data (model, purchases, products)
+    const { data: model, error: modelError } = await supabase.from('models').select('*').eq('id', modelId).single();
+    if (modelError || !model) {
+      console.error('Error fetching model context:', modelError);
+      return { items: [], hasMore: false };
+    }
+
+    // 2. Fetch media items paginated (pedindo 1 item a mais para verificar 'hasMore')
     const { data: mediaItems, error: mediaError } = await supabase
       .from('media_items')
       .select(`
@@ -114,38 +121,28 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
       `) // Incluindo todos os campos de copy e IA
       .eq('model_id', modelId)
       .order('created_at', { ascending: false })
-      .range(from, to);
+      .range(from, to); // Pede 11 itens (0-10) se pageSize=10
 
     if (mediaError) {
       console.error('Error fetching media for model page:', mediaError);
       return { items: [], hasMore: false };
     }
 
-    const count = mediaItems?.length ?? 0;
+    const rawCount = mediaItems?.length ?? 0;
+    
+    // 3. Determinar se há mais itens (se o número de itens for maior que o tamanho da página)
+    const hasMore = rawCount > pageSize;
+    
+    // 4. Pegar apenas o tamanho da página (10 itens)
+    const itemsToProcess = mediaItems!.slice(0, pageSize);
 
-    if (count === 0) {
-      console.log('[MODEL PROFILE] fetchMediaForModelPage result', {
-        page,
-        pageSize,
-        count: 0,
-        error: null,
-      });
-      return { items: [], hasMore: false };
-    }
-
-    // 2. Fetch context data (model, purchases, products)
-    const { data: model, error: modelError } = await supabase.from('models').select('*').eq('id', modelId).single();
-    if (modelError || !model) {
-      console.error('Error fetching model context:', modelError);
-      return { items: [], hasMore: false };
-    }
-
+    // 5. Fetch context data (purchases, products)
     const purchases = await fetchUserPurchases();
     const productsForModel = await fetchProductsForModel(modelId);
     const accessContext: AccessContext = { purchases, productsForModel, model };
 
-    // 3. Compute access status
-    const mediaWithAccess = mediaItems.map(media => {
+    // 6. Compute access status
+    const mediaWithAccess = itemsToProcess.map(media => {
       const rawThumb = media.thumbnail;
       const isVideoThumb =
         typeof rawThumb === 'string' &&
@@ -159,13 +156,11 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
       };
     });
     
-    const hasMore = count === pageSize;
-    
     console.log('[MODEL PROFILE] fetchMediaForModelPage result', {
       page,
       pageSize,
-      count: count,
-      error: null,
+      count: mediaWithAccess.length,
+      hasMore: hasMore,
     });
 
     return { items: mediaWithAccess, hasMore };

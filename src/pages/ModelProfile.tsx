@@ -96,68 +96,73 @@ export const ModelProfile: React.FC = () => {
     const [hasAccess, setHasAccess] = useState(false);
     const [mediaCounts, setMediaCounts] = useState<{ totalPosts: number; totalPhotos: number; totalVideos: number } | null>(null);
     
-    // Estados de Paginação do Mural
-    const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
-    const [mediaPage, setMediaPage] = useState(0);
-    const [muralLoading, setMuralLoading] = useState(true);
-    const [mediaHasMore, setMediaHasMore] = useState(true);
+    // --- ESTADOS DO MURAL (ALINHADOS COM GLOBAL FEED) ---
+    const [muralItems, setMuralItems] = useState<MediaItemWithAccess[]>([]);
+    const [muralPage, setMuralPage] = useState(0);
+    const [muralHasMore, setMuralHasMore] = useState(true);
+    const [muralInitialLoading, setMuralInitialLoading] = useState(true);
+    const [muralPageLoading, setMuralPageLoading] = useState(false);
     const [muralError, setMuralError] = useState<string | null>(null);
+    // ----------------------------------------------------
     
     const [openMediaIndex, setOpenMediaIndex] = useState<number | null>(null);
     const { purchases } = usePurchases();
     
-    const sentinelRef = useRef<HTMLDivElement | null>(null);
+    const muralSentinelRef = useRef<HTMLDivElement | null>(null);
     
-    // Refs para acessar o estado mais recente dentro do useCallback
-    const mediaPageRef = useRef(mediaPage);
-    const mediaHasMoreRef = useRef(mediaHasMore);
-    const muralLoadingRef = useRef(muralLoading);
-    const mediaRef = useRef(media); // <-- Novo ref para o array de mídias
+    // Refs para acessar o estado mais recente dentro do useCallback e IntersectionObserver
+    const muralPageRef = useRef(muralPage);
+    const muralHasMoreRef = useRef(muralHasMore);
+    const muralPageLoadingRef = useRef(muralPageLoading);
+    const muralItemsRef = useRef(muralItems);
 
     useEffect(() => {
-        mediaPageRef.current = mediaPage;
-        mediaHasMoreRef.current = mediaHasMore;
-        muralLoadingRef.current = muralLoading;
-        mediaRef.current = media; // <-- Atualiza o ref do array
-    }, [mediaPage, mediaHasMore, muralLoading, media]);
+        muralPageRef.current = muralPage;
+        muralHasMoreRef.current = muralHasMore;
+        muralPageLoadingRef.current = muralPageLoading;
+        muralItemsRef.current = muralItems;
+    }, [muralPage, muralHasMore, muralPageLoading, muralItems]);
 
 
     // Function to load media page (Memoized)
-    const loadMediaPage = useCallback(async (nextPage: number, modelId: string) => {
+    const loadMuralPage = useCallback(async (nextPage: number) => {
+        if (!model?.id) return;
+
         const isFirstPage = nextPage === 0;
         
         // Prevenção de chamadas duplicadas (usando refs para o estado mais recente)
-        if (!isFirstPage && (muralLoadingRef.current || !mediaHasMoreRef.current)) return;
+        if (!isFirstPage && (muralPageLoadingRef.current || !muralHasMoreRef.current)) return;
         
         if (isFirstPage) {
-            setMuralLoading(true);
-            setMuralError(null);
+            setMuralInitialLoading(true);
         } else {
-            setMuralLoading(true); // Define loading para true para a próxima página
+            setMuralPageLoading(true);
         }
 
+        setMuralError(null);
+
         try {
-            console.log('[MODEL PROFILE] loadMuralPage called', { nextPage, modelId });
+            console.log('[MODEL FEED] loadMuralPage called', { nextPage, modelId: model.id });
             
-            const { items: newMedia, hasMore: nextHasMore } = await fetchMediaForModelPage({
-                modelId,
+            const { items: newItems, hasMore: nextHasMore } = await fetchMediaForModelPage({
+                modelId: model.id,
                 page: nextPage,
                 pageSize: PAGE_SIZE,
             });
             
-            console.log('[MODEL PROFILE] loadMuralPage result', {
+            console.log('[MODEL FEED] loadMuralPage result', {
                 nextPage,
-                received: newMedia.length,
+                received: newItems.length,
                 nextHasMore,
             });
             
-            setMedia(prev => isFirstPage ? newMedia : [...prev, ...newMedia]);
-            setMediaPage(nextPage);
-            setMediaHasMore(nextHasMore);
+            setMuralItems(prev => isFirstPage ? newItems : [...prev, ...newItems]);
+            setMuralPage(nextPage);
+            setMuralHasMore(nextHasMore);
             
             // Atualizar cache após o carregamento bem-sucedido
-            feedCache.model[modelId] = {
-                items: isFirstPage ? newMedia : [...mediaRef.current, ...newMedia], // CORREÇÃO APLICADA AQUI
+            feedCache.model[model.id] = {
+                items: isFirstPage ? newItems : [...muralItemsRef.current, ...newItems],
                 hasMore: nextHasMore,
                 lastPage: nextPage,
             };
@@ -165,13 +170,17 @@ export const ModelProfile: React.FC = () => {
         } catch (e) {
             console.error("Error loading media page:", e);
             setMuralError('Erro ao carregar o mural.');
-            setMediaHasMore(false); // Parar de tentar carregar em caso de erro
+            setMuralHasMore(false); // Parar de tentar carregar em caso de erro
         } finally {
-            setMuralLoading(false);
+            if (isFirstPage) {
+                setMuralInitialLoading(false);
+            } else {
+                setMuralPageLoading(false);
+            }
         }
-    }, []); // Dependências removidas para garantir que o IntersectionObserver chame a função
+    }, [model?.id]); // Dependências ajustadas para apenas model.id
 
-    // 1. Efeito para carregar o PERFIL (Model + Products + Counts) E O MURAL INICIAL
+    // 1. Efeito para carregar o PERFIL (Model + Products + Counts)
     useEffect(() => {
         console.log('[MODEL PROFILE] useEffect loadModel start', { username });
         if (!username) { 
@@ -220,47 +229,53 @@ export const ModelProfile: React.FC = () => {
                 const cached = feedCache.model[fetchedModel.id];
                 if (cached && cached.items.length > 0) {
                     console.log('[MODEL PROFILE] Loading mural from cache.');
-                    setMedia(cached.items);
-                    setMediaHasMore(cached.hasMore);
-                    setMediaPage(cached.lastPage);
-                    setMuralLoading(false);
+                    setMuralItems(cached.items);
+                    setMuralHasMore(cached.hasMore);
+                    setMuralPage(cached.lastPage);
+                    setMuralInitialLoading(false);
                 } else {
                     // Se não houver cache, carrega a primeira página
-                    await loadMediaPage(0, fetchedModel.id);
+                    // Chamamos loadMuralPage(0) no próximo useEffect para garantir que 'model' esteja definido
                 }
 
             } catch (e) {
                 console.error('[MODEL PROFILE] loadProfileData error:', e);
                 setProfileError('Erro ao carregar dados do perfil.');
                 setModel(null);
-                setMuralLoading(false);
+                setMuralInitialLoading(false);
             } finally {
                 setProfileLoading(false);
             }
         };
         
         // Reset media state when profile changes
-        setMedia([]);
-        setMediaPage(0);
-        setMediaHasMore(true);
-        setMuralLoading(true); // Reset mural loading state
+        setMuralItems([]);
+        setMuralPage(0);
+        setMuralHasMore(true);
+        setMuralInitialLoading(true); 
+        setMuralPageLoading(false);
         
         loadProfileData();
-    }, [username, purchases, loadMediaPage]); // Adicionado loadMediaPage como dependência
+    }, [username, purchases]); // loadMuralPage removido daqui
 
-    // 2. Efeito para atualizar cache (removido, agora está dentro de loadMediaPage)
-    // O useEffect anterior (3) foi removido para evitar corridas de estado.
+    // 2. Efeito para carregar a primeira página do mural (após o modelo ser carregado)
+    useEffect(() => {
+        if (model?.id && muralInitialLoading && muralItems.length === 0) {
+            // Se o modelo foi carregado e o mural ainda está no estado inicial (sem cache), carrega a página 0
+            loadMuralPage(0);
+        }
+    }, [model?.id, muralInitialLoading, muralItems.length, loadMuralPage]);
 
 
     // 3. Intersection Observer for infinite scroll (Mural)
     useEffect(() => {
-        if (!sentinelRef.current || !model?.id) return;
+        if (!muralSentinelRef.current || muralInitialLoading) return;
 
         const observer = new IntersectionObserver(entries => {
             const [entry] = entries;
             // Usamos refs para acessar o estado mais recente
-            if (entry.isIntersecting && !muralLoadingRef.current && mediaHasMoreRef.current) {
-                loadMediaPage(mediaPageRef.current + 1, model.id);
+            if (entry.isIntersecting && !muralPageLoadingRef.current && muralHasMoreRef.current) {
+                loadMuralPage(muralPageRef.current + 1);
             }
         }, {
             root: null,
@@ -268,10 +283,10 @@ export const ModelProfile: React.FC = () => {
             threshold: 0.1,
         });
 
-        observer.observe(sentinelRef.current);
+        observer.observe(muralSentinelRef.current);
 
         return () => observer.disconnect();
-    }, [model?.id, loadMediaPage]);
+    }, [muralInitialLoading, loadMuralPage]);
 
 
     const mainProduct = products.find(p => p.is_base_membership) || products[0];
@@ -292,11 +307,14 @@ export const ModelProfile: React.FC = () => {
     };
     
     const handleOpenMedia = (index: number) => {
-        const mediaItem = media[index];
+        const mediaItem = muralItems[index];
         if (mediaItem.accessStatus === 'locked') {
             handleLockedClick();
             return;
         }
+        // Filter unlocked media for the viewer
+        const unlockedMedia = muralItems.filter(m => m.accessStatus !== 'locked');
+        
         // Find index in the unlocked list
         const unlockedIndex = unlockedMedia.findIndex(m => m.id === mediaItem.id);
         if (unlockedIndex !== -1) {
@@ -328,8 +346,8 @@ export const ModelProfile: React.FC = () => {
     const stats = mediaCounts || { totalPosts: 0, totalPhotos: 0, totalVideos: 0 };
     
     // Media for Feed/Viewer (only unlocked/free)
-    const feedMedia = media.filter(m => m.accessStatus === 'free' || m.accessStatus === 'unlocked');
-    const unlockedMedia = media.filter(m => m.accessStatus !== 'locked');
+    const feedMedia = muralItems.filter(m => m.accessStatus === 'free' || m.accessStatus === 'unlocked');
+    const unlockedMedia = muralItems.filter(m => m.accessStatus !== 'locked');
     
     const purchasedProductIds = new Set(purchases.map((p: UserPurchaseWithProduct) => p.product_id));
     
@@ -436,25 +454,25 @@ export const ModelProfile: React.FC = () => {
                                 {muralError}
                             </p>
                         )}
-                        {muralLoading && media.length === 0 && !muralError ? (
+                        {muralInitialLoading && muralItems.length === 0 && !muralError ? (
                             <p className="text-sm text-privacy-text-secondary text-center mt-4">
                                 Carregando mural...
                             </p>
-                        ) : media.length === 0 && !muralError ? (
+                        ) : muralItems.length === 0 && !muralError ? (
                             <p className="text-center text-privacy-text-secondary py-10">
                                 Esta modelo ainda não postou nenhum conteúdo no mural.
                             </p>
                         ) : (
                             <>
-                                <MediaGrid media={media} onLockedClick={handleLockedClick} />
+                                <MediaGrid media={muralItems} onLockedClick={handleLockedClick} />
                                 
                                 {/* Sentinela para Scroll Infinito do Mural */}
-                                {mediaHasMore && <div ref={sentinelRef} className="h-10" />}
+                                {muralHasMore && <div ref={muralSentinelRef} className="h-10" />}
                                 
-                                {muralLoading && media.length > 0 && (
+                                {muralPageLoading && muralItems.length > 0 && (
                                     <p className="text-center text-xs text-privacy-text-secondary py-2">Carregando mais do mural...</p>
                                 )}
-                                {!mediaHasMore && media.length > 0 && (
+                                {!muralHasMore && muralItems.length > 0 && (
                                     <p className="text-center text-xs text-privacy-text-secondary py-2">Você já viu todo o mural 👀</p>
                                 )}
                             </>

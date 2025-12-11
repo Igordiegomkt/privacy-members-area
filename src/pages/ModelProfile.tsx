@@ -479,7 +479,7 @@ export const ModelProfile: React.FC = () => {
                         )}
                     </TabsContent>
                     <TabsContent value="feed" className="mt-6 px-2 sm:px-0">
-                        {feedMedia.length === 0 && !muralLoading ? (
+                        {feedMedia.length === 0 && !muralInitialLoading ? (
                             <p className="text-center text-privacy-text-secondary py-10">Ainda não há posts no feed desta modelo.</p>
                         ) : (
                             <div className="flex flex-col items-center">

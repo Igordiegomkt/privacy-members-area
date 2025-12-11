@@ -12,18 +12,18 @@ interface NotificationBellProps {
 export const NotificationBell: React.FC<NotificationBellProps> = ({
   onNavigateToProduct,
 }: NotificationBellProps) => {
-  const [session, setSession] = useState<Session | null>(null);
+  const [userId, setUserId] = useState<string | null>(null);
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationWithStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
 
-  const userId = session?.user?.id;
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const fetchNotifications = React.useCallback(async (currentUserId: string) => {
     setLoading(true);
 
+    // A query é robusta e deve retornar [] se não houver user_notifications para o ID.
     const { data, error } = await supabase
       .from('user_notifications')
       .select(`
@@ -75,12 +75,16 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
 
   // 1. Handle Auth State
   useEffect(() => {
+    const updateUserId = (session: Session | null) => {
+        setUserId(session?.user?.id ?? null);
+    };
+
     supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
+      updateUserId(session);
     });
 
     const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
+      updateUserId(session);
     });
 
     return () => subscription.unsubscribe();
@@ -162,7 +166,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     }
   };
 
-  if (!userId) return null;
+  if (!userId) return null; // Renderiza apenas se houver userId
 
   return (
     <div className="relative" ref={bellRef}>

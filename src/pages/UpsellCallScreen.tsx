@@ -5,9 +5,9 @@ import { supabase } from '../lib/supabase';
 import { Product } from '../types';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { useAuth } from '../contexts/AuthContext';
-import { usePurchases } from '../contexts/PurchaseContext'; // Importado para Preferência A
+import { usePurchases } from '../contexts/PurchaseContext';
 import { CheckCircle, X } from 'lucide-react';
-import { hasUserPurchasedProduct } from '../lib/marketplace'; // Helper para checar compra
+import { hasUserPurchasedProduct } from '../lib/marketplace';
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -18,7 +18,7 @@ const MAX_POLLING_TIME = 60000; // 60 segundos
 export const UpsellCallScreen: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
-  const { purchases } = usePurchases(); // Preferência A
+  const { purchases } = usePurchases();
   const { openCheckoutForProduct } = useCheckout();
   
   const [callProduct, setCallProduct] = useState<Product | null>(null);
@@ -140,19 +140,17 @@ export const UpsellCallScreen: React.FC = () => {
     }
     
     // Fallback B: Inicia Polling se o produto for o [CALL] e não estiver comprado
-    // O polling só deve iniciar APÓS o usuário clicar no CTA e o modal de checkout abrir,
-    // mas para garantir que o Realtime não falhe, vamos iniciar o polling se o modal estiver aberto.
-    // No entanto, para seguir a regra "iniciar polling somente depois do clique no CTA",
-    // vamos deixar o polling ser iniciado apenas dentro do handleCtaClick, se necessário.
+    // O polling só deve iniciar APÓS o usuário clicar no CTA e o modal de checkout abrir.
+    // O useEffect abaixo garante que o polling seja limpo no unmount.
     
-    // Cleanup do polling no unmount
     return () => {
         if (pollingTimerRef.current) {
             clearInterval(pollingTimerRef.current);
             pollingTimerRef.current = null;
         }
     };
-  }, [callProduct, user?.id, isPurchased, navigate, purchases]); // Adicionado purchases como dependência
+  }, [callProduct, user?.id, isPurchased, navigate, purchases]);
+
 
   const handleCtaClick = () => {
     if (!callProduct || !user?.id) {
@@ -164,7 +162,6 @@ export const UpsellCallScreen: React.FC = () => {
     openCheckoutForProduct(callProduct.id);
     
     // 2. Inicia o Polling (Fallback B)
-    // Se o Realtime do PurchaseContext falhar, o polling garante o redirecionamento.
     if (!pollingTimerRef.current) {
         startTimeRef.current = Date.now();
         pollingTimerRef.current = setInterval(() => {
@@ -192,12 +189,20 @@ export const UpsellCallScreen: React.FC = () => {
     );
   }
   
+  // Remove o prefixo [CALL] do nome do produto para exibição
+  const displayProductName = callProduct.name.replace(/\[CALL\]\s*/i, '').trim();
+  
   // Verifica se o modal de checkout está aberto (para desabilitar o CTA)
   const isCheckoutOpen = !!(document.querySelector('.fixed.inset-0.z-\\[999\\]'));
 
   return (
     <div className="min-h-screen bg-privacy-black text-white flex flex-col items-center justify-between p-4 relative">
       
+      {/* Header Simples */}
+      <div className="w-full text-center pt-4">
+        <p className="text-sm text-privacy-text-secondary">MeuPrivacy • Acesso privado</p>
+      </div>
+
       {/* Conteúdo Principal */}
       <div className="flex flex-col items-center text-center w-full max-w-md flex-1 justify-center">
         
@@ -228,8 +233,8 @@ export const UpsellCallScreen: React.FC = () => {
         
         {/* Detalhes do Produto */}
         <div className="mt-6 bg-privacy-surface p-4 rounded-lg w-full max-w-xs border border-privacy-border">
-            <p className="text-sm text-privacy-text-secondary">Oferta Exclusiva:</p>
-            <p className="text-lg font-bold text-white truncate">{callProduct.name}</p>
+            <p className="text-sm text-privacy-text-secondary">Produto:</p>
+            <p className="text-lg font-bold text-white truncate">{displayProductName}</p>
             <p className="text-2xl font-bold text-primary mt-1">{formatPrice(callProduct.price_cents)}</p>
         </div>
       </div>

@@ -28,8 +28,8 @@ import { AiTools } from './pages/admin/AiTools';
 import { CheckoutModal } from './components/CheckoutModal';
 import { AdminNotifications } from './pages/admin/AdminNotifications';
 import { useAuth } from './contexts/AuthContext';
-import { UpsellCallScreen } from './pages/UpsellCallScreen'; // Novo import
-import { CallRoom } from './pages/CallRoom'; // Novo import
+import { UpsellCallScreen } from './pages/UpsellCallScreen'; // Importado
+import { CallRoom } from './pages/CallRoom'; // Importado
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {

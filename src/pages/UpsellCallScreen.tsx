@@ -1,176 +1,178 @@
 import * as React from 'react';
-import { useState, useEffect, useRef, useCallback } from 'react';
+import { useEffect, useMemo, useRef, useState, useCallback } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { supabase } from '../lib/supabase';
-import { Product } from '../types';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { useAuth } from '../contexts/AuthContext';
 import { usePurchases } from '../contexts/PurchaseContext';
-import { CheckCircle, X } from 'lucide-react';
+import { Product } from '../types';
 import { hasUserPurchasedProduct } from '../lib/marketplace';
-
-const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
 // Constantes para o polling (Fallback B)
 const POLLING_INTERVAL = 3000; // 3 segundos
 const MAX_POLLING_TIME = 60000; // 60 segundos
+
+const formatBRLFromCents = (cents: number) => {
+  return (cents / 100).toLocaleString("pt-BR", { style: "currency", currency: "BRL" });
+};
+
+const isCallProductName = (name?: string | null) => {
+  return (name ?? "").trim().toUpperCase().startsWith("[CALL]");
+};
 
 export const UpsellCallScreen: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
   const { purchases } = usePurchases();
   const { openCheckoutForProduct } = useCheckout();
-  
-  const [callProduct, setCallProduct] = useState<Product | null>(null);
+
   const [loading, setLoading] = useState(true);
-  const [error, setError] = useState<string | null>(null);
+  const [callProduct, setCallProduct] = useState<Product | null>(null);
+  const [cameraOk, setCameraOk] = useState(true);
+
+  const [polling, setPolling] = useState(false);
+  const pollIntervalRef = useRef<number | null>(null);
+  const pollTimeoutRef = useRef<number | null>(null);
+
+  const previewVideoRef = useRef<HTMLVideoElement | null>(null);
+  const cameraStreamRef = useRef<MediaStream | null>(null);
+
+  const productTitle = useMemo(() => {
+    const raw = callProduct?.name ?? "";
+    return raw.replace(/^\[CALL\]\s*/i, "").trim() || "Acesso privado";
+  }, [callProduct]);
   
-  const videoRef = useRef<HTMLVideoElement | null>(null);
-  const streamRef = useRef<MediaStream | null>(null);
-  const pollingTimerRef = useRef<number | null>(null);
-  const startTimeRef = useRef(Date.now());
-
-  // Verifica se o produto [CALL] já foi comprado
   const isPurchased = callProduct ? hasUserPurchasedProduct(purchases, callProduct.id) : false;
+  const isCheckoutOpen = !!(document.querySelector('.fixed.inset-0.z-\\[999\\]'));
 
-  // 1. Busca o produto [CALL]
+
+  // --- Lógica de Polling (Fallback B) ---
+  const cleanupPolling = useCallback(() => {
+    if (pollIntervalRef.current) window.clearInterval(pollIntervalRef.current);
+    if (pollTimeoutRef.current) window.clearTimeout(pollTimeoutRef.current);
+    pollIntervalRef.current = null;
+    pollTimeoutRef.current = null;
+    setPolling(false);
+  }, []);
+
+  const checkPaidOnce = useCallback(async (productId: string, userId: string) => {
+    const { data, error } = await supabase
+      .from("user_purchases")
+      .select("id")
+      .eq("user_id", userId)
+      .eq("product_id", productId)
+      .eq("status", "paid")
+      .limit(1);
+
+    if (!error && (data?.length ?? 0) > 0) {
+      cleanupPolling();
+      navigate("/chamada/sala", { replace: true });
+      return true;
+    }
+    return false;
+  }, [navigate, cleanupPolling]);
+
+  const startPaidPolling = useCallback(async (productId: string) => {
+    const userId = user?.id ?? null;
+    if (!userId) {
+      cleanupPolling();
+      return;
+    }
+
+    setPolling(true);
+    
+    // Checagem imediata (para cobrir o tempo entre o clique e o modal)
+    if (await checkPaidOnce(productId, userId)) return;
+
+    pollIntervalRef.current = window.setInterval(() => {
+      void checkPaidOnce(productId, userId);
+    }, POLLING_INTERVAL);
+
+    pollTimeoutRef.current = window.setTimeout(() => {
+      cleanupPolling();
+    }, MAX_POLLING_TIME);
+  }, [user?.id, checkPaidOnce, cleanupPolling]);
+  // ---------------------------------------
+
+
+  // 1. Busca do Produto [CALL]
   useEffect(() => {
-    const fetchCallProduct = async () => {
+    let cancelled = false;
+
+    (async () => {
       setLoading(true);
       try {
-        // Busca o produto cujo name começa com [CALL]
         const { data, error } = await supabase
-          .from('products')
-          .select('*')
-          .ilike('name', '[CALL]%')
-          .eq('status', 'active')
-          .limit(1)
-          .single();
+          .from("products")
+          .select("id,name,price_cents,status")
+          .eq("status", "active");
 
-        if (error && error.code !== 'PGRST116') throw error;
-        
-        if (!data) {
-            setError('Produto de chamada não encontrado. Verifique o cadastro.');
-            setLoading(false);
-            return;
-        }
-        
-        setCallProduct(data);
-        setLoading(false);
-        
-      } catch (err: any) {
-        console.error('Error fetching call product:', err);
-        setError('Erro ao carregar a oferta.');
-        setLoading(false);
+        if (error) throw error;
+
+        const found = (data as Product[] | null)?.find((p) => isCallProductName(p.name)) ?? null;
+        if (!cancelled) setCallProduct(found);
+      } catch {
+        if (!cancelled) setCallProduct(null);
+      } finally {
+        if (!cancelled) setLoading(false);
       }
-    };
-    fetchCallProduct();
-  }, []);
-  
-  // 2. Inicia o preview da câmera
-  useEffect(() => {
-    if (!videoRef.current) return;
+    })();
 
-    const startCamera = async () => {
+    return () => {
+      cancelled = true;
+    };
+  }, []);
+
+  // 2. Preview da Câmera
+  useEffect(() => {
+    (async () => {
       try {
         const stream = await navigator.mediaDevices.getUserMedia({ video: true, audio: false });
-        streamRef.current = stream;
-        if (videoRef.current) {
-          videoRef.current.srcObject = stream;
-        }
-      } catch (err) {
-        console.warn('Câmera indisponível:', err);
+        cameraStreamRef.current = stream;
+        if (previewVideoRef.current) previewVideoRef.current.srcObject = stream;
+        setCameraOk(true);
+      } catch {
+        setCameraOk(false);
       }
-    };
-
-    startCamera();
+    })();
 
     return () => {
-      if (streamRef.current) {
-        streamRef.current.getTracks().forEach(track => track.stop());
-      }
+      const stream = cameraStreamRef.current;
+      if (stream) stream.getTracks().forEach((t) => t.stop());
+      cameraStreamRef.current = null;
+      if (previewVideoRef.current) previewVideoRef.current.srcObject = null;
     };
   }, []);
-  
-  // 3. Lógica de Polling (Fallback B)
-  const checkPurchaseStatus = useCallback(async (productId: string, userId: string) => {
-    if (Date.now() - startTimeRef.current > MAX_POLLING_TIME) {
-        console.log('[Upsell] Polling time expired.');
-        clearInterval(pollingTimerRef.current!);
-        pollingTimerRef.current = null;
-        return;
-    }
-    
-    const { data, error } = await supabase
-        .from('user_purchases')
-        .select('id')
-        .eq('user_id', userId)
-        .eq('product_id', productId)
-        .eq('status', 'paid')
-        .limit(1)
-        .maybeSingle();
 
-    if (error) {
-        console.error('[Upsell] Polling error:', error);
-        return;
-    }
-
-    if (data) {
-        console.log('[Upsell] Purchase confirmed via Polling! Redirecting...');
-        clearInterval(pollingTimerRef.current!);
-        pollingTimerRef.current = null;
-        navigate('/chamada/sala', { replace: true });
-    }
-  }, [navigate]);
-
-  // 4. Detecção de Compra (Preferência A + Fallback B)
+  // 3. Detecção de Compra (Preferência A: Realtime/Context)
   useEffect(() => {
-    if (!callProduct || !user?.id) return;
-
-    // Preferência A: Redirecionamento via PurchaseContext (Realtime)
     if (isPurchased) {
-        console.log('[Upsell] Purchase confirmed via Context! Redirecting...');
-        // Limpa polling se estiver ativo
-        if (pollingTimerRef.current) {
-            clearInterval(pollingTimerRef.current);
-            pollingTimerRef.current = null;
-        }
-        navigate('/chamada/sala', { replace: true });
-        return;
+      cleanupPolling();
+      navigate("/chamada/sala", { replace: true });
     }
-    
-    // Fallback B: Inicia Polling se o produto for o [CALL] e não estiver comprado
-    // O polling só deve iniciar APÓS o usuário clicar no CTA e o modal de checkout abrir.
-    // O useEffect abaixo garante que o polling seja limpo no unmount.
-    
-    return () => {
-        if (pollingTimerRef.current) {
-            clearInterval(pollingTimerRef.current);
-            pollingTimerRef.current = null;
-        }
-    };
-  }, [callProduct, user?.id, isPurchased, navigate, purchases]);
+    // Limpa polling no unmount
+    return cleanupPolling;
+  }, [isPurchased, navigate, cleanupPolling]);
 
 
-  const handleCtaClick = () => {
-    if (!callProduct || !user?.id) {
-        setError('Produto indisponível ou usuário não logado.');
-        return;
-    }
+  const handlePrimary = async () => {
+    if (!callProduct) return;
     
-    // 1. Inicia o fluxo de checkout PIX
+    // 1. Abre o modal de checkout
     openCheckoutForProduct(callProduct.id);
     
-    // 2. Inicia o Polling (Fallback B)
-    if (!pollingTimerRef.current) {
-        startTimeRef.current = Date.now();
-        pollingTimerRef.current = setInterval(() => {
-            checkPurchaseStatus(callProduct.id, user.id);
-        }, POLLING_INTERVAL) as unknown as number;
-    }
+    // 2. Inicia o polling (Fallback B)
+    await startPaidPolling(callProduct.id);
   };
-  
-  if (loading || !user) {
+
+  const handleSkip = () => {
+    cleanupPolling();
+    navigate("/", { replace: true });
+  };
+
+  // Se o usuário já comprou, mas o redirecionamento ainda não ocorreu (ex: erro de navegação),
+  // mostramos o estado de carregamento para forçar o redirect via useEffect.
+  if (loading || isPurchased) {
     return (
       <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">
         <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
@@ -178,86 +180,97 @@ export const UpsellCallScreen: React.FC = () => {
     );
   }
 
-  if (error || !callProduct) {
-    return (
-      <div className="min-h-screen bg-privacy-black text-white flex flex-col items-center justify-center p-4">
-        <p className="text-red-400 mb-4">{error || 'Oferta não encontrada.'}</p>
-        <button onClick={() => navigate('/')} className="text-primary hover:underline flex items-center gap-1">
-            <X size={16} /> Voltar para o Início
-        </button>
-      </div>
-    );
-  }
-  
-  // Remove o prefixo [CALL] do nome do produto para exibição
-  const displayProductName = callProduct.name.replace(/\[CALL\]\s*/i, '').trim();
-  
-  // Verifica se o modal de checkout está aberto (para desabilitar o CTA)
-  const isCheckoutOpen = !!(document.querySelector('.fixed.inset-0.z-\\[999\\]'));
-
   return (
-    <div className="min-h-screen bg-privacy-black text-white flex flex-col items-center justify-between p-4 relative">
-      
-      {/* Header Simples */}
-      <div className="w-full text-center pt-4">
-        <p className="text-sm text-privacy-text-secondary">MeuPrivacy • Acesso privado</p>
-      </div>
+    <div className="min-h-[100dvh] w-full bg-[#0b0b0f] text-white flex items-center justify-center">
+      <div className="relative w-full min-h-[100dvh] max-w-xl px-5 py-6 flex flex-col">
+        {/* Top info */}
+        <div className="flex flex-col items-center pt-4">
+          <p className="text-white/70 text-sm tracking-wide">Tudo pronto.</p>
 
-      {/* Conteúdo Principal */}
-      <div className="flex flex-col items-center text-center w-full max-w-md flex-1 justify-center">
-        
-        {/* Status e Headline */}
-        <div className="flex items-center gap-2 text-green-400 mb-4">
-          <CheckCircle size={18} />
-          <span className="text-sm font-semibold">Tudo pronto.</span>
-        </div>
-        
-        <h1 className="text-3xl font-bold text-white mb-6">
-          Meu conteúdo já é seu. Tá te esperando. 👁️🔥
-        </h1>
-        
-        {/* Preview da Câmera */}
-        <div className="w-full max-w-xs aspect-square rounded-xl overflow-hidden bg-privacy-surface border-4 border-primary shadow-2xl relative">
-          <video
-            ref={videoRef}
-            autoPlay
-            playsInline
-            muted
-            className="w-full h-full object-cover transform scale-x-[-1]" // Espelha a imagem
-          />
-          <div className="absolute inset-0 flex items-center justify-center bg-black/30 text-xs text-privacy-text-secondary">
-            {/* Fallback se a câmera falhar */}
-            {!videoRef.current?.srcObject && 'Câmera indisponível'}
+          {/* Avatar placeholder */}
+          <div className="mt-4 mb-4 h-36 w-36 rounded-full bg-[radial-gradient(circle_at_30%_30%,#2a2a2a_0%,#131313_55%,#0b0b0f_100%)] shadow-[0_0_0_5px_rgba(255,255,255,0.06),0_0_0_26px_rgba(255,95,0,0.10)]" />
+
+          <h1 className="text-center text-2xl sm:text-3xl font-extrabold leading-tight text-white drop-shadow">
+            Meu conteúdo já é seu. Tá te esperando. <span aria-hidden>👁️🔥</span>
+          </h1>
+
+          <p className="mt-3 text-white/65 text-sm">Acesso privado • MeuPrivacy</p>
+
+          {/* Offer box */}
+          <div className="mt-4 w-full rounded-2xl border border-white/10 bg-white/5 p-4">
+            {!callProduct ? (
+              <p className="text-white/70 text-sm">Acesso indisponível agora.</p>
+            ) : (
+              <div className="flex items-center justify-between gap-4">
+                <div className="min-w-0">
+                  <p className="font-semibold text-sm text-white/90 truncate">{productTitle}</p>
+                  <p className="text-white/70 text-xs mt-1">Disponível agora</p>
+                </div>
+                <div className="shrink-0 text-right">
+                  <p className="text-white font-extrabold">
+                    {formatBRLFromCents(callProduct.price_cents)}
+                  </p>
+                </div>
+              </div>
+            )}
           </div>
         </div>
-        
-        {/* Detalhes do Produto */}
-        <div className="mt-6 bg-privacy-surface p-4 rounded-lg w-full max-w-xs border border-privacy-border">
-            <p className="text-sm text-privacy-text-secondary">Produto:</p>
-            <p className="text-lg font-bold text-white truncate">{displayProductName}</p>
-            <p className="text-2xl font-bold text-primary mt-1">{formatPrice(callProduct.price_cents)}</p>
+
+        {/* Bottom actions */}
+        <div className="mt-auto flex flex-col items-center gap-2 pb-4">
+          <button
+            onClick={handlePrimary}
+            disabled={!callProduct || isCheckoutOpen}
+            className={[
+              "mt-3 h-24 w-24 rounded-full font-extrabold",
+              "bg-[#FF5F00] shadow-[0_12px_35px_rgba(255,95,0,0.25)]",
+              "active:scale-[0.98] transition-transform",
+              (!callProduct || isCheckoutOpen) ? "opacity-60 cursor-not-allowed shadow-none" : "cursor-pointer",
+            ].join(" ")}
+            aria-label="Quero entrar agora"
+          >
+            <span className="text-3xl" aria-hidden>
+              ▶
+            </span>
+          </button>
+
+          <p className="mt-1 font-extrabold text-base">Quero entrar agora</p>
+          <p className="text-white/70 text-xs -mt-1">Pagamento instantâneo • Acesso imediato</p>
+
+          <button
+            onClick={handleSkip}
+            className="mt-2 text-white/80 font-semibold text-sm underline underline-offset-4"
+          >
+            Vou deixar passar
+          </button>
+
+          <p className="mt-2 text-center text-[11px] leading-snug text-white/55 max-w-[300px]">
+            Ao sair desta tela, esse acesso pode não aparecer novamente.
+          </p>
         </div>
-      </div>
-      
-      {/* CTA Fixo na parte inferior */}
-      <div className="w-full max-w-md mt-8">
-        <button
-          onClick={handleCtaClick}
-          disabled={isPurchased || isCheckoutOpen}
-          className="w-full bg-primary hover:opacity-90 text-privacy-black font-bold py-4 rounded-xl transition-opacity disabled:opacity-50 disabled:cursor-not-allowed shadow-lg shadow-primary/30"
-        >
-          {isPurchased ? 'Acesso Liberado! Entrando...' : 'Quero entrar agora'}
-        </button>
-        <p className="text-center text-xs text-privacy-text-secondary mt-2">
-          Pagamento instantâneo • Acesso imediato
-        </p>
-        
-        <button
-          onClick={() => navigate('/')}
-          className="w-full mt-4 text-sm text-privacy-text-secondary hover:text-white transition-colors flex items-center justify-center gap-1"
-        >
-          <X size={14} /> Vou deixar passar
-        </button>
+
+        {/* Camera preview */}
+        <div className="absolute right-4 bottom-28 sm:bottom-32 w-[86px] h-[112px] rounded-xl border-2 border-white/70 overflow-hidden bg-[#111]">
+          {cameraOk ? (
+            <>
+              <video
+                ref={previewVideoRef}
+                autoPlay
+                muted
+                playsInline
+                className="w-full h-full object-cover transform scale-x-[-1]"
+              />
+              <div className="absolute bottom-5 left-1/2 -translate-x-1/2 rounded-md bg-black/60 px-2 py-[2px] text-[11px]">
+                Você
+              </div>
+              <span className="absolute bottom-2 left-1/2 -translate-x-1/2 w-2 h-2 rounded-full bg-emerald-500 shadow-[0_0_10px_rgba(16,185,129,0.9)]" />
+            </>
+          ) : (
+            <div className="w-full h-full flex items-center justify-center text-center text-[11px] text-white/80 px-2">
+              Câmera<br />indisponível
+            </div>
+          )}
+        </div>
       </div>
     </div>
   );

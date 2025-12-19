@@ -1,196 +1,171 @@
 import * as React from 'react';
-import { useState, useRef, useEffect } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
-import { Play, X } from 'lucide-react';
 
-// URL do vídeo de conteúdo (MP4 hospedado)
-const VIDEO_URL = "https://pub-c12d59796a5544b38ff738ca3ca53d5d.r2.dev/chamadadevideo/VIDEO-CHAMADA1.mp4";
+const VIDEO_URL =
+  "https://pub-c12d59796a5544b38ff738ca3ca53d5d.r2.dev/chamadadevideo/VIDEO-CHAMADA1.mp4";
 
 export const CallRoom: React.FC = () => {
   const navigate = useNavigate();
-  const videoRef = useRef<HTMLVideoElement | null>(null);
   const containerRef = useRef<HTMLDivElement | null>(null);
-  const [hasStarted, setHasStarted] = useState(false);
-  const [isEnded, setIsEnded] = useState(false);
-  const [isLoadingVideo, setIsLoadingVideo] = useState(false);
+  const videoRef = useRef<HTMLVideoElement | null>(null);
 
-  // 1. Lógica de Fullscreen (incluindo pseudo-fullscreen para iOS)
-  const enterFullscreen = () => {
-    if (!containerRef.current) return;
+  const [loading, setLoading] = useState(false);
+  const [ended, setEnded] = useState(false);
+  const [started, setStarted] = useState(false);
+  const [isIOS, setIsIOS] = useState(false);
 
-    const element = containerRef.current;
+  const url = useMemo(() => VIDEO_URL, []);
 
-    if (element.requestFullscreen) {
-      element.requestFullscreen();
-    } else if ((element as any).webkitRequestFullscreen) { // Safari/iOS
-      (element as any).webkitRequestFullscreen();
-    } else if ((element as any).msRequestFullscreen) { // IE/Edge
-      (element as any).msRequestFullscreen();
-    }
-    
-    // Adiciona classe para pseudo-fullscreen em iOS (se o request falhar)
-    if (element.classList) {
-        element.classList.add('is-fullscreen-fallback');
-    }
-  };
-  
-  const exitFullscreen = () => {
-    if (document.exitFullscreen) {
-      document.exitFullscreen();
-    } else if ((document as any).webkitExitFullscreen) {
-      (document as any).webkitExitFullscreen();
-    } else if ((document as any).msExitFullscreen) {
-      (document as any).msExitFullscreen();
-    }
-    
-    // Remove classe de pseudo-fullscreen
-    if (containerRef.current?.classList) {
-        containerRef.current.classList.remove('is-fullscreen-fallback');
-    }
-  };
-
-  // 2. Iniciar reprodução e fullscreen
-  const handleStart = () => {
-    if (!videoRef.current) return;
-    
-    setIsLoadingVideo(true);
-    
-    // Tenta carregar o vídeo (preload="auto" ajuda, mas o load() garante)
-    videoRef.current.load(); 
-    
-    // Espera o vídeo estar pronto para reprodução
-    videoRef.current.oncanplaythrough = () => {
-        setIsLoadingVideo(false);
-        videoRef.current!.play().catch(err => {
-            console.error('Failed to play video:', err);
-        });
-        enterFullscreen();
-        setHasStarted(true);
-    };
-    
-    // Fallback se oncanplaythrough não disparar rapidamente
-    setTimeout(() => {
-        if (!hasStarted) {
-            setIsLoadingVideo(false);
-            enterFullscreen();
-            setHasStarted(true);
-            videoRef.current!.play().catch(() => {});
-        }
-    }, 3000);
-  };
-  
-  // 3. Lógica de fim de vídeo
-  const handleVideoEnded = () => {
-    setIsEnded(true);
-    exitFullscreen();
-    setTimeout(() => {
-        navigate('/', { replace: true });
-    }, 1500);
-  };
-
-  // 4. Adiciona listener para o evento 'ended'
   useEffect(() => {
-    const videoElement = videoRef.current;
-    if (videoElement) {
-      videoElement.addEventListener('ended', handleVideoEnded);
-    }
-    return () => {
-      if (videoElement) {
-        videoElement.removeEventListener('ended', handleVideoEnded);
-      }
-    };
+    // Detecta iOS para usar pseudo-fullscreen
+    const ios = /iPad|iPhone|iPod/.test(navigator.userAgent) && !(window as any).MSStream;
+    setIsIOS(ios);
   }, []);
 
-  // 5. Adiciona CSS para o fallback de fullscreen (necessário para iOS)
-  useEffect(() => {
-    const style = document.createElement('style');
-    style.id = 'fullscreen-fallback-style';
-    style.innerHTML = `
-      .is-fullscreen-fallback {
-        position: fixed;
-        top: 0;
-        left: 0;
-        width: 100%;
-        height: 100%;
-        z-index: 9999;
-        background-color: black;
-      }
-    `;
-    document.head.appendChild(style);
-    return () => {
-      document.getElementById('fullscreen-fallback-style')?.remove();
-    };
-  }, []);
+  const requestNativeFullscreen = async () => {
+    const el = containerRef.current as any;
+    if (!el) return;
+    try {
+      if (el.requestFullscreen) await el.requestFullscreen();
+      else if (el.webkitRequestFullscreen) await el.webkitRequestFullscreen();
+      else if (el.mozRequestFullScreen) await el.mozRequestFullScreen();
+      else if (el.msRequestFullscreen) await el.msRequestFullscreen();
+    } catch {
+      // se falhar, segue sem fullscreen
+    }
+  };
 
+  const exitFullscreen = async () => {
+    const el = containerRef.current;
+    if (!el) return;
+
+    // Remove pseudo-fullscreen class
+    if (el.classList.contains("pseudo-fullscreen-active")) {
+      el.classList.remove("pseudo-fullscreen-active");
+      return;
+    }
+
+    const d: any = document;
+    try {
+      if (document.exitFullscreen) await document.exitFullscreen();
+      else if (d.webkitExitFullscreen) await d.webkitExitFullscreen();
+      else if (d.mozCancelFullScreen) await d.mozCancelFullScreen();
+      else if (d.msExitFullscreen) await d.msExitFullscreen();
+    } catch {}
+  };
+
+  const startVideo = async () => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    setEnded(false);
+    setLoading(true);
+    setStarted(true); // Marca como iniciado para esconder o botão
+
+    v.src = url;
+    v.load();
+
+    v.oncanplaythrough = async () => {
+      setLoading(false);
+      try {
+        await v.play(); // muted por atributo
+        if (isIOS) containerRef.current?.classList.add("pseudo-fullscreen-active");
+        else await requestNativeFullscreen();
+      } catch {
+        // se bloquear, o vídeo não inicia, mas o usuário já interagiu.
+        setLoading(false);
+      }
+    };
+
+    v.onerror = () => {
+      setLoading(false);
+      // Opcional: mostrar mensagem de erro
+    };
+  };
+
+  // Listener para o evento 'ended'
+  useEffect(() => {
+    const v = videoRef.current;
+    if (!v) return;
+
+    const onEnded = () => {
+      setEnded(true);
+      void exitFullscreen();
+      window.setTimeout(() => navigate("/", { replace: true }), 1700);
+    };
+
+    v.addEventListener("ended", onEnded);
+    return () => v.removeEventListener("ended", onEnded);
+  }, [navigate]);
 
   return (
-    <div 
-        ref={containerRef}
-        className="min-h-screen bg-privacy-black text-white flex items-center justify-center relative"
-        onContextMenu={(e) => e.preventDefault()} // Bloqueia menu de contexto no container
-    >
-      
-      {/* Header Simples */}
-      <div className="absolute top-0 left-0 right-0 text-center pt-4 z-50">
-        <p className="text-sm text-privacy-text-secondary">MeuPrivacy • Acesso privado</p>
-      </div>
+    <div className="w-full min-h-[100dvh] bg-black flex items-center justify-center">
+      <div ref={containerRef} className="relative w-full max-w-[900px] h-[100dvh] bg-black overflow-hidden">
+        {/* Header */}
+        <div className="absolute top-0 left-0 right-0 z-20 px-4 py-3 bg-black/60 text-center text-white/90 text-[13px]">
+          MeuPrivacy • Acesso privado
+        </div>
 
-      {/* Botão de Fechar (Apenas se não tiver iniciado) */}
-      {!hasStarted && (
-        <button
-          onClick={() => navigate('/')}
-          className="absolute top-4 right-4 text-white bg-black/50 rounded-full p-2 hover:bg-black/70 z-50"
-        >
-          <X size={24} />
-        </button>
-      )}
-
-      {/* Player de Vídeo */}
-      <div className="relative w-full h-full flex items-center justify-center">
+        {/* Video */}
         <video
           ref={videoRef}
-          src={VIDEO_URL}
-          preload="auto"
+          className="w-full h-full object-cover sm:object-cover max-sm:object-contain"
           playsInline
+          preload="metadata"
           muted
-          controlsList="nodownload" // Proteção contra download
-          className={`w-full h-full object-contain ${hasStarted ? 'block' : 'hidden'}`}
-          onContextMenu={(e) => e.preventDefault()} // Bloqueia menu de contexto no vídeo
+          onContextMenu={(e) => e.preventDefault()}
         >
-          Seu navegador não suporta o vídeo.
+          Seu navegador não suporta vídeo.
         </video>
-        
-        {/* Overlay de Início */}
-        {!hasStarted && (
-          <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 p-4">
-            <h1 className="text-2xl font-bold mb-8 text-center">
-                Pronta para você.
-            </h1>
-            <button
-              onClick={handleStart}
-              disabled={isLoadingVideo}
-              className="bg-primary hover:opacity-90 text-privacy-black font-bold py-4 px-10 rounded-xl transition-opacity shadow-lg shadow-primary/30 flex items-center gap-2 disabled:opacity-50"
-            >
-              {isLoadingVideo ? (
-                <div className="animate-spin rounded-full h-6 w-6 border-t-2 border-b-2 border-privacy-black"></div>
-              ) : (
-                <Play size={24} fill="currentColor" />
-              )}
-              {isLoadingVideo ? 'Carregando...' : 'Iniciar'}
-            </button>
-            <p className="text-sm text-privacy-text-secondary mt-4">
-                Toque para iniciar a reprodução.
-            </p>
+
+        {/* Loader */}
+        {loading && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center">
+            <div className="h-14 w-14 rounded-full border-4 border-white/20 border-t-white animate-spin" />
           </div>
         )}
-        
-        {/* Overlay de Fim */}
-        {isEnded && (
-            <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/90 p-4 z-50">
-                <h1 className="text-2xl font-bold text-white mb-4">Chamada Encerrada</h1>
-                <p className="text-lg text-privacy-text-secondary">Redirecionando para o início...</p>
-            </div>
+
+        {/* Start button */}
+        {!started && !ended && (
+          <button
+            onClick={startVideo}
+            className="absolute z-30 top-1/2 left-1/2 -translate-x-1/2 -translate-y-1/2 bg-[#FF5F00] text-white font-extrabold px-7 py-3 rounded-full shadow-[0_12px_35px_rgba(255,95,0,0.25)] active:scale-[0.99]"
+          >
+            Iniciar
+          </button>
         )}
+
+        {/* Ended overlay */}
+        {ended && (
+          <div className="absolute inset-0 z-30 flex items-center justify-center">
+            <div className="px-5 py-3 rounded-2xl bg-black/70 text-white font-bold">
+              Encerrado
+            </div>
+          </div>
+        )}
+
+        {/* Exit button (visível apenas após iniciar ou se estiver no modo fullscreen) */}
+        {started && !ended && (
+            <button
+              onClick={exitFullscreen}
+              className="absolute z-40 top-3 right-3 px-3 py-2 rounded-xl bg-black/60 text-white text-[13px]"
+            >
+              Sair
+            </button>
+        )}
+
+        {/* pseudo-fullscreen css */}
+        <style>{`
+          .pseudo-fullscreen-active{
+            position:fixed !important;
+            top:0; left:0;
+            width:100vw !important;
+            height:100dvh !important;
+            max-width:100vw !important;
+            z-index:9999 !important;
+          }
+        `}</style>
       </div>
     </div>
   );

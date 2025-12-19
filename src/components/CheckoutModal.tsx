@@ -72,7 +72,7 @@ export const CheckoutModal: React.FC = () => {
 
         {loading && (
           <div className="py-10 text-center text-privacy-text-secondary">
-            Gerando cobrança PIX...
+            Preparando seu acesso...
           </div>
         )}
 

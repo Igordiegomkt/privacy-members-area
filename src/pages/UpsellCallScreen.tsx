@@ -5,35 +5,40 @@ import { supabase } from '../lib/supabase';
 import { Product } from '../types';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { useAuth } from '../contexts/AuthContext';
-import { CheckCircle, ArrowRight, X } from 'lucide-react';
+import { usePurchases } from '../contexts/PurchaseContext'; // Importado para Preferência A
+import { CheckCircle, X } from 'lucide-react';
+import { hasUserPurchasedProduct } from '../lib/marketplace'; // Helper para checar compra
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
-// Constantes para o polling
+// Constantes para o polling (Fallback B)
 const POLLING_INTERVAL = 3000; // 3 segundos
 const MAX_POLLING_TIME = 60000; // 60 segundos
 
 export const UpsellCallScreen: React.FC = () => {
   const navigate = useNavigate();
   const { user } = useAuth();
+  const { purchases } = usePurchases(); // Preferência A
   const { openCheckoutForProduct } = useCheckout();
   
   const [callProduct, setCallProduct] = useState<Product | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
-  const [isPurchased, setIsPurchased] = useState(false);
   
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const streamRef = useRef<MediaStream | null>(null);
   const pollingTimerRef = useRef<number | null>(null);
   const startTimeRef = useRef(Date.now());
 
+  // Verifica se o produto [CALL] já foi comprado
+  const isPurchased = callProduct ? hasUserPurchasedProduct(purchases, callProduct.id) : false;
+
   // 1. Busca o produto [CALL]
   useEffect(() => {
     const fetchCallProduct = async () => {
       setLoading(true);
       try {
-        // Busca o produto cujo nome começa com [CALL]
+        // Busca o produto cujo name começa com [CALL]
         const { data, error } = await supabase
           .from('products')
           .select('*')
@@ -75,7 +80,6 @@ export const UpsellCallScreen: React.FC = () => {
         }
       } catch (err) {
         console.warn('Câmera indisponível:', err);
-        // Não é um erro fatal, apenas não mostra o preview
       }
     };
 
@@ -88,7 +92,7 @@ export const UpsellCallScreen: React.FC = () => {
     };
   }, []);
   
-  // 3. Lógica de Polling para detecção de compra
+  // 3. Lógica de Polling (Fallback B)
   const checkPurchaseStatus = useCallback(async (productId: string, userId: string) => {
     if (Date.now() - startTimeRef.current > MAX_POLLING_TIME) {
         console.log('[Upsell] Polling time expired.');
@@ -112,47 +116,61 @@ export const UpsellCallScreen: React.FC = () => {
     }
 
     if (data) {
-        console.log('[Upsell] Purchase confirmed! Redirecting...');
-        setIsPurchased(true);
+        console.log('[Upsell] Purchase confirmed via Polling! Redirecting...');
         clearInterval(pollingTimerRef.current!);
         pollingTimerRef.current = null;
         navigate('/chamada/sala', { replace: true });
     }
   }, [navigate]);
 
-  // 4. Inicia/Para o Polling
+  // 4. Detecção de Compra (Preferência A + Fallback B)
   useEffect(() => {
-    if (callProduct && user?.id && !isPurchased && !pollingTimerRef.current) {
-        // Verifica imediatamente
-        checkPurchaseStatus(callProduct.id, user.id);
-        
-        // Inicia o polling
-        pollingTimerRef.current = setInterval(() => {
-            checkPurchaseStatus(callProduct.id, user.id);
-        }, POLLING_INTERVAL) as unknown as number;
-        
-        startTimeRef.current = Date.now();
+    if (!callProduct || !user?.id) return;
+
+    // Preferência A: Redirecionamento via PurchaseContext (Realtime)
+    if (isPurchased) {
+        console.log('[Upsell] Purchase confirmed via Context! Redirecting...');
+        // Limpa polling se estiver ativo
+        if (pollingTimerRef.current) {
+            clearInterval(pollingTimerRef.current);
+            pollingTimerRef.current = null;
+        }
+        navigate('/chamada/sala', { replace: true });
+        return;
     }
     
+    // Fallback B: Inicia Polling se o produto for o [CALL] e não estiver comprado
+    // O polling só deve iniciar APÓS o usuário clicar no CTA e o modal de checkout abrir,
+    // mas para garantir que o Realtime não falhe, vamos iniciar o polling se o modal estiver aberto.
+    // No entanto, para seguir a regra "iniciar polling somente depois do clique no CTA",
+    // vamos deixar o polling ser iniciado apenas dentro do handleCtaClick, se necessário.
+    
+    // Cleanup do polling no unmount
     return () => {
         if (pollingTimerRef.current) {
             clearInterval(pollingTimerRef.current);
             pollingTimerRef.current = null;
         }
     };
-  }, [callProduct, user?.id, isPurchased, checkPurchaseStatus]);
-
+  }, [callProduct, user?.id, isPurchased, navigate, purchases]); // Adicionado purchases como dependência
 
   const handleCtaClick = () => {
-    if (!callProduct) {
-        setError('Produto indisponível.');
+    if (!callProduct || !user?.id) {
+        setError('Produto indisponível ou usuário não logado.');
         return;
     }
-    // Rastreamento AddToCart (opcional, mas boa prática)
-    // trackAddToCart({ ... }); 
     
-    // Inicia o fluxo de checkout PIX
+    // 1. Inicia o fluxo de checkout PIX
     openCheckoutForProduct(callProduct.id);
+    
+    // 2. Inicia o Polling (Fallback B)
+    // Se o Realtime do PurchaseContext falhar, o polling garante o redirecionamento.
+    if (!pollingTimerRef.current) {
+        startTimeRef.current = Date.now();
+        pollingTimerRef.current = setInterval(() => {
+            checkPurchaseStatus(callProduct.id, user.id);
+        }, POLLING_INTERVAL) as unknown as number;
+    }
   };
   
   if (loading || !user) {
@@ -174,6 +192,7 @@ export const UpsellCallScreen: React.FC = () => {
     );
   }
   
+  // Verifica se o modal de checkout está aberto (para desabilitar o CTA)
   const isCheckoutOpen = !!(document.querySelector('.fixed.inset-0.z-\\[999\\]'));
 
   return (

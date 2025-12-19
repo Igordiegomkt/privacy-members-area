@@ -4,7 +4,7 @@ import { useNavigate } from 'react-router-dom';
 import { Play, X } from 'lucide-react';
 
 // URL do vídeo de conteúdo (MP4 hospedado)
-const VIDEO_URL = 'https://conteudos.s3.us-east-005.backblazeb2.com/video/video1.mp4';
+const VIDEO_URL = "https://pub-c12d59796a5544b38ff738ca3ca53d5d.r2.dev/chamadadevideo/VIDEO-CHAMADA1.mp4";
 
 export const CallRoom: React.FC = () => {
   const navigate = useNavigate();
@@ -109,7 +109,7 @@ export const CallRoom: React.FC = () => {
         <video
           ref={videoRef}
           src={VIDEO_URL}
-          preload="auto"
+          preload="auto" // Permite que o navegador comece a carregar
           playsInline
           muted
           controlsList="nodownload" // Proteção contra download

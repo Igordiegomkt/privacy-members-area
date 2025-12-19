@@ -7,6 +7,7 @@ import { useAuth } from '../contexts/AuthContext';
 import { usePurchases } from '../contexts/PurchaseContext';
 import { Product } from '../types';
 import { hasUserPurchasedProduct } from '../lib/marketplace';
+import { CheckCircle } from 'lucide-react';
 
 // Constantes para o polling (Fallback B)
 const POLLING_INTERVAL = 3000; // 3 segundos
@@ -187,8 +188,10 @@ export const UpsellCallScreen: React.FC = () => {
         <div className="flex flex-col items-center pt-4">
           <p className="text-white/70 text-sm tracking-wide">Tudo pronto.</p>
 
-          {/* Avatar placeholder */}
-          <div className="mt-4 mb-4 h-36 w-36 rounded-full bg-[radial-gradient(circle_at_30%_30%,#2a2a2a_0%,#131313_55%,#0b0b0f_100%)] shadow-[0_0_0_5px_rgba(255,255,255,0.06),0_0_0_26px_rgba(255,95,0,0.10)]" />
+          {/* Avatar placeholder com glow/ping suave */}
+          <div className="relative mt-4 mb-4 h-36 w-36 rounded-full bg-[radial-gradient(circle_at_30%_30%,#2a2a2a_0%,#131313_55%,#0b0b0f_100%)] shadow-[0_0_0_5px_rgba(255,255,255,0.06),0_0_0_26px_rgba(255,95,0,0.10)]">
+            <span className="absolute inset-0 rounded-full animate-pulse-slow bg-primary/30" />
+          </div>
 
           <h1 className="text-center text-2xl sm:text-3xl font-extrabold leading-tight text-white drop-shadow">
             Meu conteúdo já é seu. Tá te esperando. <span aria-hidden>👁️🔥</span>

@@ -28,8 +28,6 @@ import { AiTools } from './pages/admin/AiTools';
 import { CheckoutModal } from './components/CheckoutModal';
 import { AdminNotifications } from './pages/admin/AdminNotifications';
 import { useAuth } from './contexts/AuthContext';
-import { UpsellCallScreen } from './pages/UpsellCallScreen'; // Importado
-import { CallRoom } from './pages/CallRoom'; // Importado
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {
@@ -88,9 +86,7 @@ function App() {
           <Route path="/compra-sucesso" element={<PurchaseSuccess />} />
           <Route path="/compra-falhou" element={<PurchaseFailed />} />
           
-          {/* Rotas de Upsell */}
-          <Route path="/upsell/chamada" element={<UpsellCallScreen />} />
-          <Route path="/chamada/sala" element={<CallRoom />} />
+          {/* Rotas de Upsell (REMOVIDAS) */}
         </Route>
         
         {/* Admin Routes */}

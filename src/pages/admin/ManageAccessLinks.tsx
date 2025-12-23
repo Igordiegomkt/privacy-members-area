@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Model, Product } from '../../types';
 import { Link as LinkIcon, Copy, Check, Trash2, ToggleLeft, ToggleRight, Clock, Users, Calendar, XCircle } from 'lucide-react';
-import { createHash } from 'crypto-js'; // Usando crypto-js para sha256 no frontend
+import SHA256 from 'crypto-js/sha256'; // Importação corrigida para SHA256
 import { useAuth } from '../../contexts/AuthContext'; // Importando useAuth
 
 // Tipos para a tabela access_links
@@ -86,8 +86,8 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
             // 1. Gerar token forte (UUID + 16 bytes rand)
             const rawToken = crypto.randomUUID() + btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
             
-            // 2. Calcular SHA256 hash (usando crypto-js para compatibilidade)
-            const tokenHash = createHash('sha256').update(rawToken).toString('hex');
+            // 2. Calcular SHA256 hash
+            const tokenHash = SHA256(rawToken).toString(); // Uso corrigido do SHA256
 
             // 3. Preparar payload
             const payload = {

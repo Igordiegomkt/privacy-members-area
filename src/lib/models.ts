@@ -1,6 +1,7 @@
 import { supabase } from './supabase';
 import { Model, Product, MediaItem, MediaAccessStatus } from '../types';
 import { fetchUserPurchases, UserPurchaseWithProduct } from './marketplace';
+import { getValidGrant, AccessGrant } from './accessGrant'; // Novo import
 
 export type MediaItemWithAccess = MediaItem & {
   accessStatus: MediaAccessStatus;
@@ -20,18 +21,83 @@ interface AccessContext {
   model: Model;
 }
 
+/**
+ * Verifica se o AccessGrant temporário concede acesso a esta mídia.
+ */
+function checkGrantAccess(media: MediaItem, grant: AccessGrant, productsForModel: Product[]): boolean {
+    if (grant.scope === 'global') {
+        return true;
+    }
+
+    if (grant.scope === 'model' && media.model_id === grant.model_id) {
+        return true;
+    }
+
+    if (grant.scope === 'product' && grant.product_id) {
+        // Verifica se a mídia está vinculada ao produto do grant
+        // Nota: Como não temos a relação product_media no objeto media,
+        // precisamos de uma forma de verificar se a mídia pertence ao produto.
+        // Para simplificar e evitar uma query extra por mídia, vamos assumir
+        // que se a mídia pertence à modelo do produto, e o produto é o único
+        // produto base, liberamos.
+        
+        // Alternativa mais robusta (requer query):
+        // Se a mídia for de um pack, ela estará em product_media.
+        // Se for single_media, o product_id estará na media_items (se implementado).
+        
+        // Para a implementação mínima, vamos verificar se a mídia está ligando ao produto do grant.
+        // Como a tabela media_items não tem product_id, precisamos de uma query.
+        // Para evitar N+1 queries, vamos usar uma heurística: se a mídia for da modelo do produto,
+        // e o produto for o VIP base, liberamos (já que o VIP libera tudo).
+        
+        // HEURÍSTICA SIMPLIFICADA: Se o grant é de um produto, e a mídia é da modelo desse produto,
+        // e o produto é o VIP base, liberamos.
+        const grantedProduct = productsForModel.find(p => p.id === grant.product_id);
+        
+        if (grantedProduct && grantedProduct.is_base_membership && media.model_id === grantedProduct.model_id) {
+            return true;
+        }
+        
+        // Para mídias avulsas/packs, a verificação precisa ser mais precisa.
+        // Como a EF validate-access-link não retorna a lista de media_ids,
+        // vamos focar apenas no escopo 'global' e 'model' para o override inicial.
+        // Se o escopo for 'product', o usuário deve ser redirecionado para a página do produto.
+        
+        // Para evitar complexidade de DB aqui, vamos considerar que o grant 'product'
+        // só libera o acesso se for o produto VIP base da modelo.
+        
+        // Se o grant for de um produto específico (não VIP base), o acesso à mídia
+        // individual não será liberado automaticamente aqui.
+        
+        // Vamos manter a lógica restrita ao escopo 'global' e 'model' por enquanto,
+        // e garantir que o grant 'product' libere o acesso na página do produto.
+        
+        // Se o grant for de um produto, e a mídia for da modelo desse produto,
+        // e o produto for o VIP base, liberamos.
+        if (grantedProduct && grantedProduct.is_base_membership && media.model_id === grantedProduct.model_id) {
+            return true;
+        }
+    }
+
+    return false;
+}
+
+
 export function computeMediaAccessStatus(
   media: MediaItem,
   ctx: AccessContext
 ): MediaAccessStatus {
+  
+  // 1. Verificar AccessGrant temporário
+  const grant = getValidGrant();
+  if (grant && checkGrantAccess(media, grant, ctx.productsForModel)) {
+      return 'unlocked';
+  }
+  
+  // 2. Verificar acesso gratuito
   if (media.is_free) return 'free';
 
-  const isCarolina = ctx.model.username === BASE_MODEL_USERNAME;
-  
-  // A compra de boas-vindas agora é um registro 'paid' em user_purchases,
-  // então não precisamos mais do localStorage 'welcomePurchaseCarolina'.
-  // A lógica de acesso é unificada: se comprou o produto base, tem acesso.
-
+  // 3. Verificar compras existentes (Lógica original)
   const baseMembership = ctx.productsForModel.find(p => p.is_base_membership);
   const purchasedIds = new Set(ctx.purchases.map(p => p.product_id));
 

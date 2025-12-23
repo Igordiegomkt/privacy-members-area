@@ -21,7 +21,6 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
   try {
     // 1. Identificar modelos que o usuário já tem acesso (necessário para accessStatus)
     const userPurchases = await fetchUserPurchases(userId); // Usando userId
-    const purchasedModelIds = new Set(userPurchases.map(p => p.products?.model_id).filter(Boolean));
     
     // Definindo o tipo correto para o cache
     type ModelContextCacheEntry = { 

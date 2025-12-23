@@ -4,6 +4,7 @@ import { supabase } from '../../lib/supabase';
 import { Model, Product } from '../../types';
 import { Link as LinkIcon, Copy, Check, Trash2, ToggleLeft, ToggleRight, Clock, Users, Calendar, XCircle } from 'lucide-react';
 import { createHash } from 'crypto-js'; // Usando crypto-js para sha256 no frontend
+import { useAuth } from '../../contexts/AuthContext'; // Importando useAuth
 
 // Tipos para a tabela access_links
 interface AccessLink {

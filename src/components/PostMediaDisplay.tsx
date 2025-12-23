@@ -61,8 +61,10 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
         <img
           src={imageSrc}
           alt={media.title || 'Conteúdo'}
-          // Usamos object-contain para garantir que a imagem/poster caiba no container
-          className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl`}
+          // APLICANDO O EFEITO DE BLUR/ESCURECIMENTO DO MURAL AQUI
+          className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl ${
+            isLocked ? 'blur-xl brightness-25 scale-105' : ''
+          }`}
           loading="lazy"
           draggable={false}
           onContextMenu={(e) => e.preventDefault()}
@@ -125,6 +127,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
 
       {/* Overlay de Bloqueio */}
       {isLocked && (
+        // O overlay de bloqueio já existe e fica por cima do blur (z-30)
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-center px-3 z-30">
           <Lock className="w-8 h-8 text-primary mb-2" />
           <p className="text-sm text-white font-semibold mb-3">

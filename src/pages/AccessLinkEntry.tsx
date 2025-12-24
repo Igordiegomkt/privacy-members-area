@@ -6,7 +6,7 @@ import { LinkIcon } from 'lucide-react';
 import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
 
 export const AccessLinkEntry: React.FC = () => {
-  const { token } = useParams<{ token: string }>();
+  const { token: encodedToken } = useParams<{ token: string }>();
   const navigate = useNavigate();
   const { user } = useAuth(); // Obtém o usuário logado (se houver)
   
@@ -28,31 +28,51 @@ export const AccessLinkEntry: React.FC = () => {
   const handleValidation = async (e?: React.FormEvent) => {
     e?.preventDefault();
     
-    if (!token) {
+    if (!encodedToken) {
       setMessage('Link de acesso inválido ou incompleto.');
       setStatus('error');
       setTimeout(() => navigate('/login', { replace: true }), 3000);
       return;
     }
     
+    let tokenNormalized: string;
+    try {
+        // 1. Decode e Normalização
+        tokenNormalized = decodeURIComponent(encodedToken).trim();
+    } catch (err) {
+        console.error('Failed to decode token:', err);
+        setMessage('O formato do link é inválido.');
+        setStatus('error');
+        setTimeout(() => navigate('/login', { replace: true }), 3000);
+        return;
+    }
+    
     setStatus('loading');
     setMessage('Validando seu link de acesso...');
 
-    // 1. Chamar a EF com dados do visitante
-    const grant = await validateAccessToken(token, {
+    // 2. Chamar a EF com dados do visitante e token normalizado
+    const grantResponse = await validateAccessToken(tokenNormalized, {
         visitor_name: visitorName,
         visitor_email: visitorEmail,
         user_id: user?.id,
     });
 
-    if (grant) {
-      saveGrant(grant);
+    if (grantResponse && grantResponse.ok && grantResponse.grant) {
+      saveGrant(grantResponse.grant);
       setMessage('Acesso liberado com sucesso! Redirecionando para o login...');
       setStatus('success');
-      // Redireciona para o login para que o usuário complete a autenticação
-      setTimeout(() => navigate('/login', { replace: true }), 1000);
+      // Redireciona para a raiz para forçar o AuthContext a reavaliar a sessão
+      setTimeout(() => navigate('/', { replace: true }), 1000);
     } else {
-      setMessage('O link de acesso é inválido, expirou ou atingiu o limite de usos.');
+      const code = grantResponse?.code || 'UNKNOWN_ERROR';
+      let errorMessage = grantResponse?.message || 'O link de acesso é inválido, expirou ou atingiu o limite de usos.';
+      
+      if (code === 'INVALID_LINK') errorMessage = 'Link de acesso não encontrado.';
+      if (code === 'EXPIRED_LINK') errorMessage = 'Link expirado.';
+      if (code === 'MAX_USES') errorMessage = 'Limite de usos atingido.';
+      if (code === 'INACTIVE_LINK') errorMessage = 'Link inativo.';
+      
+      setMessage(errorMessage);
       setStatus('error');
       // Redireciona para o login sem o grant
       setTimeout(() => navigate('/login', { replace: true }), 3000);

@@ -38,7 +38,7 @@ interface Grant {
 }
 
 /**
- * Calcula o hash SHA-256 de uma string e retorna o resultado em formato hexadecimal.
+ * Calcula o hash SHA-256 de uma string e retorna o resultado em formato hexadecimal (lowercase).
  */
 async function sha256Hex(input: string): Promise<string> {
   const data = new TextEncoder().encode(input);
@@ -59,20 +59,23 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { token, visitor_name, visitor_email, user_id } = await req.json();
+    const { token: rawToken, visitor_name, visitor_email, user_id } = await req.json();
 
-    if (typeof token !== 'string' || token.length < 10) {
+    if (typeof rawToken !== 'string' || rawToken.length < 10) {
       return createResponse(false, { code: "INVALID_LINK", message: "Token inválido." });
     }
+    
+    // 1. Normalização do Token
+    const token = rawToken.trim();
 
-    // 1. Calcular token_hash
+    // 2. Calcular token_hash (SHA-256 Hex Lowercase)
     const tokenHash = await sha256Hex(token);
     
-    // 2. Obter dados do visitante e IP
+    // 3. Obter dados do visitante e IP
     const userAgent = req.headers.get('user-agent') || null;
     const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null;
 
-    // 3. Chamar a RPC para validação e consumo atômico
+    // 4. Chamar a RPC para validação e consumo atômico
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('consume_access_link', {
         p_token_hash: tokenHash,
         p_visitor_name: visitor_name || null,
@@ -96,7 +99,7 @@ serve(async (req: Request) => {
         return createResponse(false, { code, message });
     }
 
-    // 4. Sucesso: Retorna o grant
+    // 5. Sucesso: Retorna o grant
     const grant: Grant = {
         scope: result.scope as 'global' | 'model' | 'product',
         model_id: result.model_id,

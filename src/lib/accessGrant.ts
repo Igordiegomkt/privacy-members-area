@@ -17,31 +17,38 @@ interface ValidationPayload {
     user_id?: string;
 }
 
+interface EFResponse {
+    ok: boolean;
+    code?: string;
+    message?: string;
+    grant?: Omit<AccessGrant, 'local_expires_at'>;
+}
+
 /**
  * Valida o token de acesso chamando a Edge Function.
  */
-export const validateAccessToken = async (token: string, payload: ValidationPayload = {}): Promise<Omit<AccessGrant, 'local_expires_at'> | null> => {
+export const validateAccessToken = async (token: string, payload: ValidationPayload = {}): Promise<EFResponse | null> => {
   try {
-    // Não precisamos mais calcular o hash aqui, a EF faz isso.
     const { data, error } = await supabase.functions.invoke('validate-access-link', {
       body: { token, ...payload },
     });
 
     if (error) {
       console.error('[validateAccessToken] EF invoke error:', error);
-      return null;
+      return { ok: false, code: 'EF_INVOKE_ERROR', message: error.message };
     }
 
-    if (!data || data.ok === false) {
-      console.warn('[validateAccessToken] Validation failed:', data?.message || 'Unknown error');
-      return null;
+    if (!data) {
+      return { ok: false, code: 'EMPTY_RESPONSE', message: 'Resposta vazia da Edge Function.' };
     }
+    
+    // Retorna a resposta completa da EF (que já contém ok, code, message, e opcionalmente grant)
+    return data as EFResponse;
 
-    // Retorna o grant sem o local_expires_at, que será adicionado no saveGrant
-    return data.grant as Omit<AccessGrant, 'local_expires_at'>;
   } catch (e) {
-    console.error('[validateAccessToken] Unexpected error:', e);
-    return null;
+    const err = e as Error;
+    console.error('[validateAccessToken] Unexpected error:', err);
+    return { ok: false, code: 'UNEXPECTED_ERROR', message: err.message };
   }
 };
 

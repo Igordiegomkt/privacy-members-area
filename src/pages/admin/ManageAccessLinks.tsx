@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Model, Product } from '../../types';
-import { Link as LinkIcon, Copy, Check, Trash2, ToggleLeft, ToggleRight, Clock, Users, Calendar, XCircle, Edit, Eye } from 'lucide-react';
+import { Link as LinkIcon, Copy, Check, Trash2, ToggleLeft, ToggleRight, Clock, Users, Calendar, XCircle, Edit, Eye, TestTube } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { sha256Hex, generateStrongToken } from '../../lib/crypto';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../../components/ui/dialog';
@@ -381,13 +381,13 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
 };
 
 // --- Componente de Listagem ---
-const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void, onEdit: (link: AccessLink) => void, onShowVisits: (linkId: string) => void }> = ({ links, onToggleActive, onDelete, onEdit, onShowVisits }: { links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void, onEdit: (link: AccessLink) => void, onShowVisits: (linkId: string) => void }) => {
+const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void, onEdit: (link: AccessLink) => void, onShowVisits: (linkId: string) => void, onTestLink: (link: AccessLink) => void }> = ({ links, onToggleActive, onDelete, onEdit, onShowVisits, onTestLink }: { links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void, onEdit: (link: AccessLink) => void, onShowVisits: (linkId: string) => void, onTestLink: (link: AccessLink) => void }) => {
     const isExpired = (link: AccessLink) => link.expires_at && new Date(link.expires_at) < new Date();
     const isMaxUses = (link: AccessLink) => link.max_uses !== null && link.uses >= link.max_uses;
     const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
     const handleCopyLink = (tokenPlain: string) => {
-        const link = `${DOMAIN}/acesso/${tokenPlain}`;
+        const link = `${DOMAIN}/acesso/${encodeURIComponent(tokenPlain)}`;
         navigator.clipboard.writeText(link);
         setCopyFeedback('Link copiado!');
         setTimeout(() => setCopyFeedback(null), 2000);
@@ -451,6 +451,13 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                                     </td>
                                     <td className="px-4 py-3 space-x-2 flex items-center">
                                         <button 
+                                            onClick={() => onTestLink(link)}
+                                            className="p-1 rounded-full text-yellow-400 hover:bg-yellow-400/20 transition-colors"
+                                            title="Testar Link"
+                                        >
+                                            <TestTube size={20} />
+                                        </button>
+                                        <button 
                                             onClick={() => onShowVisits(link.id)}
                                             className="p-1 rounded-full text-blue-400 hover:bg-blue-400/20 transition-colors"
                                             title="Ver Acessos"
@@ -503,6 +510,8 @@ export const ManageAccessLinks: React.FC = () => {
     const [isGeneratedModalOpen, setIsGeneratedModalOpen] = useState(false);
     const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
     const [linkIdToView, setLinkIdToView] = useState<string | null>(null);
+    const [isTestModalOpen, setIsTestModalOpen] = useState(false);
+    const [testResult, setTestResult] = useState<{ ok: boolean, code: string, message: string } | null>(null);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -577,6 +586,50 @@ export const ManageAccessLinks: React.FC = () => {
             fetchData();
         }
     };
+    
+    const handleTestLink = async (link: AccessLink) => {
+        if (!link.token_plain) {
+            setTestResult({ ok: false, code: 'MISSING_TOKEN', message: 'Token puro não está salvo no banco.' });
+            setIsTestModalOpen(true);
+            return;
+        }
+        
+        setIsTestModalOpen(true);
+        setTestResult(null);
+        
+        try {
+            // 1. Diagnóstico de Hash
+            const localHash = await sha256Hex(link.token_plain);
+            if (localHash !== link.token_hash) {
+                setTestResult({ 
+                    ok: false, 
+                    code: 'HASH_MISMATCH', 
+                    message: `O hash calculado localmente (${localHash.substring(0, 10)}...) não corresponde ao hash salvo no DB (${link.token_hash.substring(0, 10)}...). O link foi criado incorretamente.` 
+                });
+                return;
+            }
+            
+            // 2. Chamar EF com o token puro
+            const { data, error: invokeError } = await supabase.functions.invoke('validate-access-link', {
+                body: { token: link.token_plain, visitor_name: 'Admin Teste' },
+            });
+            
+            if (invokeError) {
+                setTestResult({ ok: false, code: 'EF_ERROR', message: invokeError.message });
+                return;
+            }
+            
+            if (data.ok === false) {
+                setTestResult({ ok: false, code: data.code, message: data.message });
+            } else {
+                setTestResult({ ok: true, code: 'OK', message: 'Link validado com sucesso! (Uso registrado)' });
+                fetchData(); // Atualiza a lista para mostrar o incremento de 'uses'
+            }
+            
+        } catch (err: any) {
+            setTestResult({ ok: false, code: 'UNEXPECTED_ERROR', message: err.message });
+        }
+    };
 
     if (loading) return <p className="text-center text-privacy-text-secondary">Carregando...</p>;
     if (error) return <p className="text-center text-red-400">{error}</p>;
@@ -601,8 +654,34 @@ export const ManageAccessLinks: React.FC = () => {
                 onDelete={handleDelete}
                 onEdit={handleEdit}
                 onShowVisits={handleShowVisits}
+                onTestLink={handleTestLink}
             />
             
+            {/* Modal de Teste */}
+            <Dialog open={isTestModalOpen} onOpenChange={setIsTestModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="flex items-center gap-2">
+                            <TestTube size={20} /> Resultado do Teste
+                        </DialogTitle>
+                    </DialogHeader>
+                    {testResult && (
+                        <div className={`p-4 rounded-lg ${testResult.ok ? 'bg-green-500/10 border border-green-500/50' : 'bg-red-500/10 border border-red-500/50'}`}>
+                            <p className={`font-bold ${testResult.ok ? 'text-green-400' : 'text-red-400'}`}>
+                                Status: {testResult.code}
+                            </p>
+                            <p className="text-sm text-white mt-2">{testResult.message}</p>
+                            {testResult.ok && <p className="text-xs text-privacy-text-secondary mt-1">O contador de usos foi incrementado.</p>}
+                        </div>
+                    )}
+                    <DialogFooter>
+                        <button onClick={() => setIsTestModalOpen(false)} className="bg-primary text-black font-bold py-2 px-4 rounded-lg">
+                            Fechar
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
+
             {/* Modal de Edição */}
             <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
                 {linkToEdit && (

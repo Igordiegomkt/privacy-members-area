@@ -76,7 +76,9 @@ serve(async (req: Request) => {
     const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null;
 
     // 4. Chamar a RPC para validação e consumo atômico
-    // Usamos parâmetros nomeados para evitar problemas de ordem
+    // A RPC agora tem 6 parâmetros, mas o PostgREST pode usar a versão de 1 parâmetro se for mais específica.
+    // Vamos chamar a RPC com o token_hash, que é o parâmetro obrigatório para a lógica atômica.
+    // A RPC no DB já foi atualizada para aceitar 6 parâmetros e fazer o log.
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('consume_access_link', {
         p_token_hash: tokenHash,
         p_visitor_name: visitor_name || null,
@@ -88,14 +90,12 @@ serve(async (req: Request) => {
 
     if (rpcError) {
       console.error("[validate-access-link] RPC Error:", rpcError);
-      // Retorna erro RPC_ERROR com a mensagem limpa
       return createResponse(false, { code: "RPC_ERROR", message: rpcError.message });
     }
     
     const result = rpcData?.[0];
 
     if (!result || result.ok === false) {
-        // Retorna o código de erro exato da RPC
         const code = result?.code || 'UNKNOWN_VALIDATION_ERROR';
         const message = result?.message || 'Falha na validação do link.';
         return createResponse(false, { code, message });
@@ -109,6 +109,9 @@ serve(async (req: Request) => {
         expires_at: result.expires_at,
     };
     
+    // NOTA: A lógica de INSERT em access_link_visits foi movida para dentro da RPC no passo anterior.
+    // Se a RPC retornou OK, o log já foi inserido (best-effort).
+
     return createResponse(true, { grant });
 
   } catch (err) {

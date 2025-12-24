@@ -7,6 +7,7 @@ import { fetchUserPurchases } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
+import { isModelUnlockedByGrant, getVipBadgeLabel } from '../lib/accessVisual'; // Novo import
 
 interface ModelWithAccess extends Model {
   isUnlocked: boolean;
@@ -16,7 +17,9 @@ interface ModelWithAccess extends Model {
 
 const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: ModelWithAccess }) => {
   const navigate = useNavigate();
-  // Removendo openCheckoutForProduct daqui, pois a Home só navega para o perfil.
+  
+  const isUnlockedByGrant = isModelUnlockedByGrant(model.id);
+  const isUnlocked = model.isUnlocked || isUnlockedByGrant;
 
   const formattedPrice =
     model.mainProductPriceCents != null
@@ -36,10 +39,16 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: Mod
           src={model.avatar_url ?? ''}
           alt={model.name}
           className={`w-full h-full object-cover transition-all duration-300 ${
-            !model.isUnlocked ? 'grayscale' : ''
+            !isUnlocked ? 'grayscale' : ''
           }`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+
+        {isUnlockedByGrant && (
+            <div className="absolute top-2 right-2 bg-blue-500/20 text-blue-400 rounded-full px-2 py-1 text-[10px] font-bold">
+                {getVipBadgeLabel()}
+            </div>
+        )}
 
         <div className="absolute bottom-2 left-2 right-2">
           <h3 className="font-bold text-white text-sm truncate">{model.name}</h3>
@@ -54,8 +63,8 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: Mod
 
       {/* CTA fixo embaixo do card */}
       <div className="p-2 border-t border-privacy-border flex flex-col gap-1">
-        {model.isUnlocked && (
-          <span className="text-[11px] text-green-400 flex items-center gap-1">
+        {isUnlocked && (
+          <span className={`text-[11px] flex items-center gap-1 ${isUnlockedByGrant ? 'text-blue-400' : 'text-green-400'}`}>
             ✔ Acesso VIP liberado
           </span>
         )}
@@ -63,7 +72,7 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: Mod
           onClick={() => navigate(`/modelo/${model.username}`)}
           className="w-full bg-primary text-privacy-black text-xs font-semibold py-1.5 rounded-lg hover:opacity-90"
         >
-          Ver perfil da modelo
+          {isUnlocked ? 'Acessar Perfil' : 'Ver perfil da modelo'}
         </button>
       </div>
     </div>

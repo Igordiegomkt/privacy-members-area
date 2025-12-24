@@ -28,6 +28,7 @@ interface AccessLink {
 // Tipos para a tabela access_link_visits
 interface AccessLinkVisit {
     id: string;
+    access_link_id: string; // Adicionado para consistência
     visited_at: string;
     visitor_name: string | null;
     visitor_email: string | null;
@@ -314,7 +315,7 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
             if (insertError) throw insertError;
 
             // 7. Mostrar link final no formato de trilha
-            const finalLink = `${DOMAIN}/acesso/${rawToken}`;
+            const finalLink = `${DOMAIN}/acesso/${encodeURIComponent(rawToken)}`;
             onLinkCreated(finalLink);
 
         } catch (err: any) {

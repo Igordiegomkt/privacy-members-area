@@ -3,6 +3,7 @@ import { useRef } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { Lock, Video, Camera, Play } from 'lucide-react';
 import { useVideoAutoplay } from '../hooks/useVideoAutoplay';
+import { isModelUnlockedByGrant, getVipBadgeLabel } from '../lib/accessVisual'; // Novo import
 
 interface PostMediaDisplayProps {
   media: MediaItemWithAccess;
@@ -26,9 +27,16 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
   const isVideo = media.type === 'video';
   const isLocked = media.accessStatus === 'locked';
   const videoRef = useRef<HTMLVideoElement | null>(null);
+  
+  // Verifica se o acesso é concedido por link (apenas para fins visuais)
+  const isUnlockedByGrant = media.model?.id ? isModelUnlockedByGrant(media.model.id) : false;
+  
+  // Se o acesso for concedido por link, tratamos visualmente como desbloqueado
+  const showLockedOverlay = isLocked && !isUnlockedByGrant;
+  const showBlurredImage = isLocked && !isUnlockedByGrant;
 
   // Hook para autoplay
-  useVideoAutoplay(videoRef, isVideo, isLocked);
+  useVideoAutoplay(videoRef, isVideo, showLockedOverlay);
 
   // Prioriza thumbnail, depois a URL da mídia (se for imagem), senão o fallback genérico
   const imageSrc = media.thumbnail || (isVideo ? '/video-fallback.svg' : media.url);
@@ -36,7 +44,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isLocked) {
+    if (showLockedOverlay) {
       onLockedClick();
     } else {
       // Quando clica, pausa o autoplay e abre o modal
@@ -63,7 +71,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
           alt={media.title || 'Conteúdo'}
           // APLICANDO O EFEITO DE BLUR/ESCURECIMENTO DO MURAL AQUI
           className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl ${
-            isLocked ? 'blur-xl brightness-25 scale-105' : ''
+            showBlurredImage ? 'blur-xl brightness-25 scale-105' : ''
           }`}
           loading="lazy"
           draggable={false}
@@ -72,7 +80,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
       </div>
       
       {/* Ícone de tipo */}
-      {!isLocked && (
+      {!showLockedOverlay && (
         <div className="absolute top-2 left-2 flex items-center gap-2 text-xs text-white/90 z-30">
           <span className="inline-flex items-center gap-1 rounded-full bg-black/60 px-2 py-0.5">
             {isVideo ? <Video size={12} /> : <Camera size={12} />}
@@ -81,8 +89,15 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
         </div>
       )}
       
+      {/* Badge VIP por Link */}
+      {isUnlockedByGrant && (
+        <div className="absolute top-2 right-2 bg-blue-500/20 text-blue-400 rounded-full px-2 py-1 text-[10px] font-bold z-30">
+            {getVipBadgeLabel()}
+        </div>
+      )}
+      
       {/* Ícone de Play para vídeos desbloqueados (Apenas se o autoplay falhar) */}
-      {isVideo && !isLocked && (
+      {isVideo && !showLockedOverlay && (
         <div className="absolute inset-0 flex items-center justify-center z-30">
             <Play size={48} className="text-primary drop-shadow-lg" fill="currentColor" />
         </div>
@@ -92,7 +107,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
 
   // --- Renderização do Vídeo (Autoplay) ---
   const renderVideoAutoplay = () => {
-    if (!isVideo || isLocked) return null;
+    if (!isVideo || showLockedOverlay) return null;
     
     // O vídeo é renderizado com z-index maior para aparecer por cima da thumbnail
     return (
@@ -126,7 +141,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
       </div>
 
       {/* Overlay de Bloqueio */}
-      {isLocked && (
+      {showLockedOverlay && (
         // O overlay de bloqueio já existe e fica por cima do blur (z-30)
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/80 text-center px-3 z-30">
           <Lock className="w-8 h-8 text-primary mb-2" />

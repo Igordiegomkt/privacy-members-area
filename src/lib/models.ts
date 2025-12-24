@@ -22,9 +22,10 @@ interface AccessContext {
 }
 
 /**
- * Verifica se o AccessGrant temporário concede acesso a esta mídia.
+ * Verifica se o AccessGrant temporário concede acesso a esta mídia (SÍNCRONO).
+ * Nota: A checagem de escopo 'product' é FAIL-CLOSED aqui, pois não temos a lista de product_media.
  */
-async function checkGrantAccess(media: MediaItem, grant: AccessGrant, productsForModel: Product[]): Promise<boolean> {
+function checkGrantAccessSync(media: MediaItem, grant: AccessGrant, productsForModel: Product[]): boolean {
     if (grant.scope === 'global') {
         return true;
     }
@@ -40,36 +41,23 @@ async function checkGrantAccess(media: MediaItem, grant: AccessGrant, productsFo
             return true;
         }
         
-        // 2. Verificar se a mídia está explicitamente vinculada ao produto (para packs/mídias avulsas)
-        // Nota: Esta é a única query extra que fazemos, mas é necessária para o escopo 'product'.
-        const { count, error } = await supabase
-            .from('product_media')
-            .select('id', { count: 'exact', head: true })
-            .eq('product_id', grant.product_id)
-            .eq('media_id', media.id);
-            
-        if (error) {
-            console.error('Error checking product_media for grant:', error);
-            return false; // Fail-closed
-        }
-        
-        if (count && count > 0) {
-            return true;
-        }
+        // 2. FAIL-CLOSED: Não podemos verificar product_media de forma síncrona no feed.
+        // Se não for o VIP base, o acesso via grant 'product' é negado no feed/mural.
+        return false;
     }
 
     return false;
 }
 
 
-export async function computeMediaAccessStatus(
+export function computeMediaAccessStatus(
   media: MediaItem,
   ctx: AccessContext
-): Promise<MediaAccessStatus> {
+): MediaAccessStatus {
   
-  // 1. Verificar AccessGrant temporário
+  // 1. Verificar AccessGrant temporário (SÍNCRONO)
   const grant = getValidGrant();
-  if (grant && await checkGrantAccess(media, grant, ctx.productsForModel)) {
+  if (grant && checkGrantAccessSync(media, grant, ctx.productsForModel)) {
       return 'unlocked';
   }
   
@@ -189,14 +177,14 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
     const productsForModel = await fetchProductsForModel(modelId);
     const accessContext: AccessContext = { purchases, productsForModel, model };
 
-    // 6. Compute access status (usando Promise.all para chamadas assíncronas)
-    const mediaWithAccessPromises = itemsToProcess.map(async media => {
+    // 6. Compute access status (agora síncrono)
+    const mediaWithAccess: MediaItemWithAccess[] = itemsToProcess.map(media => {
       const rawThumb = media.thumbnail;
       const isVideoThumb =
         typeof rawThumb === 'string' &&
         (rawThumb.endsWith('.mp4') || rawThumb.endsWith('.mov') || rawThumb.endsWith('.webm'));
       
-      const accessStatus = await computeMediaAccessStatus(media, accessContext);
+      const accessStatus = computeMediaAccessStatus(media, accessContext);
       
       return {
         ...media,
@@ -205,8 +193,6 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
         model: model, // Adicionando o objeto Model completo
       };
     });
-    
-    const mediaWithAccess = await Promise.all(mediaWithAccessPromises);
     
     console.log('[MODEL PROFILE] fetchMediaForModelPage result', {
       page,

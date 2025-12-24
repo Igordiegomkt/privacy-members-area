@@ -81,6 +81,7 @@ serve(async (req: Request) => {
     const tokenHash = await sha256Hex(token);
 
     // 2. Tentar UPDATE atômico (incrementa 'uses' e verifica todas as condições)
+    // Nota: O uses.lt.max_uses usa o valor ANTES do incremento.
     const { data: updatedLink, error: updateError } = await supabaseAdmin
       .from('access_links')
       .update({ uses: supabaseAdmin.rpc('uses') + 1 }) // Incrementa uses
@@ -88,10 +89,11 @@ serve(async (req: Request) => {
       .eq('token_hash', tokenHash)
       .eq('active', true)
       .or('expires_at.is.null,expires_at.gt.now()') // Não expirado
-      .or('max_uses.is.null,uses.lt.max_uses') // Não atingiu limite (usa o valor ANTES do incremento)
+      .or('max_uses.is.null,uses.lt.max_uses') // Não atingiu limite
       .single();
 
     if (updateError) {
+      // Se o erro for de DB, logamos e retornamos erro genérico
       console.error("[validate-access-link] Error during atomic update:", updateError);
       return createResponse(false, { code: "DB_UPDATE_ERROR", message: "Erro ao registrar uso do link." });
     }

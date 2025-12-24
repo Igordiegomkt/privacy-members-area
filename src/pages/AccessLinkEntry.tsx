@@ -15,7 +15,7 @@ export const AccessLinkEntry: React.FC = () => {
       setMessage('Link de acesso inválido ou incompleto.');
       setStatus('error');
       // Redireciona após um pequeno atraso
-      setTimeout(() => navigate('/'), 3000);
+      setTimeout(() => navigate('/login', { replace: true }), 3000);
       return;
     }
 
@@ -24,15 +24,15 @@ export const AccessLinkEntry: React.FC = () => {
 
       if (grant) {
         saveGrant(grant);
-        setMessage('Acesso liberado com sucesso! Redirecionando...');
+        setMessage('Acesso liberado com sucesso! Redirecionando para o login...');
         setStatus('success');
-        // Redireciona para a home após salvar o grant
-        setTimeout(() => navigate('/', { replace: true }), 1000);
+        // Redireciona para o login para que o usuário complete a autenticação
+        setTimeout(() => navigate('/login', { replace: true }), 1000);
       } else {
         setMessage('O link de acesso é inválido, expirou ou atingiu o limite de usos.');
         setStatus('error');
-        // Redireciona para a home sem o grant
-        setTimeout(() => navigate('/'), 3000);
+        // Redireciona para o login sem o grant
+        setTimeout(() => navigate('/login', { replace: true }), 3000);
       }
     };
 

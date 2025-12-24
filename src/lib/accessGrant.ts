@@ -11,14 +11,20 @@ export interface AccessGrant {
 
 const STORAGE_KEY = 'access_grant';
 
+interface ValidationPayload {
+    visitor_name?: string;
+    visitor_email?: string;
+    user_id?: string;
+}
+
 /**
  * Valida o token de acesso chamando a Edge Function.
  */
-export const validateAccessToken = async (token: string): Promise<Omit<AccessGrant, 'local_expires_at'> | null> => {
+export const validateAccessToken = async (token: string, payload: ValidationPayload = {}): Promise<Omit<AccessGrant, 'local_expires_at'> | null> => {
   try {
     // Não precisamos mais calcular o hash aqui, a EF faz isso.
     const { data, error } = await supabase.functions.invoke('validate-access-link', {
-      body: { token },
+      body: { token, ...payload },
     });
 
     if (error) {

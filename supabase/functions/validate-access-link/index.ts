@@ -71,7 +71,7 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { token } = await req.json();
+    const { token, visitor_name, visitor_email, user_id } = await req.json();
 
     if (typeof token !== 'string' || token.length < 10) {
       return createResponse(false, { code: "INVALID_LINK", message: "Token inválido." });
@@ -80,6 +80,9 @@ serve(async (req: Request) => {
     // 1. Calcular token_hash
     const tokenHash = await sha256Hex(token);
     const now = new Date().toISOString();
+    const userAgent = req.headers.get('user-agent') || null;
+    const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null;
+
 
     // 2. Tentar UPDATE atômico (incrementa 'uses' e verifica todas as condições)
     const { data: updatedLink, error: updateError } = await supabaseAdmin
@@ -89,7 +92,7 @@ serve(async (req: Request) => {
         last_used_at: now, // Atualiza o último uso
         first_used_at: supabaseAdmin.rpc('coalesce', supabaseAdmin.rpc('first_used_at'), now), // Define o primeiro uso se for NULL
       }) 
-      .select('scope, model_id, product_id, expires_at, active, max_uses, uses')
+      .select('id, scope, model_id, product_id, expires_at, active, max_uses, uses')
       .eq('token_hash', tokenHash)
       .eq('active', true)
       .or('expires_at.is.null,expires_at.gt.now()') // Não expirado
@@ -110,6 +113,24 @@ serve(async (req: Request) => {
             product_id: updatedLink.product_id,
             expires_at: updatedLink.expires_at,
         };
+        
+        // 3.1. Registrar a visita (não-atômico, mas importante)
+        const { error: visitError } = await supabaseAdmin
+            .from('access_link_visits')
+            .insert({
+                access_link_id: updatedLink.id,
+                visitor_name: visitor_name || null,
+                visitor_email: visitor_email || null,
+                user_id: user_id || null,
+                user_agent: userAgent,
+                ip: ipAddress,
+            });
+            
+        if (visitError) {
+            console.error("[validate-access-link] Error inserting visit log:", visitError);
+            // Não é fatal, mas logamos
+        }
+        
         return createResponse(true, { grant });
     }
 

@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Model, Product } from '../../types';
-import { Link as LinkIcon, Copy, Check, Trash2, ToggleLeft, ToggleRight, Clock, Users, Calendar, XCircle, Edit } from 'lucide-react';
+import { Link as LinkIcon, Copy, Check, Trash2, ToggleLeft, ToggleRight, Clock, Users, Calendar, XCircle, Edit, Eye } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
 import { sha256Hex, generateStrongToken } from '../../lib/crypto';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../../components/ui/dialog';
@@ -11,6 +11,7 @@ import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, Dialog
 interface AccessLink {
     id: string;
     token_hash: string;
+    token_plain: string | null; // Novo campo
     scope: 'global' | 'model' | 'product';
     model_id: string | null;
     product_id: string | null;
@@ -20,8 +21,19 @@ interface AccessLink {
     active: boolean;
     created_at: string;
     created_by: string | null;
-    last_used_at: string | null; // Novo campo
-    first_used_at: string | null; // Novo campo
+    last_used_at: string | null;
+    first_used_at: string | null;
+}
+
+// Tipos para a tabela access_link_visits
+interface AccessLinkVisit {
+    id: string;
+    visited_at: string;
+    visitor_name: string | null;
+    visitor_email: string | null;
+    user_id: string | null;
+    user_agent: string | null;
+    ip: string | null;
 }
 
 // Tipos para o formulário
@@ -36,6 +48,82 @@ interface LinkFormData {
 const DOMAIN = window.location.origin;
 const inputStyle = "w-full px-4 py-2 bg-privacy-black border border-privacy-border rounded-lg text-privacy-text-primary text-sm focus:outline-none focus:border-primary transition-colors";
 
+// --- Componente de Visualização de Acessos ---
+interface VisitModalProps {
+    linkId: string;
+    onClose: () => void;
+}
+
+const VisitModal: React.FC<VisitModalProps> = ({ linkId, onClose }: VisitModalProps) => {
+    const [visits, setVisits] = useState<AccessLinkVisit[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [error, setError] = useState<string | null>(null);
+
+    useEffect(() => {
+        const fetchVisits = async () => {
+            setLoading(true);
+            const { data, error } = await supabase
+                .from('access_link_visits')
+                .select('*')
+                .eq('access_link_id', linkId)
+                .order('visited_at', { ascending: false })
+                .limit(50);
+            
+            if (error) setError(error.message);
+            else setVisits(data as AccessLinkVisit[]);
+            setLoading(false);
+        };
+        fetchVisits();
+    }, [linkId]);
+
+    return (
+        <DialogContent className="max-w-3xl">
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <Eye size={20} /> Histórico de Acessos
+                </DialogTitle>
+            </DialogHeader>
+            <div className="max-h-96 overflow-y-auto">
+                {loading ? (
+                    <p className="text-center text-privacy-text-secondary py-4">Carregando acessos...</p>
+                ) : error ? (
+                    <p className="text-red-400 py-4">{error}</p>
+                ) : visits.length === 0 ? (
+                    <p className="text-center text-privacy-text-secondary py-4">Nenhum acesso registrado ainda.</p>
+                ) : (
+                    <table className="w-full text-sm text-left text-privacy-text-secondary">
+                        <thead className="text-xs text-privacy-text-secondary uppercase bg-privacy-border sticky top-0">
+                            <tr>
+                                <th className="px-4 py-2">Data/Hora</th>
+                                <th className="px-4 py-2">Nome/Email</th>
+                                <th className="px-4 py-2">IP</th>
+                                <th className="px-4 py-2">User Agent (Parcial)</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {visits.map(v => (
+                                <tr key={v.id} className="border-b border-privacy-border/50">
+                                    <td className="px-4 py-2 text-xs">{new Date(v.visited_at).toLocaleString('pt-BR')}</td>
+                                    <td className="px-4 py-2">
+                                        <p className="text-white">{v.visitor_name || 'Anônimo'}</p>
+                                        <p className="text-xs text-privacy-text-secondary/70">{v.visitor_email || '-'}</p>
+                                    </td>
+                                    <td className="px-4 py-2 text-xs">{v.ip || '-'}</td>
+                                    <td className="px-4 py-2 text-xs truncate max-w-[150px]">{v.user_agent?.substring(0, 50) || '-'}</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+            <DialogFooter>
+                <button onClick={onClose} className="bg-privacy-border text-white font-semibold py-2 px-4 rounded-lg">Fechar</button>
+            </DialogFooter>
+        </DialogContent>
+    );
+};
+
+
 // --- Componente de Edição ---
 interface EditLinkModalProps {
     link: AccessLink;
@@ -44,7 +132,12 @@ interface EditLinkModalProps {
 }
 
 const EditLinkModal: React.FC<EditLinkModalProps> = ({ link, onSave, onClose }: EditLinkModalProps) => {
-    const [expiresAt, setExpiresAt] = useState(link.expires_at ? new Date(link.expires_at).toISOString().slice(0, 16) : '');
+    // Converte para formato local para o input datetime-local
+    const localDateTime = link.expires_at 
+        ? new Date(link.expires_at).toLocaleString('sv').replace(' ', 'T').slice(0, 16) 
+        : '';
+        
+    const [expiresAt, setExpiresAt] = useState(localDateTime);
     const [maxUses, setMaxUses] = useState<number | string>(link.max_uses ?? '');
     const [active, setActive] = useState(link.active);
     const [loading, setLoading] = useState(false);
@@ -54,14 +147,21 @@ const EditLinkModal: React.FC<EditLinkModalProps> = ({ link, onSave, onClose }: 
         
         // 1. Tratar maxUses: vazio ou 0 => null (ilimitado)
         let finalMaxUses: number | null = null;
-        if (typeof maxUses === 'number' && maxUses >= 1) {
-            finalMaxUses = maxUses;
-        } else if (typeof maxUses === 'string' && parseInt(maxUses, 10) >= 1) {
-            finalMaxUses = parseInt(maxUses, 10);
+        const parsedMaxUses = parseInt(String(maxUses), 10);
+        if (!isNaN(parsedMaxUses) && parsedMaxUses >= 1) {
+            finalMaxUses = parsedMaxUses;
         }
         
-        // 2. Tratar expiresAt: vazio => null
-        const finalExpiresAt = expiresAt ? new Date(expiresAt).toISOString() : null;
+        // 2. Tratar expiresAt: vazio => null. Se tiver data, converte para ISO.
+        let finalExpiresAt: string | null = null;
+        if (expiresAt) {
+            // Se o input é apenas data (YYYY-MM-DD), adicionamos 23:59:59 local antes de converter para UTC/ISO
+            let dateToConvert = expiresAt;
+            if (expiresAt.length === 10) { // Formato YYYY-MM-DD
+                dateToConvert = `${expiresAt}T23:59:59`;
+            }
+            finalExpiresAt = new Date(dateToConvert).toISOString();
+        }
 
         onSave(link.id, {
             expires_at: finalExpiresAt,
@@ -146,8 +246,8 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
     
     const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        // Permite string vazia ou 0, que serão tratados como null (ilimitado)
-        setFormData(prev => ({ ...prev, maxUses: value === '' ? null : parseInt(value, 10) }));
+        // 0 ou vazio = null (ilimitado)
+        setFormData(prev => ({ ...prev, maxUses: value === '' || parseInt(value, 10) === 0 ? null : parseInt(value, 10) }));
     };
 
     const handleGenerateToken = async (e: React.FormEvent) => {
@@ -168,25 +268,25 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
             setLoading(false);
             return;
         }
-        if (scope === 'global' && (modelId || productId)) {
-            setError('Escopo "Global" não deve ter modelo ou produto selecionado.');
+        
+        // 1. Tratar maxUses: já tratado no handleNumberChange (null para 0/vazio)
+        let finalMaxUses: number | null = maxUses;
+        if (finalMaxUses !== null && finalMaxUses < 1) {
+            setError('Usos máximos deve ser um número positivo ou vazio/zero.');
             setLoading(false);
             return;
         }
         
-        // 1. Tratar maxUses: vazio ou 0 => null (ilimitado)
-        let finalMaxUses: number | null = null;
-        if (maxUses !== null && maxUses >= 1) {
-            finalMaxUses = maxUses;
+        // 2. Tratar expiresAt: vazio => null. Se tiver data, converte para ISO.
+        let finalExpiresAt: string | null = null;
+        if (expiresAt) {
+            let dateToConvert = expiresAt;
+            // Se o input é apenas data (YYYY-MM-DD), adicionamos 23:59:59 local antes de converter para UTC/ISO
+            if (expiresAt.length === 10) { 
+                dateToConvert = `${expiresAt}T23:59:59`;
+            }
+            finalExpiresAt = new Date(dateToConvert).toISOString();
         }
-        if (maxUses !== null && maxUses < 0) {
-            setError('Usos máximos deve ser um número positivo.');
-            setLoading(false);
-            return;
-        }
-        
-        // 2. Tratar expiresAt: vazio => null
-        const finalExpiresAt = expiresAt ? new Date(expiresAt).toISOString() : null;
 
         try {
             // 3. Gerar token forte
@@ -198,6 +298,7 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
             // 5. Preparar payload
             const payload = {
                 token_hash: tokenHash,
+                token_plain: rawToken, // Salvando o token puro para o Admin
                 scope,
                 model_id: scope === 'model' ? modelId : null,
                 product_id: scope === 'product' ? productId : null,
@@ -279,13 +380,22 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
 };
 
 // --- Componente de Listagem ---
-const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void, onEdit: (link: AccessLink) => void }> = ({ links, onToggleActive, onDelete, onEdit }: { links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void, onEdit: (link: AccessLink) => void }) => {
+const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void, onEdit: (link: AccessLink) => void, onShowVisits: (linkId: string) => void }> = ({ links, onToggleActive, onDelete, onEdit, onShowVisits }: { links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void, onEdit: (link: AccessLink) => void, onShowVisits: (linkId: string) => void }) => {
     const isExpired = (link: AccessLink) => link.expires_at && new Date(link.expires_at) < new Date();
     const isMaxUses = (link: AccessLink) => link.max_uses !== null && link.uses >= link.max_uses;
+    const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+
+    const handleCopyLink = (tokenPlain: string) => {
+        const link = `${DOMAIN}/acesso/${tokenPlain}`;
+        navigator.clipboard.writeText(link);
+        setCopyFeedback('Link copiado!');
+        setTimeout(() => setCopyFeedback(null), 2000);
+    };
 
     return (
         <div className="bg-privacy-surface p-6 rounded-lg shadow-lg mt-8">
             <h2 className="text-xl font-bold text-privacy-text-primary mb-4">Links Existentes ({links.length})</h2>
+            {copyFeedback && <p className="text-green-400 text-sm mb-3">{copyFeedback}</p>}
             <div className="overflow-x-auto">
                 <table className="w-full text-sm text-left text-privacy-text-secondary">
                     <thead className="text-xs text-privacy-text-secondary uppercase bg-privacy-border">
@@ -295,6 +405,7 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                             <th scope="col" className="px-4 py-3">Usos</th>
                             <th scope="col" className="px-4 py-3">Expira em</th>
                             <th scope="col" className="px-4 py-3">Último Acesso</th>
+                            <th scope="col" className="px-4 py-3">Link</th>
                             <th scope="col" className="px-4 py-3">Ações</th>
                         </tr>
                     </thead>
@@ -325,7 +436,26 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                                     <td className="px-4 py-3 text-xs">
                                         {lastUsed}
                                     </td>
+                                    <td className="px-4 py-3">
+                                        {link.token_plain ? (
+                                            <button 
+                                                onClick={() => handleCopyLink(link.token_plain!)}
+                                                className="text-xs bg-privacy-border px-2 py-1 rounded hover:bg-primary hover:text-black flex items-center gap-1"
+                                            >
+                                                <Copy size={12} /> Copiar
+                                            </button>
+                                        ) : (
+                                            <span className="text-xs text-red-400">Token indisponível</span>
+                                        )}
+                                    </td>
                                     <td className="px-4 py-3 space-x-2 flex items-center">
+                                        <button 
+                                            onClick={() => onShowVisits(link.id)}
+                                            className="p-1 rounded-full text-blue-400 hover:bg-blue-400/20 transition-colors"
+                                            title="Ver Acessos"
+                                        >
+                                            <Eye size={20} />
+                                        </button>
                                         <button 
                                             onClick={() => onEdit(link)}
                                             className="p-1 rounded-full text-primary hover:bg-primary/20 transition-colors"
@@ -370,6 +500,8 @@ export const ManageAccessLinks: React.FC = () => {
     const [linkToEdit, setLinkToEdit] = useState<AccessLink | null>(null);
     const [generatedLink, setGeneratedLink] = useState<string | null>(null);
     const [isGeneratedModalOpen, setIsGeneratedModalOpen] = useState(false);
+    const [isVisitModalOpen, setIsVisitModalOpen] = useState(false);
+    const [linkIdToView, setLinkIdToView] = useState<string | null>(null);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -409,6 +541,11 @@ export const ManageAccessLinks: React.FC = () => {
     const handleEdit = (link: AccessLink) => {
         setLinkToEdit(link);
         setIsEditModalOpen(true);
+    };
+    
+    const handleShowVisits = (linkId: string) => {
+        setLinkIdToView(linkId);
+        setIsVisitModalOpen(true);
     };
 
     const handleSaveEdit = async (id: string, updates: { expires_at: string | null, max_uses: number | null, active: boolean }) => {
@@ -461,6 +598,7 @@ export const ManageAccessLinks: React.FC = () => {
                 onToggleActive={handleToggleActive} 
                 onDelete={handleDelete}
                 onEdit={handleEdit}
+                onShowVisits={handleShowVisits}
             />
             
             {/* Modal de Edição */}
@@ -470,6 +608,16 @@ export const ManageAccessLinks: React.FC = () => {
                         link={linkToEdit} 
                         onSave={handleSaveEdit} 
                         onClose={() => setIsEditModalOpen(false)} 
+                    />
+                )}
+            </Dialog>
+
+            {/* Modal de Visualização de Acessos */}
+            <Dialog open={isVisitModalOpen} onOpenChange={setIsVisitModalOpen}>
+                {linkIdToView && (
+                    <VisitModal 
+                        linkId={linkIdToView} 
+                        onClose={() => setIsVisitModalOpen(false)} 
                     />
                 )}
             </Dialog>

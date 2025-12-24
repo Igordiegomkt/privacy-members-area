@@ -116,25 +116,33 @@ export const AccessLinkEntry: React.FC = () => {
       <div className="w-full max-w-sm bg-privacy-surface p-8 rounded-lg shadow-lg">
         <LinkIcon className={`w-12 h-12 mx-auto mb-4 ${statusClasses[status]}`} />
         <h1 className="text-2xl font-bold mb-2">Acesso por Link</h1>
-        <p className="text-privacy-text-secondary mb-6">{message}</p>
+        <p className="text-privacy-text-secondary mb-6">Informe seus dados para validar o acesso.</p>
         
         <form onSubmit={handleValidation} className="space-y-4">
             <div>
+                <label htmlFor="visitorName" className="block text-sm font-medium text-privacy-text-secondary mb-1 text-left">
+                    Nome (opcional)
+                </label>
                 <input
+                    id="visitorName"
                     type="text"
                     value={visitorName}
                     onChange={(e) => setVisitorName(e.target.value)}
                     className={inputStyle}
-                    placeholder="Seu nome (opcional)"
+                    placeholder="Seu nome"
                 />
             </div>
             <div>
+                <label htmlFor="visitorEmail" className="block text-sm font-medium text-privacy-text-secondary mb-1 text-left">
+                    Email (opcional)
+                </label>
                 <input
+                    id="visitorEmail"
                     type="email"
                     value={visitorEmail}
                     onChange={(e) => setVisitorEmail(e.target.value)}
                     className={inputStyle}
-                    placeholder="Seu e-mail (opcional)"
+                    placeholder="seuemail@exemplo.com"
                 />
             </div>
             <button

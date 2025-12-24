@@ -76,6 +76,7 @@ serve(async (req: Request) => {
     const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null;
 
     // 4. Chamar a RPC para validação e consumo atômico
+    // Usamos parâmetros nomeados para evitar problemas de ordem
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('consume_access_link', {
         p_token_hash: tokenHash,
         p_visitor_name: visitor_name || null,
@@ -87,6 +88,7 @@ serve(async (req: Request) => {
 
     if (rpcError) {
       console.error("[validate-access-link] RPC Error:", rpcError);
+      // Retorna erro RPC_ERROR com a mensagem limpa
       return createResponse(false, { code: "RPC_ERROR", message: rpcError.message });
     }
     

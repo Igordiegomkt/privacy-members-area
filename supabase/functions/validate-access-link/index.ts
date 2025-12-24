@@ -79,17 +79,21 @@ serve(async (req: Request) => {
 
     // 1. Calcular token_hash
     const tokenHash = await sha256Hex(token);
+    const now = new Date().toISOString();
 
     // 2. Tentar UPDATE atômico (incrementa 'uses' e verifica todas as condições)
-    // Nota: O uses.lt.max_uses usa o valor ANTES do incremento.
     const { data: updatedLink, error: updateError } = await supabaseAdmin
       .from('access_links')
-      .update({ uses: supabaseAdmin.rpc('uses') + 1 }) // Incrementa uses
+      .update({ 
+        uses: supabaseAdmin.rpc('uses') + 1, // Incrementa uses
+        last_used_at: now, // Atualiza o último uso
+        first_used_at: supabaseAdmin.rpc('coalesce', supabaseAdmin.rpc('first_used_at'), now), // Define o primeiro uso se for NULL
+      }) 
       .select('scope, model_id, product_id, expires_at, active, max_uses, uses')
       .eq('token_hash', tokenHash)
       .eq('active', true)
       .or('expires_at.is.null,expires_at.gt.now()') // Não expirado
-      .or('max_uses.is.null,uses.lt.max_uses') // Não atingiu limite
+      .or('max_uses.is.null,uses.lt.max_uses') // Não atingiu limite (usa o valor ANTES do incremento)
       .single();
 
     if (updateError) {
@@ -121,14 +125,13 @@ serve(async (req: Request) => {
       return createResponse(false, { code: "INVALID_LINK", message: "Link de acesso não encontrado." });
     }
 
-    const now = new Date();
     const expiresAt = link.expires_at ? new Date(link.expires_at) : null;
 
     if (!link.active) {
       return createResponse(false, { code: "INACTIVE_LINK", message: "Link inativo." });
     }
 
-    if (expiresAt && now > expiresAt) {
+    if (expiresAt && new Date() > expiresAt) {
       return createResponse(false, { code: "EXPIRED_LINK", message: "Link expirado." });
     }
 

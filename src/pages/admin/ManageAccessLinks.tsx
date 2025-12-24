@@ -2,9 +2,10 @@ import * as React from 'react';
 import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Model, Product } from '../../types';
-import { Link as LinkIcon, Copy, Check, Trash2, ToggleLeft, ToggleRight, Clock, Users, Calendar, XCircle } from 'lucide-react';
+import { Link as LinkIcon, Copy, Check, Trash2, ToggleLeft, ToggleRight, Clock, Users, Calendar, XCircle, Edit } from 'lucide-react';
 import { useAuth } from '../../contexts/AuthContext';
-import { sha256Hex, generateStrongToken } from '../../lib/crypto'; // Importando utilitários de criptografia
+import { sha256Hex, generateStrongToken } from '../../lib/crypto';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../../components/ui/dialog';
 
 // Tipos para a tabela access_links
 interface AccessLink {
@@ -19,6 +20,8 @@ interface AccessLink {
     active: boolean;
     created_at: string;
     created_by: string | null;
+    last_used_at: string | null; // Novo campo
+    first_used_at: string | null; // Novo campo
 }
 
 // Tipos para o formulário
@@ -31,8 +34,100 @@ interface LinkFormData {
 }
 
 const DOMAIN = window.location.origin;
+const inputStyle = "w-full px-4 py-2 bg-privacy-black border border-privacy-border rounded-lg text-privacy-text-primary text-sm focus:outline-none focus:border-primary transition-colors";
 
-const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: () => void, userId: string }> = ({ models, products, onLinkCreated, userId }: { models: Model[], products: Product[], onLinkCreated: () => void, userId: string }) => {
+// --- Componente de Edição ---
+interface EditLinkModalProps {
+    link: AccessLink;
+    onSave: (id: string, updates: { expires_at: string | null, max_uses: number | null, active: boolean }) => void;
+    onClose: () => void;
+}
+
+const EditLinkModal: React.FC<EditLinkModalProps> = ({ link, onSave, onClose }: EditLinkModalProps) => {
+    const [expiresAt, setExpiresAt] = useState(link.expires_at ? new Date(link.expires_at).toISOString().slice(0, 16) : '');
+    const [maxUses, setMaxUses] = useState<number | string>(link.max_uses ?? '');
+    const [active, setActive] = useState(link.active);
+    const [loading, setLoading] = useState(false);
+
+    const handleSave = () => {
+        setLoading(true);
+        
+        // 1. Tratar maxUses: vazio ou 0 => null (ilimitado)
+        let finalMaxUses: number | null = null;
+        if (typeof maxUses === 'number' && maxUses >= 1) {
+            finalMaxUses = maxUses;
+        } else if (typeof maxUses === 'string' && parseInt(maxUses, 10) >= 1) {
+            finalMaxUses = parseInt(maxUses, 10);
+        }
+        
+        // 2. Tratar expiresAt: vazio => null
+        const finalExpiresAt = expiresAt ? new Date(expiresAt).toISOString() : null;
+
+        onSave(link.id, {
+            expires_at: finalExpiresAt,
+            max_uses: finalMaxUses,
+            active,
+        });
+        setLoading(false);
+        onClose();
+    };
+
+    return (
+        <DialogContent>
+            <DialogHeader>
+                <DialogTitle>Editar Link de Acesso</DialogTitle>
+            </DialogHeader>
+            <div className="space-y-4">
+                <p className="text-sm text-privacy-text-secondary">Escopo: <span className="font-semibold text-white capitalize">{link.scope}</span></p>
+                
+                <div>
+                    <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Expira em (Opcional)</label>
+                    <input 
+                        type="datetime-local" 
+                        value={expiresAt} 
+                        onChange={e => setExpiresAt(e.target.value)} 
+                        className={inputStyle} 
+                    />
+                    <p className="text-xs text-privacy-text-secondary/70 mt-1">Deixe vazio para nunca expirar. (Seu horário local)</p>
+                </div>
+                
+                <div>
+                    <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Usos Máximos</label>
+                    <input 
+                        type="number" 
+                        value={maxUses} 
+                        onChange={e => setMaxUses(e.target.value)} 
+                        placeholder="0 ou vazio = Ilimitado" 
+                        className={inputStyle} 
+                        min="0"
+                    />
+                    <p className="text-xs text-privacy-text-secondary/70 mt-1">Usos atuais: {link.uses}</p>
+                </div>
+
+                <div className="flex items-center gap-3">
+                    <label className="text-sm font-medium text-privacy-text-secondary">Status</label>
+                    <button 
+                        type="button"
+                        onClick={() => setActive(prev => !prev)}
+                        className={`p-1 rounded-full transition-colors flex items-center gap-2 ${active ? 'text-green-500 bg-green-500/20' : 'text-red-500 bg-red-500/20'}`}
+                    >
+                        {active ? <ToggleRight size={20} /> : <ToggleLeft size={20} />}
+                        {active ? 'Ativo' : 'Inativo'}
+                    </button>
+                </div>
+            </div>
+            <DialogFooter>
+                <button onClick={onClose} className="bg-privacy-border text-white font-semibold py-2 px-4 rounded-lg">Cancelar</button>
+                <button onClick={handleSave} disabled={loading} className="bg-primary text-black font-bold py-2 px-4 rounded-lg disabled:opacity-50">
+                    {loading ? 'Salvando...' : 'Salvar Alterações'}
+                </button>
+            </DialogFooter>
+        </DialogContent>
+    );
+};
+
+// --- Componente de Criação ---
+const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string }> = ({ models, products, onLinkCreated, userId }: { models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string }) => {
     const [formData, setFormData] = useState<LinkFormData>({
         scope: 'global',
         modelId: '',
@@ -42,26 +137,23 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
     });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const [generatedLink, setGeneratedLink] = useState<string | null>(null);
-    const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
         setFormData(prev => ({ ...prev, [name]: value }));
-        setGeneratedLink(null);
         setError(null);
     };
     
     const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
         const value = e.target.value;
-        setFormData(prev => ({ ...prev, maxUses: value ? parseInt(value, 10) : null }));
+        // Permite string vazia ou 0, que serão tratados como null (ilimitado)
+        setFormData(prev => ({ ...prev, maxUses: value === '' ? null : parseInt(value, 10) }));
     };
 
     const handleGenerateToken = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
         setError(null);
-        setGeneratedLink(null);
 
         const { scope, modelId, productId, expiresAt, maxUses } = formData;
 
@@ -81,34 +173,47 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
             setLoading(false);
             return;
         }
+        
+        // 1. Tratar maxUses: vazio ou 0 => null (ilimitado)
+        let finalMaxUses: number | null = null;
+        if (maxUses !== null && maxUses >= 1) {
+            finalMaxUses = maxUses;
+        }
+        if (maxUses !== null && maxUses < 0) {
+            setError('Usos máximos deve ser um número positivo.');
+            setLoading(false);
+            return;
+        }
+        
+        // 2. Tratar expiresAt: vazio => null
+        const finalExpiresAt = expiresAt ? new Date(expiresAt).toISOString() : null;
 
         try {
-            // 1. Gerar token forte
+            // 3. Gerar token forte
             const rawToken = generateStrongToken();
             
-            // 2. Calcular SHA256 hash
+            // 4. Calcular SHA256 hash
             const tokenHash = await sha256Hex(rawToken);
 
-            // 3. Preparar payload
+            // 5. Preparar payload
             const payload = {
                 token_hash: tokenHash,
                 scope,
                 model_id: scope === 'model' ? modelId : null,
                 product_id: scope === 'product' ? productId : null,
-                expires_at: expiresAt || null,
-                max_uses: maxUses,
+                expires_at: finalExpiresAt,
+                max_uses: finalMaxUses,
                 created_by: userId,
             };
 
-            // 4. Inserir no Supabase
+            // 6. Inserir no Supabase
             const { error: insertError } = await supabase.from('access_links').insert([payload]);
 
             if (insertError) throw insertError;
 
-            // 5. Mostrar link final no formato de trilha
+            // 7. Mostrar link final no formato de trilha
             const finalLink = `${DOMAIN}/acesso/${rawToken}`;
-            setGeneratedLink(finalLink);
-            onLinkCreated();
+            onLinkCreated(finalLink);
 
         } catch (err: any) {
             console.error('Error generating link:', err);
@@ -118,15 +223,6 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
         }
     };
     
-    const handleCopyLink = () => {
-        if (!generatedLink) return;
-        navigator.clipboard.writeText(generatedLink);
-        setCopyFeedback('Link copiado!');
-        setTimeout(() => setCopyFeedback(null), 2000);
-    };
-
-    const inputStyle = "w-full px-4 py-2 bg-privacy-black border border-privacy-border rounded-lg text-privacy-text-primary text-sm focus:outline-none focus:border-primary transition-colors";
-
     return (
         <form onSubmit={handleGenerateToken} className="bg-privacy-surface p-6 rounded-lg space-y-4">
             <h2 className="text-xl font-bold text-white mb-4">Gerar Novo Link de Acesso</h2>
@@ -166,46 +262,24 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
                 <div>
                     <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Expira em (Opcional)</label>
                     <input type="datetime-local" name="expiresAt" value={formData.expiresAt} onChange={handleChange} className={inputStyle} />
-                    <p className="text-xs text-privacy-text-secondary/70 mt-1">Deixe vazio para nunca expirar.</p>
+                    <p className="text-xs text-privacy-text-secondary/70 mt-1">Deixe vazio para nunca expirar. (Seu horário local)</p>
                 </div>
                 <div>
-                    <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Usos Máximos (Opcional)</label>
-                    <input type="number" name="maxUses" value={formData.maxUses ?? ''} onChange={handleNumberChange} placeholder="Ilimitado" className={inputStyle} min="1" />
-                    <p className="text-xs text-privacy-text-secondary/70 mt-1">Deixe vazio para usos ilimitados.</p>
+                    <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Usos Máximos</label>
+                    <input type="number" name="maxUses" value={formData.maxUses ?? ''} onChange={handleNumberChange} placeholder="0 ou vazio = Ilimitado" className={inputStyle} min="0" />
+                    <p className="text-xs text-privacy-text-secondary/70 mt-1">0 ou vazio = Ilimitado</p>
                 </div>
             </div>
 
             <button type="submit" disabled={loading} className="w-full bg-primary text-black font-bold py-3 rounded-lg hover:opacity-90 transition disabled:opacity-50">
                 {loading ? 'Gerando...' : 'Gerar Link de Acesso'}
             </button>
-            
-            {generatedLink && (
-                <div className="mt-4 p-4 bg-green-500/10 border border-green-500/50 rounded-lg space-y-2">
-                    <p className="text-green-400 font-semibold flex items-center gap-2">
-                        <Check size={16} /> Link Gerado com Sucesso!
-                    </p>
-                    <div className="flex items-center gap-2 bg-privacy-black p-2 rounded-md">
-                        <input 
-                            type="text" 
-                            value={generatedLink} 
-                            readOnly 
-                            className="flex-1 bg-transparent text-xs text-white truncate"
-                        />
-                        <button type="button" onClick={handleCopyLink} className="text-xs bg-primary/20 text-primary font-semibold px-2 py-1 rounded-md hover:bg-primary/40">
-                            <Copy size={14} className="inline mr-1" /> Copiar
-                        </button>
-                    </div>
-                    {copyFeedback && <p className="text-xs text-center text-green-400">{copyFeedback}</p>}
-                    <p className="text-xs text-green-400/80">
-                        Compartilhe este link. Ele concede acesso temporário/limitado.
-                    </p>
-                </div>
-            )}
         </form>
     );
 };
 
-const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void }> = ({ links, onToggleActive, onDelete }: { links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void }) => {
+// --- Componente de Listagem ---
+const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void, onEdit: (link: AccessLink) => void }> = ({ links, onToggleActive, onDelete, onEdit }: { links: AccessLink[], onToggleActive: (id: string, active: boolean) => void, onDelete: (id: string) => void, onEdit: (link: AccessLink) => void }) => {
     const isExpired = (link: AccessLink) => link.expires_at && new Date(link.expires_at) < new Date();
     const isMaxUses = (link: AccessLink) => link.max_uses !== null && link.uses >= link.max_uses;
 
@@ -220,7 +294,7 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                             <th scope="col" className="px-4 py-3">Escopo</th>
                             <th scope="col" className="px-4 py-3">Usos</th>
                             <th scope="col" className="px-4 py-3">Expira em</th>
-                            <th scope="col" className="px-4 py-3">Criado em</th>
+                            <th scope="col" className="px-4 py-3">Último Acesso</th>
                             <th scope="col" className="px-4 py-3">Ações</th>
                         </tr>
                     </thead>
@@ -229,7 +303,8 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                             const expired = isExpired(link);
                             const maxUses = isMaxUses(link);
                             const statusColor = link.active && !expired && !maxUses ? 'text-green-400' : 'text-red-400';
-                            const statusText = expired ? 'Expirado' : maxUses ? 'Limite Atingido' : link.active ? 'Ativo' : 'Inativo';
+                            const statusText = expired ? 'Expirado' : maxUses ? 'Esgotado' : link.active ? 'Ativo' : 'Inativo';
+                            const lastUsed = link.last_used_at ? new Date(link.last_used_at).toLocaleString('pt-BR') : 'Nunca usado';
 
                             return (
                                 <tr key={link.id} className="bg-privacy-surface border-b border-privacy-border hover:bg-privacy-border/50">
@@ -247,10 +322,17 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                                     <td className="px-4 py-3">
                                         {link.expires_at ? new Date(link.expires_at).toLocaleString('pt-BR') : 'Nunca'}
                                     </td>
-                                    <td className="px-4 py-3">
-                                        {new Date(link.created_at).toLocaleDateString('pt-BR')}
+                                    <td className="px-4 py-3 text-xs">
+                                        {lastUsed}
                                     </td>
                                     <td className="px-4 py-3 space-x-2 flex items-center">
+                                        <button 
+                                            onClick={() => onEdit(link)}
+                                            className="p-1 rounded-full text-primary hover:bg-primary/20 transition-colors"
+                                            title="Editar"
+                                        >
+                                            <Edit size={20} />
+                                        </button>
                                         <button 
                                             onClick={() => onToggleActive(link.id, !link.active)}
                                             className={`p-1 rounded-full transition-colors ${link.active ? 'text-green-500 hover:bg-green-500/20' : 'text-red-500 hover:bg-red-500/20'}`}
@@ -284,6 +366,10 @@ export const ManageAccessLinks: React.FC = () => {
     const [products, setProducts] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
     const [error, setError] = useState<string | null>(null);
+    const [isEditModalOpen, setIsEditModalOpen] = useState(false);
+    const [linkToEdit, setLinkToEdit] = useState<AccessLink | null>(null);
+    const [generatedLink, setGeneratedLink] = useState<string | null>(null);
+    const [isGeneratedModalOpen, setIsGeneratedModalOpen] = useState(false);
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -313,6 +399,26 @@ export const ManageAccessLinks: React.FC = () => {
     useEffect(() => {
         fetchData();
     }, [fetchData]);
+
+    const handleLinkCreated = (link: string) => {
+        setGeneratedLink(link);
+        setIsGeneratedModalOpen(true);
+        fetchData(); // Recarrega a lista para mostrar o novo link
+    };
+
+    const handleEdit = (link: AccessLink) => {
+        setLinkToEdit(link);
+        setIsEditModalOpen(true);
+    };
+
+    const handleSaveEdit = async (id: string, updates: { expires_at: string | null, max_uses: number | null, active: boolean }) => {
+        const { error: updateError } = await supabase.from('access_links').update(updates).eq('id', id);
+        if (updateError) {
+            alert(`Erro ao atualizar link: ${updateError.message}`);
+        } else {
+            fetchData();
+        }
+    };
 
     const handleToggleActive = async (id: string, active: boolean) => {
         const { error: updateError } = await supabase.from('access_links').update({ active }).eq('id', id);
@@ -345,7 +451,7 @@ export const ManageAccessLinks: React.FC = () => {
                 <LinkForm 
                     models={models} 
                     products={products} 
-                    onLinkCreated={fetchData} 
+                    onLinkCreated={handleLinkCreated} 
                     userId={user.id}
                 />
             </div>
@@ -354,7 +460,58 @@ export const ManageAccessLinks: React.FC = () => {
                 links={links} 
                 onToggleActive={handleToggleActive} 
                 onDelete={handleDelete}
+                onEdit={handleEdit}
             />
+            
+            {/* Modal de Edição */}
+            <Dialog open={isEditModalOpen} onOpenChange={setIsEditModalOpen}>
+                {linkToEdit && (
+                    <EditLinkModal 
+                        link={linkToEdit} 
+                        onSave={handleSaveEdit} 
+                        onClose={() => setIsEditModalOpen(false)} 
+                    />
+                )}
+            </Dialog>
+
+            {/* Modal de Link Gerado (Segurança: Copiar Agora) */}
+            <Dialog open={isGeneratedModalOpen} onOpenChange={setIsGeneratedModalOpen}>
+                <DialogContent>
+                    <DialogHeader>
+                        <DialogTitle className="text-green-400 flex items-center gap-2">
+                            <Check size={20} /> Link Gerado com Sucesso!
+                        </DialogTitle>
+                    </DialogHeader>
+                    <div className="space-y-4">
+                        <p className="text-sm text-white">
+                            <span className="font-bold text-red-400">ATENÇÃO:</span> Copie o link abaixo AGORA. Por motivos de segurança, o token não será exibido novamente.
+                        </p>
+                        <div className="flex items-center gap-2 bg-privacy-black p-3 rounded-md border border-green-500/50">
+                            <input 
+                                type="text" 
+                                value={generatedLink || ''} 
+                                readOnly 
+                                className="flex-1 bg-transparent text-xs text-white truncate"
+                            />
+                            <button 
+                                type="button" 
+                                onClick={() => {
+                                    if (generatedLink) navigator.clipboard.writeText(generatedLink);
+                                    alert('Link copiado!');
+                                }} 
+                                className="text-xs bg-primary/20 text-primary font-semibold px-2 py-1 rounded-md hover:bg-primary/40"
+                            >
+                                <Copy size={14} className="inline mr-1" /> Copiar
+                            </button>
+                        </div>
+                    </div>
+                    <DialogFooter>
+                        <button onClick={() => setIsGeneratedModalOpen(false)} className="bg-primary text-black font-bold py-2 px-4 rounded-lg">
+                            Entendi
+                        </button>
+                    </DialogFooter>
+                </DialogContent>
+            </Dialog>
         </div>
     );
 };

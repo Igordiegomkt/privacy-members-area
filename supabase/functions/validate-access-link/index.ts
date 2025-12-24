@@ -30,18 +30,6 @@ const supabaseAdmin = createClient(SUPABASE_URL!, SUPABASE_SERVICE_ROLE_KEY!, {
   auth: { persistSession: false },
 });
 
-interface AccessLink {
-  id: string;
-  token_hash: string;
-  scope: 'global' | 'model' | 'product';
-  model_id: string | null;
-  product_id: string | null;
-  expires_at: string | null;
-  max_uses: number | null;
-  uses: number;
-  active: boolean;
-}
-
 interface Grant {
   scope: 'global' | 'model' | 'product';
   model_id: string | null;
@@ -79,91 +67,44 @@ serve(async (req: Request) => {
 
     // 1. Calcular token_hash
     const tokenHash = await sha256Hex(token);
-    const now = new Date().toISOString();
+    
+    // 2. Obter dados do visitante e IP
     const userAgent = req.headers.get('user-agent') || null;
     const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null;
 
+    // 3. Chamar a RPC para validação e consumo atômico
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('consume_access_link', {
+        p_token_hash: tokenHash,
+        p_visitor_name: visitor_name || null,
+        p_visitor_email: visitor_email || null,
+        p_user_id: user_id || null,
+        p_user_agent: userAgent,
+        p_ip: ipAddress,
+    });
 
-    // 2. Tentar UPDATE atômico (incrementa 'uses' e verifica todas as condições)
-    const { data: updatedLink, error: updateError } = await supabaseAdmin
-      .from('access_links')
-      .update({ 
-        uses: supabaseAdmin.rpc('uses') + 1, // Incrementa uses
-        last_used_at: now, // Atualiza o último uso
-        first_used_at: supabaseAdmin.rpc('coalesce', supabaseAdmin.rpc('first_used_at'), now), // Define o primeiro uso se for NULL
-      }) 
-      .select('id, scope, model_id, product_id, expires_at, active, max_uses, uses')
-      .eq('token_hash', tokenHash)
-      .eq('active', true)
-      .or('expires_at.is.null,expires_at.gt.now()') // Não expirado
-      .or('max_uses.is.null,uses.lt.max_uses') // Não atingiu limite (usa o valor ANTES do incremento)
-      .single();
-
-    if (updateError) {
-      // Se o erro for de DB, logamos e retornamos erro genérico
-      console.error("[validate-access-link] Error during atomic update:", updateError);
-      return createResponse(false, { code: "DB_UPDATE_ERROR", message: "Erro ao registrar uso do link." });
+    if (rpcError) {
+      console.error("[validate-access-link] RPC Error:", rpcError);
+      return createResponse(false, { code: "RPC_ERROR", message: rpcError.message });
     }
     
-    // 3. Se o UPDATE retornou um link, o acesso é concedido
-    if (updatedLink) {
-        const grant: Grant = {
-            scope: updatedLink.scope,
-            model_id: updatedLink.model_id,
-            product_id: updatedLink.product_id,
-            expires_at: updatedLink.expires_at,
-        };
-        
-        // 3.1. Registrar a visita (não-atômico, mas importante)
-        const { error: visitError } = await supabaseAdmin
-            .from('access_link_visits')
-            .insert({
-                access_link_id: updatedLink.id,
-                visitor_name: visitor_name || null,
-                visitor_email: visitor_email || null,
-                user_id: user_id || null,
-                user_agent: userAgent,
-                ip: ipAddress,
-            });
-            
-        if (visitError) {
-            console.error("[validate-access-link] Error inserting visit log:", visitError);
-            // Não é fatal, mas logamos
-        }
-        
-        return createResponse(true, { grant });
+    const result = rpcData?.[0];
+
+    if (!result || result.ok === false) {
+        // Retorna o código de erro exato da RPC
+        const code = result?.code || 'UNKNOWN_VALIDATION_ERROR';
+        const message = result?.message || 'Falha na validação do link.';
+        return createResponse(false, { code, message });
     }
 
-    // 4. Se o UPDATE não retornou linha, o link falhou em alguma condição.
-    // Fazemos um SELECT simples para determinar o motivo exato (fail-closed).
-    const { data: link, error: fetchError } = await supabaseAdmin
-      .from('access_links')
-      .select('active, expires_at, max_uses, uses')
-      .eq('token_hash', tokenHash)
-      .single();
-
-    if (fetchError || !link) {
-      return createResponse(false, { code: "INVALID_LINK", message: "Link de acesso não encontrado." });
-    }
-
-    const expiresAt = link.expires_at ? new Date(link.expires_at) : null;
-
-    if (!link.active) {
-      return createResponse(false, { code: "INACTIVE_LINK", message: "Link inativo." });
-    }
-
-    if (expiresAt && new Date() > expiresAt) {
-      return createResponse(false, { code: "EXPIRED_LINK", message: "Link expirado." });
-    }
-
-    // Se o link existe, está ativo, não expirou, mas o UPDATE falhou,
-    // significa que a condição 'uses.lt.max_uses' falhou (limite atingido).
-    if (link.max_uses !== null && link.uses >= link.max_uses) {
-      return createResponse(false, { code: "MAX_USES", message: "Limite de usos atingido." });
-    }
+    // 4. Sucesso: Retorna o grant
+    const grant: Grant = {
+        scope: result.scope as 'global' | 'model' | 'product',
+        model_id: result.model_id,
+        product_id: result.product_id,
+        expires_at: result.expires_at,
+    };
     
-    // Fallback para erro desconhecido (deve ser raro)
-    return createResponse(false, { code: "UNKNOWN_VALIDATION_ERROR", message: "Falha na validação do link." });
+    return createResponse(true, { grant });
 
   } catch (err) {
     const e = err as Error;

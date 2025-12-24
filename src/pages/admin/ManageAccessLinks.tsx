@@ -62,6 +62,7 @@ const VisitModal: React.FC<VisitModalProps> = ({ linkId, onClose }: VisitModalPr
     useEffect(() => {
         const fetchVisits = async () => {
             setLoading(true);
+            // RLS garante que apenas admins podem ler esta tabela
             const { data, error } = await supabase
                 .from('access_link_visits')
                 .select('*')
@@ -507,8 +508,9 @@ export const ManageAccessLinks: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
+            // Buscando token_plain para exibição no Admin
             const [linksRes, modelsRes, productsRes] = await Promise.all([
-                supabase.from('access_links').select('*').order('created_at', { ascending: false }),
+                supabase.from('access_links').select('*, token_plain').order('created_at', { ascending: false }),
                 supabase.from('models').select('id, name, username'),
                 supabase.from('products').select('id, name, type'),
             ]);

@@ -49,6 +49,18 @@ interface Grant {
   expires_at: string | null;
 }
 
+/**
+ * Calcula o hash SHA-256 de uma string e retorna o resultado em formato hexadecimal.
+ */
+async function sha256Hex(input: string): Promise<string> {
+  const data = new TextEncoder().encode(input);
+  const digest = await crypto.subtle.digest("SHA-256", data);
+  return Array.from(new Uint8Array(digest))
+    .map((b) => b.toString(16).padStart(2, "0"))
+    .join("");
+}
+
+
 serve(async (req: Request) => {
   if (req.method === "OPTIONS") {
     return new Response("ok", { headers: corsHeaders });
@@ -66,68 +78,66 @@ serve(async (req: Request) => {
     }
 
     // 1. Calcular token_hash
-    const tokenHash = createHash("sha256").update(token).toString("hex");
+    const tokenHash = await sha256Hex(token);
 
-    // 2. Buscar link de acesso
+    // 2. Tentar UPDATE atômico (incrementa 'uses' e verifica todas as condições)
+    const { data: updatedLink, error: updateError } = await supabaseAdmin
+      .from('access_links')
+      .update({ uses: supabaseAdmin.rpc('uses') + 1 }) // Incrementa uses
+      .select('scope, model_id, product_id, expires_at, active, max_uses, uses')
+      .eq('token_hash', tokenHash)
+      .eq('active', true)
+      .or('expires_at.is.null,expires_at.gt.now()') // Não expirado
+      .or('max_uses.is.null,uses.lt.max_uses') // Não atingiu limite (usa o valor ANTES do incremento)
+      .single();
+
+    if (updateError) {
+      console.error("[validate-access-link] Error during atomic update:", updateError);
+      return createResponse(false, { code: "DB_UPDATE_ERROR", message: "Erro ao registrar uso do link." });
+    }
+    
+    // 3. Se o UPDATE retornou um link, o acesso é concedido
+    if (updatedLink) {
+        const grant: Grant = {
+            scope: updatedLink.scope,
+            model_id: updatedLink.model_id,
+            product_id: updatedLink.product_id,
+            expires_at: updatedLink.expires_at,
+        };
+        return createResponse(true, { grant });
+    }
+
+    // 4. Se o UPDATE não retornou linha, o link falhou em alguma condição.
+    // Fazemos um SELECT simples para determinar o motivo exato (fail-closed).
     const { data: link, error: fetchError } = await supabaseAdmin
       .from('access_links')
-      .select('*')
+      .select('active, expires_at, max_uses, uses')
       .eq('token_hash', tokenHash)
       .single();
 
     if (fetchError || !link) {
-      console.warn("[validate-access-link] Link not found or DB error:", fetchError?.message);
       return createResponse(false, { code: "INVALID_LINK", message: "Link de acesso não encontrado." });
     }
 
     const now = new Date();
     const expiresAt = link.expires_at ? new Date(link.expires_at) : null;
 
-    // 3. Validar status
     if (!link.active) {
       return createResponse(false, { code: "INACTIVE_LINK", message: "Link inativo." });
     }
 
-    // 4. Validar expiração
     if (expiresAt && now > expiresAt) {
       return createResponse(false, { code: "EXPIRED_LINK", message: "Link expirado." });
     }
 
-    // 5. Validar limite de usos
+    // Se o link existe, está ativo, não expirou, mas o UPDATE falhou,
+    // significa que a condição 'uses.lt.max_uses' falhou (limite atingido).
     if (link.max_uses !== null && link.uses >= link.max_uses) {
       return createResponse(false, { code: "MAX_USES", message: "Limite de usos atingido." });
     }
-
-    // 6. Incrementar uses (transacionalmente)
-    const { error: updateError, count } = await supabaseAdmin
-      .from('access_links')
-      .update({ uses: link.uses + 1 })
-      .eq('id', link.id)
-      // Condição de segurança para evitar race condition no max_uses
-      .or(
-        `max_uses.is.null,uses.lt.${link.max_uses}`
-      )
-      .select('*', { count: 'exact' });
-
-    if (updateError) {
-      console.error("[validate-access-link] Error updating uses:", updateError);
-      return createResponse(false, { code: "DB_UPDATE_ERROR", message: "Erro ao registrar uso do link." });
-    }
     
-    // Se count for 0, significa que a condição de uses < max_uses falhou (race condition)
-    if (count === 0 && link.max_uses !== null) {
-        return createResponse(false, { code: "MAX_USES", message: "Limite de usos atingido (race condition)." });
-    }
-
-    // 7. Retornar o grant
-    const grant: Grant = {
-      scope: link.scope,
-      model_id: link.model_id,
-      product_id: link.product_id,
-      expires_at: link.expires_at,
-    };
-
-    return createResponse(true, { grant });
+    // Fallback para erro desconhecido (deve ser raro)
+    return createResponse(false, { code: "UNKNOWN_VALIDATION_ERROR", message: "Falha na validação do link." });
 
   } catch (err) {
     const e = err as Error;

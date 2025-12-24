@@ -27,9 +27,9 @@ import PurchaseFailed from './pages/PurchaseFailed';
 import { AiTools } from './pages/admin/AiTools';
 import { CheckoutModal } from './components/CheckoutModal';
 import { AdminNotifications } from './pages/admin/AdminNotifications';
-import { ManageAccessLinks } from './pages/admin/ManageAccessLinks'; // Novo import
+import { ManageAccessLinks } from './pages/admin/ManageAccessLinks';
+import { AccessLinkEntry } from './pages/AccessLinkEntry'; // Novo import
 import { useAuth } from './contexts/AuthContext';
-import { extractAccessTokenFromUrl, validateAccessToken, saveGrant, clearTokenFromUrl } from './lib/accessGrant'; // Novos imports
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {
@@ -69,41 +69,15 @@ const AuthHandler: React.FC = () => {
   return null;
 };
 
-// Componente para lidar com o token de acesso na URL
-const AccessTokenHandler: React.FC = () => {
-    useEffect(() => {
-        const token = extractAccessTokenFromUrl();
-        if (token) {
-            validateAccessToken(token)
-                .then(grant => {
-                    if (grant) {
-                        saveGrant(grant);
-                        console.log('[AccessTokenHandler] Grant saved:', grant);
-                    } else {
-                        console.warn('[AccessTokenHandler] Token validation failed or expired.');
-                    }
-                })
-                .catch(err => {
-                    console.error('[AccessTokenHandler] Validation error:', err);
-                })
-                .finally(() => {
-                    // Sempre limpa a URL após a tentativa de validação
-                    clearTokenFromUrl();
-                });
-        }
-    }, []);
-    return null;
-};
-
 
 function App() {
   return (
     <>
       <AuthHandler />
-      <AccessTokenHandler /> {/* Novo handler de token */}
       <Routes>
         {/* User Routes */}
         <Route path="/login" element={<Login />} />
+        <Route path="/acesso/:token" element={<AccessLinkEntry />} /> {/* Nova Rota de Trilha */}
         
         <Route element={<ProtectedRouteUser><UserLayout /></ProtectedRouteUser>}>
           <Route path="/" element={<Home />} /> {/* Nova Home de Modelos */}
@@ -134,7 +108,7 @@ function App() {
             <Route path="/admin/configuracoes" element={<PaymentSettings />} />
             <Route path="/admin/ia" element={<AiTools />} />
             <Route path="/admin/notificacoes" element={<AdminNotifications />} />
-            <Route path="/admin/links-acesso" element={<ManageAccessLinks />} /> {/* Nova Rota */}
+            <Route path="/admin/links-acesso" element={<ManageAccessLinks />} />
           </Route>
         </Route>
 

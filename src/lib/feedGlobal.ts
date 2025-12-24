@@ -83,9 +83,9 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
     }
 
     // 3. Mapear para GlobalFeedItem, determinando o status de acesso
-    const feedItems = feedData
+    const feedItemPromises = feedData
       .filter(item => item.media && item.model)
-      .map((item: any): GlobalFeedItem => {
+      .map(async (item: any): Promise<GlobalFeedItem> => {
         const mediaItem = item.media as unknown as MediaItem;
         const model = item.model as unknown as Model & { products: any[] };
         const rawProducts = model.products || [];
@@ -125,7 +125,8 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
         }
 
         const accessContext = { purchases: userPurchases, productsForModel, model };
-        let accessStatus = computeMediaAccessStatus(mediaItem, accessContext);
+        // CHAMA A FUNÇÃO ASSÍNCRONA
+        let accessStatus = await computeMediaAccessStatus(mediaItem, accessContext);
         
         // Usar a copy do feed se existir, senão a da mídia
         const finalMedia: MediaItemWithAccess = {
@@ -147,6 +148,8 @@ export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?
           mainProductId, 
         };
       });
+      
+    const feedItems = await Promise.all(feedItemPromises);
 
     // Determine if there are more items to load
     const hasMore = count === pageSize;

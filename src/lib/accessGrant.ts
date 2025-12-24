@@ -1,38 +1,22 @@
 import { supabase } from './supabase';
+import { sha256Hex } from './crypto'; // Importando sha256Hex
 
 export interface AccessGrant {
   scope: 'global' | 'model' | 'product';
   model_id: string | null;
   product_id: string | null;
-  expires_at: string | null;
+  expires_at: string | null; // Expiration set by Admin
+  local_expires_at: string; // Local TTL (24h)
 }
 
 const STORAGE_KEY = 'access_grant';
 
 /**
- * Extrai o token de acesso da query string (?access=TOKEN).
- */
-export const extractAccessTokenFromUrl = (): string | null => {
-  const params = new URLSearchParams(window.location.search);
-  return params.get('access');
-};
-
-/**
- * Limpa o parâmetro 'access' da URL sem recarregar a página.
- */
-export const clearTokenFromUrl = (): void => {
-  const url = new URL(window.location.href);
-  if (url.searchParams.has('access')) {
-    url.searchParams.delete('access');
-    window.history.replaceState({}, document.title, url.toString());
-  }
-};
-
-/**
  * Valida o token de acesso chamando a Edge Function.
  */
-export const validateAccessToken = async (token: string): Promise<AccessGrant | null> => {
+export const validateAccessToken = async (token: string): Promise<Omit<AccessGrant, 'local_expires_at'> | null> => {
   try {
+    // Não precisamos mais calcular o hash aqui, a EF faz isso.
     const { data, error } = await supabase.functions.invoke('validate-access-link', {
       body: { token },
     });
@@ -47,7 +31,8 @@ export const validateAccessToken = async (token: string): Promise<AccessGrant | 
       return null;
     }
 
-    return data.grant as AccessGrant;
+    // Retorna o grant sem o local_expires_at, que será adicionado no saveGrant
+    return data.grant as Omit<AccessGrant, 'local_expires_at'>;
   } catch (e) {
     console.error('[validateAccessToken] Unexpected error:', e);
     return null;
@@ -55,9 +40,17 @@ export const validateAccessToken = async (token: string): Promise<AccessGrant | 
 };
 
 /**
- * Salva o grant no localStorage.
+ * Salva o grant no localStorage, adicionando um TTL local de 24h.
  */
-export const saveGrant = (grant: AccessGrant): void => {
+export const saveGrant = (grantFromServer: Omit<AccessGrant, 'local_expires_at'>): void => {
+  const now = new Date();
+  const localExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(); // 24 horas
+  
+  const grant: AccessGrant = {
+      ...grantFromServer,
+      local_expires_at: localExpiresAt,
+  };
+  
   localStorage.setItem(STORAGE_KEY, JSON.stringify(grant));
 };
 
@@ -70,15 +63,26 @@ export const getValidGrant = (): AccessGrant | null => {
 
   try {
     const grant: AccessGrant = JSON.parse(stored);
+    const now = new Date();
 
+    // 1. Verificar expiração local (24h TTL)
+    if (new Date(grant.local_expires_at) < now) {
+        console.log('[getValidGrant] Local grant expired (24h TTL).');
+        localStorage.removeItem(STORAGE_KEY);
+        return null;
+    }
+
+    // 2. Verificar expiração do Admin (se definida)
     if (grant.expires_at) {
       const expiresAt = new Date(grant.expires_at);
-      if (new Date() > expiresAt) {
-        console.log('[getValidGrant] Grant expired.');
+      if (now > expiresAt) {
+        console.log('[getValidGrant] Admin grant expired.');
         localStorage.removeItem(STORAGE_KEY);
         return null;
       }
     }
+    
+    // Se passou nas duas verificações, é válido
     return grant;
   } catch (e) {
     console.error('[getValidGrant] Error parsing stored grant:', e);

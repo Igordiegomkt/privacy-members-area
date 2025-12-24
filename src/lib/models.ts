@@ -24,7 +24,7 @@ interface AccessContext {
 /**
  * Verifica se o AccessGrant temporário concede acesso a esta mídia.
  */
-function checkGrantAccess(media: MediaItem, grant: AccessGrant, productsForModel: Product[]): boolean {
+async function checkGrantAccess(media: MediaItem, grant: AccessGrant, productsForModel: Product[]): Promise<boolean> {
     if (grant.scope === 'global') {
         return true;
     }
@@ -34,47 +34,26 @@ function checkGrantAccess(media: MediaItem, grant: AccessGrant, productsForModel
     }
 
     if (grant.scope === 'product' && grant.product_id) {
-        // Verifica se a mídia está vinculada ao produto do grant
-        // Nota: Como não temos a relação product_media no objeto media,
-        // precisamos de uma forma de verificar se a mídia pertence ao produto.
-        // Para simplificar e evitar uma query extra por mídia, vamos assumir
-        // que se a mídia pertence à modelo do produto, e o produto é o único
-        // produto base, liberamos.
-        
-        // Alternativa mais robusta (requer query):
-        // Se a mídia for de um pack, ela estará em product_media.
-        // Se for single_media, o product_id estará na media_items (se implementado).
-        
-        // Para a implementação mínima, vamos verificar se a mídia está ligando ao produto do grant.
-        // Como a tabela media_items não tem product_id, precisamos de uma query.
-        // Para evitar N+1 queries, vamos usar uma heurística: se a mídia for da modelo do produto,
-        // e o produto for o VIP base, liberamos (já que o VIP libera tudo).
-        
-        // HEURÍSTICA SIMPLIFICADA: Se o grant é de um produto, e a mídia é da modelo desse produto,
-        // e o produto é o VIP base, liberamos.
+        // 1. Verificar se é o produto VIP base da modelo (que libera tudo)
         const grantedProduct = productsForModel.find(p => p.id === grant.product_id);
-        
         if (grantedProduct && grantedProduct.is_base_membership && media.model_id === grantedProduct.model_id) {
             return true;
         }
         
-        // Para mídias avulsas/packs, a verificação precisa ser mais precisa.
-        // Como a EF validate-access-link não retorna a lista de media_ids,
-        // vamos focar apenas no escopo 'global' e 'model' para o override inicial.
-        // Se o escopo for 'product', o usuário deve ser redirecionado para a página do produto.
+        // 2. Verificar se a mídia está explicitamente vinculada ao produto (para packs/mídias avulsas)
+        // Nota: Esta é a única query extra que fazemos, mas é necessária para o escopo 'product'.
+        const { count, error } = await supabase
+            .from('product_media')
+            .select('id', { count: 'exact', head: true })
+            .eq('product_id', grant.product_id)
+            .eq('media_id', media.id);
+            
+        if (error) {
+            console.error('Error checking product_media for grant:', error);
+            return false; // Fail-closed
+        }
         
-        // Para evitar complexidade de DB aqui, vamos considerar que o grant 'product'
-        // só libera o acesso se for o produto VIP base da modelo.
-        
-        // Se o grant for de um produto específico (não VIP base), o acesso à mídia
-        // individual não será liberado automaticamente aqui.
-        
-        // Vamos manter a lógica restrita ao escopo 'global' e 'model' por enquanto,
-        // e garantir que o grant 'product' libere o acesso na página do produto.
-        
-        // Se o grant for de um produto, e a mídia for da modelo desse produto,
-        // e o produto for o VIP base, liberamos.
-        if (grantedProduct && grantedProduct.is_base_membership && media.model_id === grantedProduct.model_id) {
+        if (count && count > 0) {
             return true;
         }
     }
@@ -83,14 +62,14 @@ function checkGrantAccess(media: MediaItem, grant: AccessGrant, productsForModel
 }
 
 
-export function computeMediaAccessStatus(
+export async function computeMediaAccessStatus(
   media: MediaItem,
   ctx: AccessContext
-): MediaAccessStatus {
+): Promise<MediaAccessStatus> {
   
   // 1. Verificar AccessGrant temporário
   const grant = getValidGrant();
-  if (grant && checkGrantAccess(media, grant, ctx.productsForModel)) {
+  if (grant && await checkGrantAccess(media, grant, ctx.productsForModel)) {
       return 'unlocked';
   }
   
@@ -210,20 +189,24 @@ export const fetchMediaForModelPage = async (params: { modelId: string, page: nu
     const productsForModel = await fetchProductsForModel(modelId);
     const accessContext: AccessContext = { purchases, productsForModel, model };
 
-    // 6. Compute access status
-    const mediaWithAccess = itemsToProcess.map(media => {
+    // 6. Compute access status (usando Promise.all para chamadas assíncronas)
+    const mediaWithAccessPromises = itemsToProcess.map(async media => {
       const rawThumb = media.thumbnail;
       const isVideoThumb =
         typeof rawThumb === 'string' &&
         (rawThumb.endsWith('.mp4') || rawThumb.endsWith('.mov') || rawThumb.endsWith('.webm'));
       
+      const accessStatus = await computeMediaAccessStatus(media, accessContext);
+      
       return {
         ...media,
         thumbnail: !isVideoThumb ? rawThumb : null, // Garante que thumbnail de vídeo não seja usada
-        accessStatus: computeMediaAccessStatus(media, accessContext),
+        accessStatus: accessStatus,
         model: model, // Adicionando o objeto Model completo
       };
     });
+    
+    const mediaWithAccess = await Promise.all(mediaWithAccessPromises);
     
     console.log('[MODEL PROFILE] fetchMediaForModelPage result', {
       page,

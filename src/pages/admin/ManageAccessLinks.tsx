@@ -3,8 +3,8 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Model, Product } from '../../types';
 import { Link as LinkIcon, Copy, Check, Trash2, ToggleLeft, ToggleRight, Clock, Users, Calendar, XCircle } from 'lucide-react';
-import SHA256 from 'crypto-js/sha256'; // Importação corrigida para SHA256
-import { useAuth } from '../../contexts/AuthContext'; // Importando useAuth
+import { useAuth } from '../../contexts/AuthContext';
+import { sha256Hex, generateStrongToken } from '../../lib/crypto'; // Importando utilitários de criptografia
 
 // Tipos para a tabela access_links
 interface AccessLink {
@@ -83,11 +83,11 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
         }
 
         try {
-            // 1. Gerar token forte (UUID + 16 bytes rand)
-            const rawToken = crypto.randomUUID() + btoa(String.fromCharCode(...crypto.getRandomValues(new Uint8Array(16))));
+            // 1. Gerar token forte
+            const rawToken = generateStrongToken();
             
             // 2. Calcular SHA256 hash
-            const tokenHash = SHA256(rawToken).toString(); // Uso corrigido do SHA256
+            const tokenHash = await sha256Hex(rawToken);
 
             // 3. Preparar payload
             const payload = {
@@ -100,13 +100,13 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
                 created_by: userId,
             };
 
-            // 4. Inserir no Supabase (Service Role Key não é necessário aqui, pois o admin tem RLS INSERT)
+            // 4. Inserir no Supabase
             const { error: insertError } = await supabase.from('access_links').insert([payload]);
 
             if (insertError) throw insertError;
 
-            // 5. Mostrar link final
-            const finalLink = `${DOMAIN}/?access=${rawToken}`;
+            // 5. Mostrar link final no formato de trilha
+            const finalLink = `${DOMAIN}/acesso/${rawToken}`;
             setGeneratedLink(finalLink);
             onLinkCreated();
 

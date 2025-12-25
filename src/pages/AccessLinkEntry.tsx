@@ -59,6 +59,11 @@ export const AccessLinkEntry: React.FC = () => {
 
     if (grantResponse && grantResponse.ok && grantResponse.grant) {
       saveGrant(grantResponse.grant);
+      
+      // PARTE A: Persistir Nome e Email no localStorage
+      if (visitorName) localStorage.setItem('link_validator_name', visitorName);
+      if (visitorEmail) localStorage.setItem('link_validator_email', visitorEmail);
+      
       setMessage('Acesso liberado com sucesso! Redirecionando para o login...');
       setStatus('success');
       // Redireciona para a raiz para forçar o AuthContext a reavaliar a sessão

@@ -19,6 +19,13 @@ export const Login: React.FC = () => {
   const navigate = useNavigate();
 
   useEffect(() => {
+    // Pré-preencher com dados do validador de link, se existirem
+    const storedName = localStorage.getItem('link_validator_name');
+    const storedEmail = localStorage.getItem('link_validator_email');
+    
+    if (storedName) setName(storedName);
+    if (storedEmail) setEmail(storedEmail);
+    
     // Verifica se já existe uma sessão Supabase ativa
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {

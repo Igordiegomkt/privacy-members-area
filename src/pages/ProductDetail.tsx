@@ -1,15 +1,14 @@
 import * as React from 'react';
 import { useEffect, useState } from 'react';
 import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Product, Model } from '../types';
-import { fetchProductById, hasUserPurchasedProduct, getProductImageSrc } from '../lib/marketplace';
+import { Product } from '../types';
+import { fetchProductById, fetchUserPurchases, hasUserPurchasedProduct } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { supabase } from '../lib/supabase';
 import { ArrowLeft } from 'lucide-react';
 import { usePurchases } from '../contexts/PurchaseContext';
 import { useCheckout } from '../contexts/CheckoutContext';
-import { trackViewContent, trackAddToCart } from '../lib/tracking'; // Importando tracking
 
 const formatPrice = (cents: number) => {
     return (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
@@ -20,7 +19,6 @@ export const ProductDetail: React.FC = () => {
   const navigate = useNavigate();
   const { openCheckoutForProduct } = useCheckout();
   const [product, setProduct] = useState<Product | null>(null);
-  const [model, setModel] = useState<Model | null>(null);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
   
@@ -44,26 +42,6 @@ export const ProductDetail: React.FC = () => {
         setError(null);
         const fetchedProduct = await fetchProductById(id);
         setProduct(fetchedProduct);
-
-        if (fetchedProduct) {
-            // ViewContent
-            trackViewContent({
-                content_type: 'product',
-                content_ids: [fetchedProduct.id],
-                value: fetchedProduct.price_cents / 100,
-                currency: 'BRL',
-                model_id: fetchedProduct.model_id
-            });
-            
-            if (fetchedProduct.model_id) {
-                const { data: fetchedModel } = await supabase
-                    .from('models')
-                    .select('*')
-                    .eq('id', fetchedProduct.model_id)
-                    .single();
-                setModel(fetchedModel);
-            }
-        }
       } catch (e) {
         setError('Não foi possível carregar o produto.');
       } finally {
@@ -73,26 +51,6 @@ export const ProductDetail: React.FC = () => {
 
     loadProductData();
   }, [id]);
-  
-  // A lógica de rastreamento Purchase foi movida para PurchaseContext.
-  // Este useEffect agora é desnecessário.
-  /*
-  useEffect(() => {
-    if (isPurchased && product) {
-        const purchaseRecord = purchases.find(p => p.product_id === product.id);
-        if (purchaseRecord && !localStorage.getItem(`purchased-${purchaseRecord.id}`)) {
-            trackPurchase({
-                content_ids: [product.id],
-                value: product.price_cents / 100,
-                currency: 'BRL',
-                eventID: `purchase-${purchaseRecord.id}`
-            });
-            localStorage.setItem(`purchased-${purchaseRecord.id}`, '1');
-        }
-    }
-  }, [isPurchased, product, purchases]);
-  */
-
 
   const handlePurchase = async () => {
     if (!product || !id) return;
@@ -101,14 +59,6 @@ export const ProductDetail: React.FC = () => {
     try {
       const { data: { user } } = await supabase.auth.getUser();
       if (!user) throw new Error("Sessão inválida. Por favor, faça login novamente.");
-
-      // ADDTOCART: Clicou em desbloquear
-      trackAddToCart({
-        content_ids: [product.id],
-        value: product.price_cents / 100,
-        currency: 'BRL',
-        model_id: product.model_id
-      });
 
       // Chama o modal centralizado do CheckoutContext
       openCheckoutForProduct(id);
@@ -146,8 +96,6 @@ export const ProductDetail: React.FC = () => {
       </div>
     );
   }
-  
-  const productImageSrc = getProductImageSrc(product, model);
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">
@@ -158,7 +106,7 @@ export const ProductDetail: React.FC = () => {
         </button>
         <div className="grid grid-cols-1 md:grid-cols-2 gap-8">
           <div>
-            <img src={productImageSrc} alt={product.name} className="w-full aspect-square object-cover rounded-lg" />
+            <img src={product.cover_thumbnail} alt={product.name} className="w-full aspect-square object-cover rounded-lg" />
           </div>
           <div className="flex flex-col">
             <span className="text-sm text-primary font-semibold capitalize">
@@ -176,9 +124,9 @@ export const ProductDetail: React.FC = () => {
                   <div className="w-full mt-4 bg-green-500/20 text-green-400 font-semibold py-3 rounded-lg text-center">
                     ✅ Conteúdo desbloqueado!
                   </div>
-                  {product.is_base_membership && model?.username && (
+                  {product.is_base_membership && (
                     <button 
-                      onClick={() => navigate(`/modelo/${model.username}`)}
+                      onClick={() => navigate(`/modelo/${product.model_id}`)} // Assumindo que model_id pode ser usado para buscar o username ou que o produto tem o username
                       className="w-full mt-2 bg-primary hover:opacity-90 text-privacy-black font-semibold py-3 rounded-lg transition-opacity"
                     >
                       Ir para o Perfil VIP

@@ -26,24 +26,13 @@ import PurchaseSuccess from './pages/PurchaseSuccess';
 import PurchaseFailed from './pages/PurchaseFailed';
 import { AiTools } from './pages/admin/AiTools';
 import { CheckoutModal } from './components/CheckoutModal';
-import { AdminNotifications } from './pages/admin/AdminNotifications';
-import { ManageAccessLinks } from './pages/admin/ManageAccessLinks';
-import { AccessLinkEntry } from './pages/AccessLinkEntry'; // Novo import
-import { useAuth } from './contexts/AuthContext';
+import { AdminNotifications } from './pages/admin/AdminNotifications'; // Novo import
 
 // Componente de rota protegida para usuários
 const ProtectedRouteUser: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {
-  const { session, isLoading } = useAuth();
+  const isAuthenticated = localStorage.getItem('isAuthenticated') === 'true';
   
-  if (isLoading) {
-    return (
-      <div className="min-h-screen bg-privacy-black flex items-center justify-center">
-        <div className="animate-spin rounded-full h-16 w-16 border-t-2 border-b-2 border-primary"></div>
-      </div>
-    );
-  }
-  
-  if (!session) {
+  if (!isAuthenticated) {
     return <Navigate to="/login" replace />;
   }
   
@@ -69,7 +58,6 @@ const AuthHandler: React.FC = () => {
   return null;
 };
 
-
 function App() {
   return (
     <>
@@ -77,7 +65,6 @@ function App() {
       <Routes>
         {/* User Routes */}
         <Route path="/login" element={<Login />} />
-        <Route path="/acesso/:token" element={<AccessLinkEntry />} /> {/* Nova Rota de Trilha */}
         
         <Route element={<ProtectedRouteUser><UserLayout /></ProtectedRouteUser>}>
           <Route path="/" element={<Home />} /> {/* Nova Home de Modelos */}
@@ -89,8 +76,6 @@ function App() {
           <Route path="/minhas-compras" element={<MyPurchases />} />
           <Route path="/compra-sucesso" element={<PurchaseSuccess />} />
           <Route path="/compra-falhou" element={<PurchaseFailed />} />
-          
-          {/* Rotas de Upsell (REMOVIDAS) */}
         </Route>
         
         {/* Admin Routes */}
@@ -107,8 +92,7 @@ function App() {
             <Route path="/admin/modelos/:id/conteudos" element={<ManageContent />} />
             <Route path="/admin/configuracoes" element={<PaymentSettings />} />
             <Route path="/admin/ia" element={<AiTools />} />
-            <Route path="/admin/notificacoes" element={<AdminNotifications />} />
-            <Route path="/admin/links-acesso" element={<ManageAccessLinks />} />
+            <Route path="/admin/notificacoes" element={<AdminNotifications />} /> {/* Rota Adicionada */}
           </Route>
         </Route>
 

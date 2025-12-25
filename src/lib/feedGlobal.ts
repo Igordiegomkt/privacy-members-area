@@ -1,176 +1,66 @@
 import { supabase } from './supabase';
-import { Model, MediaItem, Product } from '../types'; // Importando Product
-import { MediaItemWithAccess, computeMediaAccessStatus, fetchProductsForModel } from './models';
+import { Model } from '../types';
+import { MediaItemWithAccess } from './models';
 import { fetchUserPurchases } from './marketplace';
 
 export interface GlobalFeedItem {
   media: MediaItemWithAccess;
-  model: Model & { mainProductPriceCents?: number }; // Added price here
-  mainProductId?: string | null; // For redirection to purchase
+  model: Model;
+  mainProductId?: string | null; // Para redirecionar para a compra
 }
 
-const PAGE_SIZE = 10;
+export const fetchGlobalFeedItems = async (): Promise<GlobalFeedItem[]> => {
+  // 1. Identificar modelos que o usuário já tem acesso
+  const userPurchases = await fetchUserPurchases();
+  const purchasedModelIds = new Set(userPurchases.map(p => p.products?.model_id).filter(Boolean));
+  const hasWelcomeCarolina = localStorage.getItem('welcomePurchaseCarolina') === 'true';
 
-export const fetchGlobalFeedItemsPage = async (params: { page: number; pageSize?: number; userId: string }): Promise<{ items: GlobalFeedItem[], hasMore: boolean }> => {
-  const { page, pageSize = PAGE_SIZE, userId } = params;
-  const from = page * pageSize;
-  const to = from + pageSize - 1;
+  // 2. Buscar todas as mídias com os dados de suas modelos
+  const { data: mediaWithModels, error } = await supabase
+    .from('media_items')
+    .select(`
+      *, 
+      model:models(*),
+      ai_title,
+      ai_subtitle,
+      ai_description,
+      ai_cta,
+      ai_tags
+    `) // Incluindo todos os campos de copy e IA
+    .order('created_at', { ascending: false })
+    .limit(100); // Limitar para performance inicial
 
-  console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage called', { page, pageSize });
-
-  try {
-    // 1. Identificar modelos que o usuário já tem acesso (necessário para accessStatus)
-    const userPurchases = await fetchUserPurchases(userId); // Usando userId
-    
-    // Definindo o tipo correto para o cache
-    type ModelContextCacheEntry = { 
-      products: Product[], 
-      mainProductPriceCents: number, 
-      mainProductId: string,
-    };
-
-    // Map to store model prices and products for access calculation
-    const modelContextCache = new Map<string, ModelContextCacheEntry>();
-
-    // 2. Buscar itens do global_feed paginados, fazendo JOIN com media_items e models
-    const { data: feedData, error } = await supabase
-      .from('global_feed')
-      .select(`
-        id,
-        model_id,
-        media_id,
-        title,
-        subtitle,
-        description,
-        cta,
-        media:media_id (
-          *,
-          ai_title,
-          ai_subtitle,
-          ai_description,
-          ai_cta,
-          ai_tags
-        ),
-        model:models (
-          *,
-          products ( id, is_base_membership, price_cents )
-        )
-      `)
-      .order('created_at', { ascending: false })
-      .range(from, to);
-
-    if (error) {
-      console.error('Error fetching global feed page:', error);
-      console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage result', {
-        page,
-        pageSize,
-        count: 0,
-        error: error.message,
-      });
-      return { items: [], hasMore: false };
-    }
-
-    const count = feedData?.length ?? 0;
-    
-    if (count === 0) {
-      console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage result', {
-        page,
-        pageSize,
-        count: 0,
-        error: null,
-      });
-      return { items: [], hasMore: false };
-    }
-
-    // 3. Mapear para GlobalFeedItem, determinando o status de acesso
-    const feedItemPromises = feedData
-      .filter(item => item.media && item.model)
-      .map(async (item: any): Promise<GlobalFeedItem> => {
-        const mediaItem = item.media as unknown as MediaItem;
-        const model = item.model as unknown as Model & { products: any[] };
-        const rawProducts = model.products || [];
-        
-        let mainProductPriceCents = 0;
-        let mainProductId: string | null = null;
-        let productsForModel: Product[] = [];
-        
-        if (!modelContextCache.has(model.id)) {
-            productsForModel = rawProducts.map((p: any) => ({
-                id: p.id,
-                is_base_membership: p.is_base_membership,
-                price_cents: p.price_cents,
-                name: '', // Placeholder, not needed for access check
-                type: 'subscription', // Placeholder
-                status: 'active', // Placeholder
-                created_at: new Date().toISOString(), // Placeholder
-            }));
-            
-            const baseProduct = productsForModel.find((p: any) => p.is_base_membership) || productsForModel[0];
-            if (baseProduct && baseProduct.id) {
-                mainProductPriceCents = baseProduct.price_cents;
-                mainProductId = baseProduct.id;
-                // Corrigido: Usando ModelContextCacheEntry
-                modelContextCache.set(model.id, { 
-                    products: productsForModel, 
-                    mainProductPriceCents: mainProductPriceCents,
-                    mainProductId: mainProductId as string 
-                });
-            }
-        } else {
-            const cached = modelContextCache.get(model.id)!;
-            // Corrigido: Acessando as propriedades corretas
-            mainProductPriceCents = cached.mainProductPriceCents; 
-            mainProductId = cached.mainProductId;
-            productsForModel = cached.products;
-        }
-
-        const accessContext = { purchases: userPurchases, productsForModel, model };
-        // CHAMA A FUNÇÃO ASSÍNCRONA
-        let accessStatus = await computeMediaAccessStatus(mediaItem, accessContext);
-        
-        // Usar a copy do feed se existir, senão a da mídia
-        const finalMedia: MediaItemWithAccess = {
-            ...mediaItem,
-            title: item.title || mediaItem.title,
-            subtitle: item.subtitle || mediaItem.subtitle,
-            description: item.description || mediaItem.description,
-            cta: item.cta || mediaItem.cta,
-            accessStatus,
-        };
-
-
-        return {
-          media: finalMedia,
-          model: {
-              ...model,
-              mainProductPriceCents, // Attach price to model object
-          },
-          mainProductId, 
-        };
-      });
-      
-    const feedItems = await Promise.all(feedItemPromises);
-
-    // Determine if there are more items to load
-    const hasMore = count === pageSize;
-    
-    console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage result', {
-      page,
-      pageSize,
-      count: count,
-      error: null,
-    });
-
-    return { items: feedItems, hasMore };
-  } catch (e) {
-    const error = e as Error;
-    console.error('Unexpected error in fetchGlobalFeedItemsPage:', error);
-    console.log('[GLOBAL FEED] fetchGlobalFeedItemsPage result', {
-      page,
-      pageSize,
-      count: 0,
-      error: error.message,
-    });
-    return { items: [], hasMore: false };
+  if (error || !mediaWithModels) {
+    console.error('Error fetching global feed:', error);
+    return [];
   }
+
+  // 3. Mapear para GlobalFeedItem, determinando o status de acesso
+  const feedItems = mediaWithModels
+    .filter(item => item.model) // Garantir que a mídia tem uma modelo associada
+    .map((item): GlobalFeedItem => {
+      const media = item as any; // Cast para simplificar o acesso
+      const model = media.model as Model;
+      
+      let accessStatus: 'unlocked' | 'free' | 'locked' = 'locked';
+      const isCarolina = model.username === 'carolina-andrade';
+
+      if (media.is_free) {
+        accessStatus = 'free';
+      } else if ((isCarolina && hasWelcomeCarolina) || purchasedModelIds.has(model.id)) {
+        accessStatus = 'unlocked';
+      }
+
+      return {
+        media: {
+          ...media,
+          accessStatus,
+        },
+        model: model,
+        mainProductId: null, 
+      };
+    });
+
+  // Embaralhar para uma experiência mais dinâmica
+  return feedItems.sort(() => Math.random() - 0.5);
 };

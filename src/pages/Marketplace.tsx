@@ -4,13 +4,10 @@ import { Product, Model } from '../types';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { useProtection } from '../hooks/useProtection';
-import { fetchProducts, UserPurchaseWithProduct, fetchUserPurchases, hasUserPurchasedProduct, getProductImageSrc } from '../lib/marketplace';
+import { fetchProducts, UserPurchaseWithProduct, fetchUserPurchases, hasUserPurchasedProduct } from '../lib/marketplace';
 import { supabase } from '../lib/supabase';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { useNavigate } from 'react-router-dom';
-import { trackAddToCart } from '../lib/tracking'; // Importando tracking
-import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
-import { isModelUnlockedByGrant } from '../lib/accessVisual'; // Importando helper de link
 
 const formatPrice = (cents: number) => {
   return (cents / 100).toLocaleString('pt-BR', {
@@ -27,36 +24,21 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: ProductCardProps) => {
   const { openCheckoutForProduct } = useCheckout();
   const navigate = useNavigate();
-  
-  // Se for um produto de modelo, verifica se o acesso por link está ativo
-  const isUnlockedByGrant = product.model_id ? isModelUnlockedByGrant(product.model_id) : false;
-  const isUnlocked = isPurchased || isUnlockedByGrant;
-  const showCta = !isUnlocked;
 
   const handleCtaClick = () => {
-    if (isUnlocked) {
+    if (isPurchased) {
       navigate(`/produto/${product.id}`);
     } else {
-      // ADDTOCART
-      trackAddToCart({
-        content_ids: [product.id],
-        value: product.price_cents / 100,
-        currency: 'BRL',
-        model_id: product.model_id
-      });
       openCheckoutForProduct(product.id);
     }
   };
-  
-  // Usando o helper. Como não temos o objeto model aqui, o fallback será o padrão.
-  const imageSrc = getProductImageSrc(product, null); 
 
   return (
     <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
       <div className="relative aspect-square">
-        {imageSrc ? (
+        {product.cover_thumbnail ? (
           <img
-            src={imageSrc}
+            src={product.cover_thumbnail}
             alt={product.name}
             className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105"
           />
@@ -70,7 +52,7 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: Produ
           {product.type === 'single_media' && 'Conteúdo'}
           {product.type === 'subscription' && 'Assinatura'}
         </div>
-        {isUnlocked && (
+        {isPurchased && (
           <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full px-2 py-1 text-[10px] font-bold">
             ✔ Comprado
           </div>
@@ -83,21 +65,16 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: Produ
         <p className="text-sm font-bold text-primary">
           {formatPrice(product.price_cents)}
         </p>
-        {showCta ? (
-            <button
-              onClick={handleCtaClick}
-              className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity bg-primary text-privacy-black hover:opacity-90`}
-            >
-              Comprar agora via PIX
-            </button>
-        ) : (
-            <button
-              onClick={() => navigate(`/produto/${product.id}`)}
-              className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70`}
-            >
-              Ver Detalhes
-            </button>
-        )}
+        <button
+          onClick={handleCtaClick}
+          className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity ${
+            isPurchased
+              ? 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
+              : 'bg-primary text-privacy-black hover:opacity-90'
+          }`}
+        >
+          {isPurchased ? 'Ver Detalhes' : 'Comprar agora via PIX'}
+        </button>
       </div>
     </div>
   );
@@ -114,34 +91,20 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
   const model = product.models;
 
   if (!model) return null;
-  
-  const isUnlockedByGrant = isModelUnlockedByGrant(model.id);
-  const isUnlocked = isPurchased || isUnlockedByGrant;
-  const showCta = !isUnlocked;
 
   const handleCtaClick = () => {
-    if (isUnlocked) {
+    if (isPurchased) {
       navigate(`/modelo/${model.username}`);
     } else {
-      // ADDTOCART
-      trackAddToCart({
-        content_ids: [product.id],
-        value: product.price_cents / 100,
-        currency: 'BRL',
-        model_id: product.model_id
-      });
       openCheckoutForProduct(product.id);
     }
   };
-  
-  // Usando a função helper para garantir a fonte de verdade
-  const imageSrc = getProductImageSrc(product, model);
 
   return (
     <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
       <div className="relative aspect-square">
-        <img src={imageSrc} alt={model.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-        {isUnlocked && (
+        <img src={model.avatar_url ?? ''} alt={model.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+        {isPurchased && (
           <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full px-2 py-1 text-[10px] font-bold">
             ✔ VIP Ativo
           </div>
@@ -157,21 +120,16 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
         <p className="text-sm font-bold text-primary">
           {formatPrice(product.price_cents)}
         </p>
-        {showCta ? (
-            <button
-              onClick={handleCtaClick}
-              className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity bg-primary text-privacy-black hover:opacity-90`}
-            >
-              Desbloquear VIP via PIX
-            </button>
-        ) : (
-            <button
-              onClick={() => navigate(`/modelo/${model.username}`)}
-              className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70`}
-            >
-              Acessar Perfil VIP
-            </button>
-        )}
+        <button
+          onClick={handleCtaClick}
+          className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity ${
+            isPurchased
+              ? 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
+              : 'bg-primary text-privacy-black hover:opacity-90'
+          }`}
+        >
+          {isPurchased ? 'Acessar Perfil VIP' : 'Desbloquear VIP via PIX'}
+        </button>
       </div>
     </div>
   );
@@ -179,7 +137,6 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
 
 export const Marketplace: React.FC = () => {
   useProtection();
-  const { user, isLoading: isLoadingAuth } = useAuth();
   const [otherProducts, setOtherProducts] = useState<Product[]>([]);
   const [baseProducts, setBaseProducts] = useState<(Product & { models: Model | null })[]>([]);
   const [purchases, setPurchases] = useState<UserPurchaseWithProduct[]>([]);
@@ -187,11 +144,6 @@ export const Marketplace: React.FC = () => {
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isLoadingAuth || !user?.id) {
-        if (!isLoadingAuth) setLoading(false);
-        return;
-    }
-    
     const loadData = async () => {
       try {
         setLoading(true);
@@ -201,10 +153,10 @@ export const Marketplace: React.FC = () => {
           fetchProducts(),
           supabase
             .from('products')
-            .select('id, name, price_cents, model_id, is_base_membership, cover_thumbnail, models ( id, name, username, avatar_url, cover_url )') // Adicionado cover_url da modelo
+            .select('id, name, price_cents, model_id, is_base_membership, models ( id, name, username, avatar_url )')
             .eq('status', 'active')
             .eq('is_base_membership', true),
-          fetchUserPurchases(user.id), // Corrigido: Passando userId
+          fetchUserPurchases(),
         ]);
 
         if (baseProductsRes.error) throw baseProductsRes.error;
@@ -221,7 +173,7 @@ export const Marketplace: React.FC = () => {
       }
     };
     loadData();
-  }, [user?.id, isLoadingAuth]);
+  }, []);
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">

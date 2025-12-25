@@ -1,23 +1,20 @@
 import * as React from 'react';
-import { useEffect, useState, useRef, useCallback } from 'react';
-import { useParams, Link, useNavigate } from 'react-router-dom';
-import { Product, Model } from '../types';
-import { fetchModelByUsername, fetchProductsForModel, fetchMediaForModelPage, MediaItemWithAccess, fetchModelMediaCounts } from '../lib/models';
-import { UserPurchaseWithProduct, getProductImageSrc } from '../lib/marketplace';
+import { useEffect, useState } from 'react';
+import { useParams, useNavigate } from 'react-router-dom';
+import { Model, Product } from '../types';
+import { fetchModelByUsername, fetchMediaForModel, fetchProductsForModel, MediaItemWithAccess } from '../lib/models';
+import { UserPurchaseWithProduct } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { MediaGrid } from '../components/MediaGrid';
 import { PostCard } from '../components/PostCard';
-import { MediaViewerFullscreen } from '../components/MediaViewerFullscreen';
+import { VideoPlayerModal } from '../components/VideoPlayerModal';
+import { MediaModal } from '../components/MediaModal';
 import { Tabs, TabsContent, TabsList, TabsTrigger } from '../components/ui/tabs';
 import { useProtection } from '../hooks/useProtection';
-import { ArrowLeft, MessageCircle, Gift, CheckCircle } from 'lucide-react';
+import { ArrowLeft, MessageCircle, Gift } from 'lucide-react';
 import { usePurchases } from '../contexts/PurchaseContext';
 import { useCheckout } from '../contexts/CheckoutContext';
-import { trackViewContent, trackAddToCart } from '../lib/tracking';
-import { feedCache } from '../lib/feedCache';
-import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
-import { isModelUnlockedByGrant } from '../lib/accessVisual'; // Importando helper de link
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -26,43 +23,32 @@ interface ProductCardProps {
     isPurchased: boolean;
     modelName: string;
     isFirst: boolean;
-    modelCoverUrl?: string | null;
-    isUnlockedByGrant: boolean; // Nova prop
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelName, isFirst, modelCoverUrl, isUnlockedByGrant }: ProductCardProps) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelName, isFirst }: ProductCardProps) => {
     const navigate = useNavigate();
     const { openCheckoutForProduct } = useCheckout();
-    
-    const isUnlocked = isPurchased || isUnlockedByGrant;
-    const showCta = !isUnlocked;
 
     const handleCtaClick = () => {
-        if (isUnlocked) {
-            // Se já comprou ou tem acesso por link, navega para o detalhe do produto
-            navigate(`/produto/${product.id}`);
+        if (isPurchased) {
+            // Se já comprou, navega para o perfil (ou para a página de compras)
+            navigate(`/minhas-compras?highlight=${product.id}`);
         } else {
             // Se não comprou, abre o modal de checkout
             openCheckoutForProduct(product.id);
         }
     };
-    
-    const productImageSrc = getProductImageSrc(product, { cover_url: modelCoverUrl });
 
     return (
         <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
             <div className="relative aspect-square cursor-pointer" onClick={() => navigate(`/produto/${product.id}`)}>
-                <img 
-                    src={productImageSrc}
-                    alt={product.name} 
-                    className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
-                />
-                {isFirst && !isUnlocked && (
+                <img src={product.cover_thumbnail} alt={product.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
+                {isFirst && !isPurchased && (
                     <div className="absolute top-2 left-2 bg-primary text-privacy-black rounded-full px-2 py-1 text-xs font-bold">
                         🔥 Mais vendido de {modelName.split(' ')[0]}
                     </div>
                 )}
-                {isUnlocked && (
+                {isPurchased && (
                     <div className="absolute top-2 left-2 bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold">
                         ✔ Já é seu
                     </div>
@@ -74,300 +60,77 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelNa
                 <button
                     onClick={handleCtaClick}
                     className={`w-full mt-3 text-sm font-semibold py-2 rounded-lg transition-colors ${
-                        showCta
-                            ? 'bg-primary text-privacy-black hover:opacity-90'
-                            : 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
+                        isPurchased
+                            ? 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
+                            : 'bg-primary text-privacy-black hover:opacity-90'
                     }`}
                 >
-                    {showCta ? 'Desbloquear agora' : 'Ver conteúdo'}
+                    {isPurchased ? 'Ver conteúdo' : 'Desbloquear agora'}
                 </button>
             </div>
         </div>
     );
 };
 
-const PAGE_SIZE = 10;
-
 export const ModelProfile: React.FC = () => {
     useProtection();
     const { username } = useParams<{ username: string }>();
     const navigate = useNavigate();
     const { openCheckoutForProduct } = useCheckout();
-    const { user } = useAuth(); // Usando useAuth
-    
-    // Estados de Carregamento e Dados do Perfil
     const [model, setModel] = useState<Model | null>(null);
-    const [profileLoading, setProfileLoading] = useState(true);
-    const [profileError, setProfileError] = useState<string | null>(null);
+    const [media, setMedia] = useState<MediaItemWithAccess[]>([]);
     const [products, setProducts] = useState<Product[]>([]);
+    const [loading, setLoading] = useState(true);
+    const [openVideo, setOpenVideo] = useState<MediaItemWithAccess | null>(null);
+    const [openImage, setOpenImage] = useState<MediaItemWithAccess | null>(null);
     const [hasAccess, setHasAccess] = useState(false);
-    const [mediaCounts, setMediaCounts] = useState<{ totalPosts: number; totalPhotos: number; totalVideos: number } | null>(null);
-    
-    // --- ESTADOS DO MURAL (ALINHADOS COM GLOBAL FEED) ---
-    const [muralItems, setMuralItems] = useState<MediaItemWithAccess[]>([]);
-    const [muralPage, setMuralPage] = useState(0);
-    const [muralHasMore, setMuralHasMore] = useState(true);
-    const [muralInitialLoading, setMuralInitialLoading] = useState(true);
-    const [muralPageLoading, setMuralPageLoading] = useState(false);
-    const [muralError, setMuralError] = useState<string | null>(null);
-    // ----------------------------------------------------
-    
-    const [openMediaIndex, setOpenMediaIndex] = useState<number | null>(null);
     const { purchases } = usePurchases();
-    
-    const muralSentinelRef = useRef<HTMLDivElement | null>(null);
-    
-    // Refs para acessar o estado mais recente dentro do useCallback e IntersectionObserver
-    const muralPageRef = useRef(muralPage);
-    const muralHasMoreRef = useRef(muralHasMore);
-    const muralPageLoadingRef = useRef(muralPageLoading);
-    const muralItemsRef = useRef(muralItems);
 
     useEffect(() => {
-        muralPageRef.current = muralPage;
-        muralHasMoreRef.current = muralHasMore;
-        muralPageLoadingRef.current = muralPageLoading;
-        muralItemsRef.current = muralItems;
-    }, [muralPage, muralHasMore, muralPageLoading, muralItems]);
-
-
-    // Function to load media page (Memoized)
-    const loadMuralPage = useCallback(async (nextPage: number) => {
-        if (!model?.id || !user?.id) return;
-
-        const isFirstPage = nextPage === 0;
-        
-        // Prevenção de chamadas duplicadas (usando refs para o estado mais recente)
-        if (!isFirstPage && (muralPageLoadingRef.current || !muralHasMoreRef.current)) return;
-        
-        if (isFirstPage) {
-            setMuralInitialLoading(true);
-        } else {
-            setMuralPageLoading(true);
-        }
-
-        setMuralError(null);
-
-        try {
-            console.log('[MODEL FEED] loadMuralPage called', { nextPage, modelId: model.id });
-            
-            const { items: newItems, hasMore: nextHasMore } = await fetchMediaForModelPage({
-                modelId: model.id,
-                page: nextPage,
-                pageSize: PAGE_SIZE,
-                userId: user.id, // Passando userId
-            });
-            
-            console.log('[MODEL FEED] loadMuralPage result', {
-                nextPage,
-                received: newItems.length,
-                nextHasMore,
-            });
-            
-            setMuralItems(prev => isFirstPage ? newItems : [...prev, ...newItems]);
-            setMuralPage(nextPage);
-            setMuralHasMore(nextHasMore);
-            
-            // Atualizar cache após o carregamento bem-sucedido
-            feedCache.model[model.id] = {
-                items: isFirstPage ? newItems : [...muralItemsRef.current, ...newItems],
-                hasMore: nextHasMore,
-                lastPage: nextPage,
-            };
-            
-        } catch (e) {
-            console.error("Error loading media page:", e);
-            setMuralError('Erro ao carregar o mural.');
-            setMuralHasMore(false); // Parar de tentar carregar em caso de erro
-        } finally {
-            if (isFirstPage) {
-                setMuralInitialLoading(false);
-            } else {
-                setMuralPageLoading(false);
-            }
-        }
-    }, [model?.id, user?.id]); // Dependências ajustadas para model.id e user.id
-
-    // 1. Efeito para carregar o PERFIL (Model + Products + Counts)
-    useEffect(() => {
-        console.log('[MODEL PROFILE] useEffect loadModel start', { username });
-        if (!username) { 
-            setProfileLoading(false); 
-            return; 
-        }
-        
+        if (!username) { setLoading(false); return; }
         const loadProfileData = async () => {
-            setProfileLoading(true); 
-            setProfileError(null);
-            
-            try {
-                const fetchedModel = await fetchModelByUsername(username);
-                
-                if (!fetchedModel) {
-                    setProfileError('Modelo não encontrada.');
-                    setModel(null);
-                    setProfileLoading(false);
-                    return;
-                }
-                
+            setLoading(true);
+            const fetchedModel = await fetchModelByUsername(username);
+            if (fetchedModel) {
                 setModel(fetchedModel);
+                const [fetchedMedia, fetchedProducts] = await Promise.all([
+                    fetchMediaForModel(fetchedModel.id),
+                    fetchProductsForModel(fetchedModel.id)
+                ]);
                 
-                trackViewContent({
-                    content_type: 'model_profile',
-                    content_ids: [fetchedModel.id],
-                    model_id: fetchedModel.id
-                });
-
-                // Fetch products once (not paginated)
-                const fetchedProducts = await fetchProductsForModel(fetchedModel.id);
+                setMedia(fetchedMedia);
                 setProducts(fetchedProducts);
-                
-                // Fetch total counts
-                const counts = await fetchModelMediaCounts(fetchedModel.id);
-                setMediaCounts(counts);
 
                 const modelProductIds = new Set(fetchedProducts.map(p => p.id));
                 const userHasAnyProduct = purchases.some((p: UserPurchaseWithProduct) => modelProductIds.has(p.product_id));
-                
-                // A lógica de acesso agora é unificada e baseada apenas em purchases
-                setHasAccess(userHasAnyProduct);
-                
-                console.log('[MODEL PROFILE] useEffect loadModel done', { modelId: fetchedModel.id });
-                
-                // --- CARREGAMENTO INICIAL DO MURAL (PÁGINA 0) ---
-                const cached = feedCache.model[fetchedModel.id];
-                if (cached && cached.items.length > 0) {
-                    console.log('[MODEL PROFILE] Loading mural from cache.');
-                    setMuralItems(cached.items);
-                    setMuralHasMore(cached.hasMore);
-                    setMuralPage(cached.lastPage);
-                    setMuralInitialLoading(false);
-                } else {
-                    // Se não houver cache, carrega a primeira página
-                    // Chamamos loadMuralPage(0) no próximo useEffect para garantir que 'model' e 'user' estejam definidos
-                }
-
-            } catch (e) {
-                console.error('[MODEL PROFILE] loadProfileData error:', e);
-                setProfileError('Erro ao carregar dados do perfil.');
-                setModel(null);
-                setMuralInitialLoading(false);
-            } finally {
-                setProfileLoading(false);
+                const isCarolinaWelcome = fetchedModel.username === 'carolina-andrade' && localStorage.getItem('welcomePurchaseCarolina') === 'true';
+                setHasAccess(userHasAnyProduct || isCarolinaWelcome);
             }
+            setLoading(false);
         };
-        
-        // Reset media state when profile changes
-        setMuralItems([]);
-        setMuralPage(0);
-        setMuralHasMore(true);
-        setMuralInitialLoading(true); 
-        setMuralPageLoading(false);
-        
         loadProfileData();
-    }, [username, purchases]); // purchases é dependência para re-calcular hasAccess
-
-    // 2. Efeito para carregar a primeira página do mural (após o modelo e usuário serem carregados)
-    useEffect(() => {
-        if (model?.id && user?.id && muralInitialLoading && muralItems.length === 0) {
-            // Se o modelo e o usuário foram carregados e o mural ainda está no estado inicial (sem cache), carrega a página 0
-            loadMuralPage(0);
-        }
-    }, [model?.id, user?.id, muralInitialLoading, muralItems.length, loadMuralPage]);
-
-
-    // 3. Intersection Observer for infinite scroll (Mural)
-    useEffect(() => {
-        if (!muralSentinelRef.current || muralInitialLoading) return;
-
-        const observer = new IntersectionObserver(entries => {
-            const [entry] = entries;
-            // Usamos refs para acessar o estado mais recente
-            if (entry.isIntersecting && !muralPageLoadingRef.current && muralHasMoreRef.current) {
-                loadMuralPage(muralPageRef.current + 1);
-            }
-        }, {
-            root: null,
-            rootMargin: '0px 0px 300px 0px',
-            threshold: 0.1,
-        });
-
-        observer.observe(muralSentinelRef.current);
-
-        return () => observer.disconnect();
-    }, [muralInitialLoading, loadMuralPage]);
-
+    }, [username, purchases]);
 
     const mainProduct = products.find(p => p.is_base_membership) || products[0];
 
     const handleLockedClick = () => {
         if (mainProduct) {
-            trackAddToCart({
-                content_ids: [mainProduct.id],
-                value: mainProduct.price_cents / 100,
-                currency: 'BRL',
-                model_id: model?.id
-            });
-            
-            // 2. Chama o fluxo de checkout PIX
             openCheckoutForProduct(mainProduct.id);
         } else {
+            // Se não houver produto base, redireciona para a loja
             navigate('/loja');
         }
     };
-    
-    const handleOpenMedia = (index: number) => {
-        const mediaItem = muralItems[index];
-        
-        // 1. Se o item estiver bloqueado, chama o fluxo de checkout PIX
-        if (mediaItem.accessStatus === 'locked') {
-            handleLockedClick();
-            return;
-        }
-        
-        // Filter unlocked media for the viewer
-        const unlockedMedia = muralItems.filter(m => m.accessStatus !== 'locked');
-        
-        // Find index in the unlocked list
-        const unlockedIndex = unlockedMedia.findIndex(m => m.id === mediaItem.id);
-        if (unlockedIndex !== -1) {
-            setOpenMediaIndex(unlockedIndex);
-        }
+
+    if (loading) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Carregando perfil...</div>;
+    if (!model) return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Modelo não encontrada.</div>;
+
+    const stats = {
+        posts: media.length,
+        photos: media.filter(m => m.type === 'image').length,
+        videos: media.filter(m => m.type === 'video').length,
     };
-
-    // Tratamento de estados de carregamento e erro do Perfil
-    if (profileLoading || !user) { // Adicionado !user para esperar o Auth
-        return (
-            <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">
-                <p className="text-sm text-privacy-text-secondary">Carregando perfil...</p>
-            </div>
-        );
-    }
-
-    if (profileError || !model) {
-        return (
-            <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">
-                <p className="text-sm text-red-400">{profileError || 'Modelo não encontrada.'}</p>
-            </div>
-        );
-    }
-
-    // Garantimos que model é Model aqui
-    const currentModel = model as Model;
-    
-    // --- PARTE A: VERIFICAÇÃO DE ACESSO POR LINK ---
-    const isUnlockedByGrant = isModelUnlockedByGrant(currentModel.id);
-    const isFullyUnlocked = hasAccess || isUnlockedByGrant; // Acesso por compra OU link
-    const showPurchaseCta = !isFullyUnlocked;
-    // ----------------------------------------------
-
-    // Usando os contadores totais (fix)
-    const stats = mediaCounts || { totalPosts: 0, totalPhotos: 0, totalVideos: 0 };
-    
-    // Media for Feed/Viewer (TODAS as mídias, incluindo locked)
-    const feedPosts = muralItems; // <--- CORREÇÃO: Usa todas as mídias
-    const unlockedMedia = muralItems.filter(m => m.accessStatus !== 'locked');
-    
+    const feedMedia = media.filter(m => m.accessStatus === 'free' || m.accessStatus === 'unlocked');
     const purchasedProductIds = new Set(purchases.map((p: UserPurchaseWithProduct) => p.product_id));
     
 
@@ -381,18 +144,18 @@ export const ModelProfile: React.FC = () => {
                 
                 <div className="relative w-full">
                     <div className="h-40 sm:h-56 w-full overflow-hidden bg-privacy-surface">
-                        {currentModel.cover_url && <img src={currentModel.cover_url} alt={`${currentModel.name} cover`} className="w-full h-full object-cover" />}
+                        {model.cover_url && <img src={model.cover_url} alt={`${model.name} cover`} className="w-full h-full object-cover" />}
                     </div>
                     <div className="flex flex-col items-center -mt-12 sm:-mt-16">
                         <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full border-4 border-privacy-black overflow-hidden bg-privacy-surface">
-                            {currentModel.avatar_url && <img src={currentModel.avatar_url} alt={currentModel.name} className="w-full h-full object-cover" />}
+                            {model.avatar_url && <img src={model.avatar_url} alt={model.name} className="w-full h-full object-cover" />}
                         </div>
                         <div className="flex items-center gap-1.5 mt-2">
-                            <h1 className="text-xl sm:text-2xl font-bold text-white">{currentModel.name}</h1>
-                            {currentModel.is_verified && <span className="inline-flex items-center justify-center rounded-full bg-blue-500 w-4 h-4 text-[10px] text-white">✓</span>}
+                            <h1 className="text-xl sm:text-2xl font-bold text-white">{model.name}</h1>
+                            {model.is_verified && <span className="inline-flex items-center justify-center rounded-full bg-blue-500 w-4 h-4 text-[10px] text-white">✓</span>}
                         </div>
-                        <p className="text-sm text-privacy-text-secondary">@{currentModel.username}</p>
-                        {currentModel.bio && <p className="mt-3 px-6 text-center text-sm text-privacy-text-secondary max-w-lg">{currentModel.bio}</p>}
+                        <p className="text-sm text-privacy-text-secondary">@{model.username}</p>
+                        {model.bio && <p className="mt-3 px-6 text-center text-sm text-privacy-text-secondary max-w-lg">{model.bio}</p>}
                         
                         <div className="mt-4 flex items-center justify-center gap-4">
                             <button className="bg-privacy-surface border border-privacy-border rounded-lg px-4 py-2 text-sm font-semibold flex items-center gap-2"><MessageCircle size={16}/> Chat</button>
@@ -400,51 +163,43 @@ export const ModelProfile: React.FC = () => {
                         </div>
 
                         <div className="mt-4 flex items-center justify-center gap-6 text-sm text-privacy-text-secondary">
-                            <span><strong className="text-white">{stats.totalPosts}</strong> posts</span>
-                            <span><strong className="text-white">{stats.totalPhotos}</strong> fotos</span>
-                            <span><strong className="text-white">{stats.totalVideos}</strong> vídeos</span>
+                            <span><strong className="text-white">{stats.posts}</strong> posts</span>
+                            <span><strong className="text-white">{stats.photos}</strong> fotos</span>
+                            <span><strong className="text-white">{stats.videos}</strong> vídeos</span>
                         </div>
                     </div>
                 </div>
 
-                {/* CTA Principal VIP (Requirement 9B) */}
-                {mainProduct && (
+                {!hasAccess && mainProduct && (
                   <div className="px-4 sm:px-6 my-6">
-                    <div className={`rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3 ${!showPurchaseCta ? 'bg-green-500/10 border border-green-500/30' : 'bg-primary/10 border border-primary/30'}`}>
+                    <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3">
                       <div className="text-center sm:text-left">
-                        {!showPurchaseCta ? (
-                            <p className={`font-semibold flex items-center gap-2 text-green-400`}>
-                                <CheckCircle size={16} /> Acesso VIP de {currentModel.name} liberado!
-                            </p>
-                        ) : (
-                            <>
-                                <p className="font-semibold text-primary">
-                                    Desbloqueie o conteúdo exclusivo de {currentModel.name}.
-                                </p>
-                                <p className="text-privacy-text-secondary mt-1">
-                                    Acesso VIP por{' '}
-                                    <span className="text-primary font-semibold">
-                                        {formatPrice(mainProduct.price_cents)}
-                                    </span>
-                                </p>
-                            </>
-                        )}
+                        <p className="font-semibold text-primary">
+                          Você ainda não tem acesso ao conteúdo exclusivo de {model.name}.
+                        </p>
+                        <p className="text-privacy-text-secondary mt-1">
+                          Acesse vídeos privados, mural VIP e conteúdos completos.
+                        </p>
+                        <p className="text-privacy-text-secondary mt-1">
+                          Acesso VIP por{' '}
+                          <span className="text-primary font-semibold">
+                            {formatPrice(mainProduct.price_cents)}
+                          </span>
+                        </p>
                       </div>
 
-                      {showPurchaseCta && (
-                        <button
-                          onClick={handleLockedClick}
-                          className="w-full sm:w-auto bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg hover:opacity-90"
-                        >
-                          🔓 Desbloquear VIP agora
-                        </button>
-                      )}
+                      <button
+                        onClick={handleLockedClick}
+                        className="w-full sm:w-auto bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg hover:opacity-90"
+                      >
+                        🔓 Desbloquear conteúdo VIP
+                      </button>
                     </div>
                   </div>
                 )}
                 
                 {/* Se não houver produto base, mas houver outros produtos, mostra o banner genérico */}
-                {!isFullyUnlocked && !mainProduct && products.length > 0 && (
+                {!hasAccess && !mainProduct && products.length > 0 && (
                     <div className="px-4 sm:px-6 my-6">
                         <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3">
                             <p className="font-semibold text-primary">
@@ -468,49 +223,20 @@ export const ModelProfile: React.FC = () => {
                         <TabsTrigger value="loja">Loja</TabsTrigger>
                     </TabsList>
                     <TabsContent value="mural" className="mt-6">
-                        {muralError && (
-                            <p className="text-sm text-red-400 text-center mt-4">
-                                {muralError}
-                            </p>
-                        )}
-                        {muralInitialLoading && muralItems.length === 0 && !muralError ? (
-                            <p className="text-sm text-privacy-text-secondary text-center mt-4">
-                                Carregando mural...
-                            </p>
-                        ) : muralItems.length === 0 && !muralError ? (
-                            <p className="text-center text-privacy-text-secondary py-10">
-                                Esta modelo ainda não postou nenhum conteúdo no mural.
-                            </p>
-                        ) : (
-                            <>
-                                <MediaGrid media={muralItems} onLockedClick={handleLockedClick} />
-                                
-                                {/* Sentinela para Scroll Infinito do Mural */}
-                                {muralHasMore && <div ref={muralSentinelRef} className="h-10" />}
-                                
-                                {muralPageLoading && muralItems.length > 0 && (
-                                    <p className="text-center text-xs text-privacy-text-secondary py-2">Carregando mais do mural...</p>
-                                )}
-                                {!muralHasMore && muralItems.length > 0 && (
-                                    <p className="text-center text-xs text-privacy-text-secondary py-2">Você já viu todo o mural 👀</p>
-                                )}
-                            </>
-                        )}
+                        <MediaGrid media={media} onLockedClick={handleLockedClick} />
                     </TabsContent>
                     <TabsContent value="feed" className="mt-6 px-2 sm:px-0">
-                        {/* Agora feedPosts usa muralItems, que contém todas as mídias */}
-                        {feedPosts.length === 0 && !muralInitialLoading ? (
+                        {feedMedia.length === 0 ? (
                             <p className="text-center text-privacy-text-secondary py-10">Ainda não há posts no feed desta modelo.</p>
                         ) : (
                             <div className="flex flex-col items-center">
-                                {feedPosts.map((item, index) => (
+                                {feedMedia.map(item => (
                                     <PostCard
                                         key={item.id}
-                                        media={{...item, model: currentModel}}
-                                        priceCents={mainProduct?.price_cents || 0}
+                                        media={{...item, model: model}}
                                         onLockedClick={handleLockedClick}
-                                        onOpenVideo={() => handleOpenMedia(index)}
-                                        onOpenImage={() => handleOpenMedia(index)}
+                                        onOpenVideo={() => setOpenVideo(item)}
+                                        onOpenImage={() => setOpenImage(item)}
                                     />
                                 ))}
                             </div>
@@ -524,10 +250,8 @@ export const ModelProfile: React.FC = () => {
                                         key={p.id} 
                                         product={p} 
                                         isPurchased={purchasedProductIds.has(p.id) || !!p.is_base_membership}
-                                        modelName={currentModel.name}
+                                        modelName={model.name}
                                         isFirst={index === 0}
-                                        modelCoverUrl={currentModel.cover_url}
-                                        isUnlockedByGrant={isUnlockedByGrant} // Passando a flag
                                     />
                                 ))}
                             </div>
@@ -537,16 +261,8 @@ export const ModelProfile: React.FC = () => {
                     </TabsContent>
                 </Tabs>
             </main>
-            
-            {openMediaIndex !== null && unlockedMedia.length > 0 && (
-                <MediaViewerFullscreen 
-                    mediaList={unlockedMedia} 
-                    initialIndex={openMediaIndex} 
-                    isOpen={openMediaIndex !== null} 
-                    onClose={() => setOpenMediaIndex(null)} 
-                />
-            )}
-            
+            <VideoPlayerModal media={openVideo} isOpen={!!openVideo} onClose={() => setOpenVideo(null)} />
+            <MediaModal media={openImage} isOpen={!!openImage} onClose={() => setOpenImage(null)} />
             <BottomNavigation />
         </div>
     );

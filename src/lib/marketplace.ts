@@ -24,20 +24,6 @@ export type PixCheckoutData = {
 
 const PRODUCT_COLUMNS = 'id, name, description, price_cents, type, status, cover_thumbnail, created_at, model_id, is_base_membership';
 
-/**
- * Helper function para padronizar a fonte da imagem do produto
- */
-export function getProductImageSrc(
-  product: { cover_thumbnail?: string | null },
-  model?: { cover_url?: string | null } | null
-): string {
-  return (
-    product.cover_thumbnail ??
-    model?.cover_url ??
-    '/video-fallback.svg' // Usando o fallback genérico existente
-  );
-}
-
 export const fetchProducts = async (): Promise<Product[]> => {
   const { data, error } = await supabase
     .from('products')
@@ -60,15 +46,18 @@ export const fetchProductById = async (id: string): Promise<Product | null> => {
   return data || null;
 };
 
-/**
- * Busca as compras pagas de um usuário específico.
- * @param userId O ID do usuário autenticado.
- */
-export const fetchUserPurchases = async (userId: string): Promise<UserPurchaseWithProduct[]> => {
-  if (!userId) {
-    console.error('[fetchUserPurchases] userId is required.');
+export const fetchUserPurchases = async (): Promise<UserPurchaseWithProduct[]> => {
+  const {
+    data: authData,
+    error: authError,
+  } = await supabase.auth.getUser();
+
+  if (authError || !authData?.user) {
+    console.error('[fetchUserPurchases] No authenticated user', authError);
     return [];
   }
+
+  const user = authData.user;
 
   const { data, error } = await supabase
     .from('user_purchases')
@@ -96,13 +85,12 @@ export const fetchUserPurchases = async (userId: string): Promise<UserPurchaseWi
           id,
           name,
           username,
-          avatar_url,
-          cover_url
+          avatar_url
         )
       )
     `
     )
-    .eq('user_id', userId)
+    .eq('user_id', user.id)
     .eq('status', 'paid')
     .order('created_at', { ascending: false });
 

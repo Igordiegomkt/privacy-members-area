@@ -5,11 +5,9 @@
 // 2) Conferir Minhas Compras + Admin Dashboard
 
 import * as React from 'react';
-import { useState } from 'react';
 import { useCheckout } from '../contexts/CheckoutContext';
 import { X, Clipboard, CheckCircle2 } from 'lucide-react';
 import { useNavigate } from 'react-router-dom';
-import { trackAddPaymentInfo } from '../lib/tracking'; // Importando tracking
 
 const formatPrice = (cents?: number) =>
   cents != null
@@ -22,30 +20,11 @@ const formatPrice = (cents?: number) =>
 export const CheckoutModal: React.FC = () => {
   const { state, closeCheckout } = useCheckout();
   const navigate = useNavigate();
-  const { isOpen, loading, pixCopiaCola, pixQrCodeUrl, amountCents, productId, productName, modelName, error } = state;
-  const [copyFeedback, setCopyFeedback] = useState<string | null>(null);
+  const { isOpen, loading, pixCopiaCola, pixQrCodeUrl, amountCents, productName, modelName, error } = state;
 
   const handleCopy = () => {
-    if (!pixCopiaCola || !productId || amountCents == null) return;
-    
-    navigator.clipboard.writeText(pixCopiaCola)
-      .then(() => {
-        // --- RASTREAMENTO: AddPaymentInfo ---
-        trackAddPaymentInfo({
-            content_type: 'pix',
-            content_ids: [productId],
-            value: amountCents / 100,
-            currency: 'BRL'
-        });
-        // -----------------------------------
-
-        setCopyFeedback('Código PIX copiado!');
-        setTimeout(() => setCopyFeedback(null), 2000);
-      })
-      .catch(() => {
-        setCopyFeedback('Não foi possível copiar, tente manualmente.');
-        setTimeout(() => setCopyFeedback(null), 2000);
-      });
+    if (!pixCopiaCola) return;
+    navigator.clipboard.writeText(pixCopiaCola).catch(() => {});
   };
 
   const handleGoToPurchases = () => {
@@ -72,7 +51,7 @@ export const CheckoutModal: React.FC = () => {
 
         {loading && (
           <div className="py-10 text-center text-privacy-text-secondary">
-            Preparando seu acesso...
+            Gerando cobrança PIX...
           </div>
         )}
 
@@ -140,21 +119,11 @@ export const CheckoutModal: React.FC = () => {
                       Copiar
                     </button>
                   </div>
-                  {copyFeedback && (
-                    <p className={`mt-1 text-xs text-center ${copyFeedback.includes('copiado') ? 'text-green-400' : 'text-red-400'}`}>
-                      {copyFeedback}
-                    </p>
-                  )}
                 </div>
               )}
             </div>
-            
-            {/* Mensagem de pagamento seguro (Requirement 2.1) */}
-            <p className="mt-2 text-xs text-privacy-text-secondary text-center">
-              Pagamento 100% seguro via PIX pelo Mercado Pago. Assim que o banco confirmar, seu acesso é liberado automaticamente.
-            </p>
 
-            <div className="space-y-2 mt-4">
+            <div className="space-y-2">
               <button
                 onClick={handleGoToPurchases}
                 className="w-full bg-green-500 text-white font-semibold py-2 rounded-lg flex items-center justify-center gap-2 hover:bg-green-500/90"

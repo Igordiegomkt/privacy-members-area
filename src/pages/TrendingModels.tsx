@@ -6,7 +6,6 @@ import { BottomNavigation } from '../components/BottomNavigation';
 import { useProtection } from '../hooks/useProtection';
 import { fetchTrendingModels, ModelWithStats } from '../lib/models';
 import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
-import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
 
 const BASE_MODEL_USERNAME = 'carolina-andrade';
 
@@ -56,25 +55,19 @@ const TrendingModelCard: React.FC<TrendingModelCardProps> = ({ model, rank, isVi
 
 export const TrendingModels: React.FC = () => {
   useProtection();
-  const { user, isLoading: isLoadingAuth } = useAuth(); // Usando useAuth
   const [trendingModels, setTrendingModels] = useState<ModelWithStats[]>([]);
   const [userPurchases, setUserPurchases] = useState<UserPurchaseWithProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState<string | null>(null);
 
   useEffect(() => {
-    if (isLoadingAuth || !user?.id) {
-        if (!isLoadingAuth) setLoading(false);
-        return;
-    }
-    
     const loadTrending = async () => {
       try {
         setLoading(true);
         setError(null);
         const [models, purchases] = await Promise.all([
             fetchTrendingModels(),
-            fetchUserPurchases(user.id) // Passando userId
+            fetchUserPurchases()
         ]);
         setTrendingModels(models);
         setUserPurchases(purchases);
@@ -85,11 +78,7 @@ export const TrendingModels: React.FC = () => {
       }
     };
     loadTrending();
-  }, [user?.id, isLoadingAuth]);
-
-  if (isLoadingAuth || loading) {
-    return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Carregando...</div>;
-  }
+  }, []);
 
   const purchasedModelIds = new Set(userPurchases.map(p => p.products?.model_id).filter(Boolean));
 
@@ -102,9 +91,10 @@ export const TrendingModels: React.FC = () => {
           <p className="text-sm text-privacy-text-secondary">As modelos mais compradas e desejadas do momento.</p>
         </div>
 
+        {loading && <div className="text-center py-10">Carregando ranking...</div>}
         {error && <div className="text-center py-10 text-red-400">{error}</div>}
 
-        {!error && trendingModels.length === 0 && (
+        {!loading && !error && trendingModels.length === 0 && (
           <div className="text-center py-10 text-privacy-text-secondary">
             <p>O ranking ainda está sendo formado.</p>
             <p>Volte mais tarde!</p>

@@ -52,6 +52,14 @@ export const Login: React.FC = () => {
     
     setIsLoading(true);
 
+    // --- Lógica para pular a compra de boas-vindas se vier de link ---
+    const skipWelcomePurchase = sessionStorage.getItem('skip_welcome_purchase') === '1';
+    if (skipWelcomePurchase) {
+        sessionStorage.removeItem('skip_welcome_purchase');
+        console.log("[Login] Skipping welcome purchase due to skip_welcome_purchase flag.");
+    }
+    // -----------------------------------------------------------------
+
     try {
       let user;
       
@@ -123,9 +131,11 @@ export const Login: React.FC = () => {
       localStorage.setItem('userName', name.trim() || user.email || 'Usuário');
       localStorage.setItem('userIsAdult', isAdult.toString());
       
-      // GARANTIR COMPRA VIP DA CAROLINA
-      console.log("[Login] calling ensureWelcomePurchaseForCarolina");
-      await ensureWelcomePurchaseForCarolina(user.id);
+      // GARANTIR COMPRA VIP DA CAROLINA (APENAS SE NÃO HOUVER FLAG DE PULAR)
+      if (!skipWelcomePurchase) {
+        console.log("[Login] calling ensureWelcomePurchaseForCarolina");
+        await ensureWelcomePurchaseForCarolina(user.id);
+      }
       
       // Registra o primeiro acesso (para fins de analytics/tracking)
       await registerFirstAccess({

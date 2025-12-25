@@ -72,6 +72,9 @@ export const AccessLinkEntry: React.FC = () => {
       if (visitorName) localStorage.setItem('link_validator_name', visitorName);
       if (visitorEmail) localStorage.setItem('link_validator_email', visitorEmail);
       
+      // BUG FIX: Setar flag para pular a compra de boas-vindas no login
+      sessionStorage.setItem('skip_welcome_purchase', '1');
+      
       setMessage('Acesso liberado com sucesso! Redirecionando para o login...');
       setStatus('success');
       // Redireciona para a raiz para forçar o AuthContext a reavaliar a sessão

@@ -3,7 +3,7 @@ import { useState, useEffect, useCallback } from 'react';
 import { supabase } from '../../lib/supabase';
 import { Model, Product } from '../../types';
 import { Link as LinkIcon, Copy, Check, Trash2, ToggleLeft, ToggleRight, Clock, Users, Calendar, XCircle, Edit, Eye, TestTube } from 'lucide-react';
-import { useAuth } from '../../contexts/AuthContext';
+import { useAuth } from '../../contexts/Auth/AuthContext';
 import { sha256Hex, generateStrongToken } from '../../lib/crypto';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '../../components/ui/dialog';
 
@@ -248,7 +248,18 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        setFormData(prev => ({ ...prev, [name]: value }));
+        
+        // Se mudar o tipo de link, resetar o escopo se for incompatível
+        if (name === 'linkType' && value === 'grant' && formData.scope === 'global') {
+            setFormData(prev => ({ ...prev, [name]: value as 'access' | 'grant', scope: 'model', productId: '' }));
+        } else if (name === 'linkType' && value === 'access') {
+            setFormData(prev => ({ ...prev, [name]: value as 'access' | 'grant' }));
+        } else if (name === 'scope') {
+            // Se mudar o escopo, resetar o produto
+            setFormData(prev => ({ ...prev, [name]: value as 'global' | 'model' | 'product', productId: '' }));
+        } else {
+            setFormData(prev => ({ ...prev, [name]: value }));
+        }
         setError(null);
     };
     
@@ -264,8 +275,15 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
         setError(null);
 
         const { scope, linkType, modelId, productId, expiresAt, maxUses } = formData;
+        const isGrant = linkType === 'grant';
 
         // Validação de coerência no frontend
+        if (isGrant && scope === 'global') {
+            setError('Links do tipo "Grant" devem ter escopo "Modelo Específica" ou "Produto Específico".');
+            setLoading(false);
+            return;
+        }
+        
         if (scope === 'model' && !modelId) {
             setError('Selecione uma modelo para o escopo "Modelo".');
             setLoading(false);
@@ -273,13 +291,6 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
         }
         if (scope === 'product' && !productId) {
             setError('Selecione um produto para o escopo "Produto".');
-            setLoading(false);
-            return;
-        }
-        
-        // Validação de coerência para Grant
-        if (linkType === 'grant' && scope === 'global') {
-            setError('Links do tipo "Grant" devem ter escopo "Modelo Específica" ou "Produto Específico".');
             setLoading(false);
             return;
         }
@@ -359,7 +370,6 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
     
     useEffect(() => {
         if (formData.scope === 'product' && selectedProduct?.model_id && formData.modelId !== selectedProduct.model_id) {
-            // Correção: Garante que selectedProduct.model_id é uma string antes de setar
             setFormData(prev => ({ ...prev, modelId: selectedProduct.model_id || '' }));
         }
     }, [formData.scope, formData.productId, selectedProduct?.model_id]);
@@ -386,7 +396,13 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
 
             <div>
                 <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Escopo de Acesso</label>
-                <select name="scope" value={formData.scope} onChange={handleChange} className={inputStyle} required disabled={isGrant && formData.scope === 'global'}>
+                <select 
+                    name="scope" 
+                    value={formData.scope} 
+                    onChange={handleChange} 
+                    className={inputStyle} 
+                    required
+                >
                     <option value="global" disabled={isGrant}>Global (Acesso a tudo)</option>
                     <option value="model">Modelo Específica</option>
                     <option value="product">Produto Específico</option>
@@ -396,10 +412,20 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
             {(formData.scope === 'model' || formData.scope === 'product') && (
                 <div>
                     <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Modelo (Opcional para Produto)</label>
-                    <select name="modelId" value={formData.modelId} onChange={handleChange} className={inputStyle} required={formData.scope === 'model'}>
+                    <select 
+                        name="modelId" 
+                        value={formData.modelId} 
+                        onChange={handleChange} 
+                        className={inputStyle} 
+                        required={formData.scope === 'model' || (isGrant && formData.scope === 'model')}
+                        disabled={formData.scope === 'product' && !!selectedProduct?.model_id}
+                    >
                         <option value="">{formData.scope === 'model' ? 'Selecione uma modelo' : 'Filtrar por modelo (Opcional)'}</option>
                         {models.map(m => <option key={m.id} value={m.id}>{m.name} (@{m.username})</option>)}
                     </select>
+                    {formData.scope === 'product' && selectedProduct?.model_id && (
+                        <p className="text-xs text-privacy-text-secondary/70 mt-1">Modelo definida automaticamente pelo produto.</p>
+                    )}
                 </div>
             )}
 

@@ -1,0 +1,1 @@
+DROP FUNCTION IF EXISTS public.consume_access_link(p_token_hash text);

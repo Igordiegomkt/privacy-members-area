@@ -37,9 +37,9 @@ export const AccessLinkEntry: React.FC = () => {
       return;
     }
     
-    // Validação de Email (Obrigatório)
-    if (!visitorEmail.trim() || !visitorEmail.includes('@')) {
-        setValidationError('O email é obrigatório e deve ser válido.');
+    // Validação de Email (Obrigatório no frontend antes de chamar a EF)
+    if (!visitorEmail.trim()) {
+        setValidationError('O email é obrigatório.');
         return;
     }
     
@@ -84,6 +84,14 @@ export const AccessLinkEntry: React.FC = () => {
       if (code === 'EXPIRED_LINK') errorMessage = 'Link expirado.';
       if (code === 'MAX_USES') errorMessage = 'Limite de usos atingido.';
       if (code === 'INACTIVE_LINK') errorMessage = 'Link inativo.';
+      if (code === 'EMAIL_REQUIRED') errorMessage = 'O email é obrigatório para validar o acesso.';
+      
+      // Se for erro de validação, voltamos ao formulário com a mensagem
+      if (code === 'EMAIL_REQUIRED') {
+          setValidationError(errorMessage);
+          setStatus('initial');
+          return;
+      }
       
       setMessage(errorMessage);
       setStatus('error');

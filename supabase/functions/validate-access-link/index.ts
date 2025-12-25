@@ -59,10 +59,21 @@ serve(async (req: Request) => {
   }
 
   try {
-    const { token: rawToken, visitor_name, visitor_email, user_id } = await req.json();
+    const body = await req.json();
+    const rawToken = body.token;
+    const user_id = body.user_id;
+
+    // Compatibilidade de nomes de campos
+    const visitor_name = body.visitor_name || body.name || body.nome || null;
+    const visitor_email = body.visitor_email || body.email || null;
 
     if (typeof rawToken !== 'string' || rawToken.length < 10) {
       return createResponse(false, { code: "INVALID_LINK", message: "Token inválido." });
+    }
+    
+    // 3. Validação de Email Obrigatório
+    if (!visitor_email || typeof visitor_email !== 'string' || !visitor_email.includes('@')) {
+        return createResponse(false, { code: "EMAIL_REQUIRED", message: "O email é obrigatório para validar o acesso." });
     }
     
     // 1. Normalização do Token
@@ -73,16 +84,18 @@ serve(async (req: Request) => {
     
     // 3. Obter dados do visitante e IP
     const userAgent = req.headers.get('user-agent') || null;
-    const ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null;
+    
+    // Ajuste de IP: pega o primeiro IP se for uma lista
+    let ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null;
+    if (ipAddress && ipAddress.includes(',')) {
+        ipAddress = ipAddress.split(',')[0].trim();
+    }
 
     // 4. Chamar a RPC para validação e consumo atômico
-    // A RPC agora tem 6 parâmetros, mas o PostgREST pode usar a versão de 1 parâmetro se for mais específica.
-    // Vamos chamar a RPC com o token_hash, que é o parâmetro obrigatório para a lógica atômica.
-    // A RPC no DB já foi atualizada para aceitar 6 parâmetros e fazer o log.
     const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('consume_access_link', {
         p_token_hash: tokenHash,
-        p_visitor_name: visitor_name || null,
-        p_visitor_email: visitor_email || null,
+        p_visitor_name: visitor_name,
+        p_visitor_email: visitor_email,
         p_user_id: user_id || null,
         p_user_agent: userAgent,
         p_ip: ipAddress,
@@ -109,9 +122,6 @@ serve(async (req: Request) => {
         expires_at: result.expires_at,
     };
     
-    // NOTA: A lógica de INSERT em access_link_visits foi movida para dentro da RPC no passo anterior.
-    // Se a RPC retornou OK, o log já foi inserido (best-effort).
-
     return createResponse(true, { grant });
 
   } catch (err) {

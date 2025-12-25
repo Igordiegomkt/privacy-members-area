@@ -35,6 +35,7 @@ interface Grant {
   model_id: string | null;
   product_id: string | null;
   expires_at: string | null;
+  link_type: 'access' | 'grant'; // Adicionado
 }
 
 /**
@@ -113,13 +114,26 @@ serve(async (req: Request) => {
         const message = result?.message || 'Falha na validação do link.';
         return createResponse(false, { code, message });
     }
+    
+    // 5. Buscar o link_type (necessário para o frontend)
+    const { data: linkData, error: linkError } = await supabaseAdmin
+        .from('access_links')
+        .select('link_type')
+        .eq('token_hash', tokenHash)
+        .single();
+        
+    if (linkError || !linkData) {
+        console.error("[validate-access-link] Error fetching link_type:", linkError);
+        // Não é fatal, mas logamos e assumimos 'access'
+    }
 
-    // 5. Sucesso: Retorna o grant
+    // 6. Sucesso: Retorna o grant
     const grant: Grant = {
         scope: result.scope as 'global' | 'model' | 'product',
         model_id: result.model_id,
         product_id: result.product_id,
         expires_at: result.expires_at,
+        link_type: linkData?.link_type as 'access' | 'grant' ?? 'access',
     };
     
     return createResponse(true, { grant });

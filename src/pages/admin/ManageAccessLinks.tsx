@@ -13,6 +13,7 @@ interface AccessLink {
     token_hash: string;
     token_plain: string | null; // Novo campo
     scope: 'global' | 'model' | 'product';
+    link_type: 'access' | 'grant'; // Novo campo
     model_id: string | null;
     product_id: string | null;
     expires_at: string | null;
@@ -42,6 +43,7 @@ interface AccessLinkVisit {
 // Tipos para o formulário
 interface LinkFormData {
     scope: 'global' | 'model' | 'product';
+    linkType: 'access' | 'grant'; // Novo campo
     modelId: string;
     productId: string;
     expiresAt: string;
@@ -183,6 +185,7 @@ const EditLinkModal: React.FC<EditLinkModalProps> = ({ link, onSave, onClose }: 
             </DialogHeader>
             <div className="space-y-4">
                 <p className="text-sm text-privacy-text-secondary">Escopo: <span className="font-semibold text-white capitalize">{link.scope}</span></p>
+                <p className="text-sm text-privacy-text-secondary">Tipo: <span className={`font-semibold text-white capitalize ${link.link_type === 'grant' ? 'text-green-400' : 'text-primary'}`}>{link.link_type}</span></p>
                 
                 <div>
                     <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Expira em (Opcional)</label>
@@ -234,6 +237,7 @@ const EditLinkModal: React.FC<EditLinkModalProps> = ({ link, onSave, onClose }: 
 const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string }> = ({ models, products, onLinkCreated, userId }: { models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string }) => {
     const [formData, setFormData] = useState<LinkFormData>({
         scope: 'global',
+        linkType: 'access', // Novo campo
         modelId: '',
         productId: '',
         expiresAt: '',
@@ -259,7 +263,7 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
         setLoading(true);
         setError(null);
 
-        const { scope, modelId, productId, expiresAt, maxUses } = formData;
+        const { scope, linkType, modelId, productId, expiresAt, maxUses } = formData;
 
         // Validação de coerência no frontend
         if (scope === 'model' && !modelId) {
@@ -269,6 +273,13 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
         }
         if (scope === 'product' && !productId) {
             setError('Selecione um produto para o escopo "Produto".');
+            setLoading(false);
+            return;
+        }
+        
+        // Validação de coerência para Grant
+        if (linkType === 'grant' && scope === 'global') {
+            setError('Links do tipo "Grant" devem ter escopo "Modelo Específica" ou "Produto Específico".');
             setLoading(false);
             return;
         }
@@ -304,12 +315,21 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
                 token_hash: tokenHash,
                 token_plain: rawToken, // Salvando o token puro para o Admin
                 scope,
-                model_id: scope === 'model' ? modelId : null,
+                link_type: linkType, // Novo campo
+                model_id: scope === 'model' || (scope === 'product' && modelId) ? modelId : null,
                 product_id: scope === 'product' ? productId : null,
                 expires_at: finalExpiresAt,
                 max_uses: finalMaxUses,
                 created_by: userId,
             };
+            
+            // Se o escopo for 'model' para Grant, precisamos garantir que o modelId está setado
+            if (linkType === 'grant' && scope === 'model' && !modelId) {
+                setError('Model ID é obrigatório para Grant de Modelo.');
+                setLoading(false);
+                return;
+            }
+
 
             // 6. Inserir no Supabase
             const { error: insertError } = await supabase.from('access_links').insert([payload]);
@@ -328,6 +348,23 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
         }
     };
     
+    const filteredProducts = formData.modelId 
+        ? products.filter(p => p.model_id === formData.modelId)
+        : products;
+        
+    const isGrant = formData.linkType === 'grant';
+    
+    // Se o escopo for 'product', precisamos do modelId para filtrar os produtos
+    const selectedProduct = products.find(p => p.id === formData.productId);
+    
+    useEffect(() => {
+        if (formData.scope === 'product' && selectedProduct?.model_id && formData.modelId !== selectedProduct.model_id) {
+            // Correção: Garante que selectedProduct.model_id é uma string antes de setar
+            setFormData(prev => ({ ...prev, modelId: selectedProduct.model_id || '' }));
+        }
+    }, [formData.scope, formData.productId, selectedProduct?.model_id]);
+
+
     return (
         <form onSubmit={handleGenerateToken} className="bg-privacy-surface p-6 rounded-lg space-y-4">
             <h2 className="text-xl font-bold text-white mb-4">Gerar Novo Link de Acesso</h2>
@@ -335,19 +372,32 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
             {error && <p className="text-red-400 bg-red-500/10 p-3 rounded-md text-sm">{error}</p>}
 
             <div>
+                <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Tipo de Link</label>
+                <select name="linkType" value={formData.linkType} onChange={handleChange} className={inputStyle} required>
+                    <option value="access">Access (Temporário - Acesso via token)</option>
+                    <option value="grant">Grant (Permanente - Cria compra no 1º acesso)</option>
+                </select>
+                {isGrant && (
+                    <p className="text-xs text-green-400 mt-1">
+                        ⚠️ Grant: Cria um registro de compra permanente (status 'paid') no banco de dados para o usuário no primeiro acesso.
+                    </p>
+                )}
+            </div>
+
+            <div>
                 <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Escopo de Acesso</label>
-                <select name="scope" value={formData.scope} onChange={handleChange} className={inputStyle} required>
-                    <option value="global">Global (Acesso a tudo)</option>
+                <select name="scope" value={formData.scope} onChange={handleChange} className={inputStyle} required disabled={isGrant && formData.scope === 'global'}>
+                    <option value="global" disabled={isGrant}>Global (Acesso a tudo)</option>
                     <option value="model">Modelo Específica</option>
                     <option value="product">Produto Específico</option>
                 </select>
             </div>
 
-            {formData.scope === 'model' && (
+            {(formData.scope === 'model' || formData.scope === 'product') && (
                 <div>
-                    <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Modelo</label>
-                    <select name="modelId" value={formData.modelId} onChange={handleChange} className={inputStyle} required>
-                        <option value="">Selecione uma modelo</option>
+                    <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Modelo (Opcional para Produto)</label>
+                    <select name="modelId" value={formData.modelId} onChange={handleChange} className={inputStyle} required={formData.scope === 'model'}>
+                        <option value="">{formData.scope === 'model' ? 'Selecione uma modelo' : 'Filtrar por modelo (Opcional)'}</option>
                         {models.map(m => <option key={m.id} value={m.id}>{m.name} (@{m.username})</option>)}
                     </select>
                 </div>
@@ -358,7 +408,7 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
                     <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Produto</label>
                     <select name="productId" value={formData.productId} onChange={handleChange} className={inputStyle} required>
                         <option value="">Selecione um produto</option>
-                        {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.type})</option>)}
+                        {filteredProducts.map(p => <option key={p.id} value={p.id}>{p.name} ({p.type})</option>)}
                     </select>
                 </div>
             )}
@@ -405,6 +455,7 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                     <thead className="text-xs text-privacy-text-secondary uppercase bg-privacy-border">
                         <tr>
                             <th scope="col" className="px-4 py-3">Status</th>
+                            <th scope="col" className="px-4 py-3">Tipo</th>
                             <th scope="col" className="px-4 py-3">Escopo</th>
                             <th scope="col" className="px-4 py-3">Usos</th>
                             <th scope="col" className="px-4 py-3">Expira em</th>
@@ -419,12 +470,15 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                             const maxUses = isMaxUses(link);
                             const statusColor = link.active && !expired && !maxUses ? 'text-green-400' : 'text-red-400';
                             const statusText = expired ? 'Expirado' : maxUses ? 'Esgotado' : link.active ? 'Ativo' : 'Inativo';
-                            const lastUsed = link.last_used_at ? new Date(link.last_used_at).toLocaleString('pt-BR') : 'Nunca usado';
+                            const linkTypeColor = link.link_type === 'grant' ? 'text-green-400' : 'text-primary';
 
                             return (
                                 <tr key={link.id} className="bg-privacy-surface border-b border-privacy-border hover:bg-privacy-border/50">
                                     <td className={`px-4 py-3 font-medium ${statusColor}`}>
                                         {statusText}
+                                    </td>
+                                    <td className={`px-4 py-3 font-medium capitalize ${linkTypeColor}`}>
+                                        {link.link_type}
                                     </td>
                                     <td className="px-4 py-3 capitalize">
                                         {link.scope}
@@ -521,11 +575,11 @@ export const ManageAccessLinks: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            // Buscando token_plain, last_validator_name e last_validator_email
+            // Buscando token_plain, link_type, last_validator_name e last_validator_email
             const [linksRes, modelsRes, productsRes] = await Promise.all([
-                supabase.from('access_links').select('*, token_plain, last_validator_name, last_validator_email').order('created_at', { ascending: false }),
+                supabase.from('access_links').select('*, token_plain, link_type, last_validator_name, last_validator_email').order('created_at', { ascending: false }),
                 supabase.from('models').select('id, name, username'),
-                supabase.from('products').select('id, name, type'),
+                supabase.from('products').select('id, name, type, model_id'), // Adicionado model_id para filtrar no form
             ]);
 
             if (linksRes.error) throw linksRes.error;
@@ -615,7 +669,7 @@ export const ManageAccessLinks: React.FC = () => {
             
             // 2. Chamar EF com o token puro
             const { data, error: invokeError } = await supabase.functions.invoke('validate-access-link', {
-                body: { token: link.token_plain, visitor_name: 'Admin Teste', visitor_email: 'admin@teste.com' },
+                body: { token: link.token_plain, visitor_name: 'Admin Teste', visitor_email: 'admin@teste.com', user_id: user?.id },
             });
             
             if (invokeError) {
@@ -626,7 +680,7 @@ export const ManageAccessLinks: React.FC = () => {
             if (data.ok === false) {
                 setTestResult({ ok: false, code: data.code, message: data.message });
             } else {
-                setTestResult({ ok: true, code: 'OK', message: 'Link validado com sucesso! (Uso registrado)' });
+                setTestResult({ ok: true, code: 'OK', message: `Link validado com sucesso! (Uso registrado). Tipo: ${data.grant?.link_type}` });
                 fetchData(); // Atualiza a lista para mostrar o incremento de 'uses'
             }
             

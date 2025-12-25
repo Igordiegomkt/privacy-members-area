@@ -72,8 +72,7 @@ export const AccessLinkEntry: React.FC = () => {
       if (visitorName) localStorage.setItem('link_validator_name', visitorName);
       if (visitorEmail) localStorage.setItem('link_validator_email', visitorEmail);
       
-      // BUG FIX: Setar flag para pular a compra de boas-vindas no login
-      sessionStorage.setItem('skip_welcome_purchase', '1');
+      // Se for um link do tipo 'grant', a purchase já foi criada na RPC.
       
       setMessage('Acesso liberado com sucesso! Redirecionando para o login...');
       setStatus('success');
@@ -88,6 +87,7 @@ export const AccessLinkEntry: React.FC = () => {
       if (code === 'MAX_USES') errorMessage = 'Limite de usos atingido.';
       if (code === 'INACTIVE_LINK') errorMessage = 'Link inativo.';
       if (code === 'EMAIL_REQUIRED') errorMessage = 'O email é obrigatório para validar o acesso.';
+      if (code === 'LOGIN_REQUIRED') errorMessage = 'Este link exige que você esteja logado. Por favor, faça login e tente novamente.';
       
       // Se for erro de validação, voltamos ao formulário com a mensagem
       if (code === 'EMAIL_REQUIRED') {
@@ -103,7 +103,7 @@ export const AccessLinkEntry: React.FC = () => {
     }
   };
 
-  const statusClasses = {
+  const statusClasses: Record<typeof status, string> = {
     initial: 'text-primary',
     loading: 'text-primary',
     success: 'text-green-400',

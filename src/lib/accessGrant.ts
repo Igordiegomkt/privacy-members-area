@@ -7,6 +7,7 @@ export interface AccessGrant {
   product_id: string | null;
   expires_at: string | null; // Expiration set by Admin
   local_expires_at: string; // Local TTL (24h)
+  link_type: 'access' | 'grant'; // Novo campo
 }
 
 const STORAGE_KEY = 'access_grant';

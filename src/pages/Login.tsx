@@ -5,7 +5,6 @@ import { saveUTMsToLocalStorage } from '../utils/utmParser';
 import { registerFirstAccess } from '../lib/accessLogger';
 import { Logo } from '../components/Logo';
 import { supabase } from '../lib/supabase';
-import { ensureWelcomePurchaseForCarolina } from '../lib/welcomePurchase';
 import { AuthApiError } from '@supabase/supabase-js'; // Importando AuthApiError
 
 const FIXED_PASSWORD = '12345678'; // Senha fixa para todos os usuários
@@ -53,6 +52,7 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     // --- Lógica para pular a compra de boas-vindas se vier de link ---
+    // A lógica de ensureWelcomePurchaseForCarolina foi removida permanentemente.
     const skipWelcomePurchase = sessionStorage.getItem('skip_welcome_purchase') === '1';
     if (skipWelcomePurchase) {
         sessionStorage.removeItem('skip_welcome_purchase');
@@ -125,17 +125,14 @@ export const Login: React.FC = () => {
       
       console.log("[Login] logged in", { userId: user.id, email: user.email });
       
-      // 4. Pós-login: Garantir compra de boas-vindas e registrar acesso
+      // 4. Pós-login: Garantir compra de boas-vindas (REMOVIDO) e registrar acesso
       
       // O ID do usuário agora é o ID do Supabase Auth
       localStorage.setItem('userName', name.trim() || user.email || 'Usuário');
       localStorage.setItem('userIsAdult', isAdult.toString());
       
-      // GARANTIR COMPRA VIP DA CAROLINA (APENAS SE NÃO HOUVER FLAG DE PULAR)
-      if (!skipWelcomePurchase) {
-        console.log("[Login] calling ensureWelcomePurchaseForCarolina");
-        await ensureWelcomePurchaseForCarolina(user.id);
-      }
+      // A rotina ensureWelcomePurchaseForCarolina foi removida.
+      // O fluxo de Grant (Tipo B) agora cuida da criação de purchases externas.
       
       // Registra o primeiro acesso (para fins de analytics/tracking)
       await registerFirstAccess({

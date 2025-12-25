@@ -155,6 +155,9 @@ export const Login: React.FC = () => {
           )}
 
           <div>
+            <label htmlFor="email" className="block text-sm font-medium text-privacy-text-secondary mb-2 text-left">
+              Email *
+            </label>
             <input
               id="email"
               type="email"
@@ -168,6 +171,9 @@ export const Login: React.FC = () => {
           </div>
           
           <div>
+            <label htmlFor="name" className="block text-sm font-medium text-privacy-text-secondary mb-2 text-left">
+              Nome
+            </label>
             <input
               id="name"
               type="text"
@@ -201,6 +207,10 @@ export const Login: React.FC = () => {
           >
             {isLoading ? 'Acessando...' : 'Entrar'}
           </button>
+          
+          <p className="text-xs text-privacy-text-secondary text-center pt-1">
+            Lembre que esse email será utilizado sempre que for fazer login.
+          </p>
         </form>
 
         <div className="mt-8 text-center">

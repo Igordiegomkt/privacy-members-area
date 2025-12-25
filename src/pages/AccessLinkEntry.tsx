@@ -14,6 +14,7 @@ export const AccessLinkEntry: React.FC = () => {
   const [message, setMessage] = useState('Informe seus dados para validar o acesso.');
   const [visitorName, setVisitorName] = useState('');
   const [visitorEmail, setVisitorEmail] = useState('');
+  const [validationError, setValidationError] = useState<string | null>(null);
   
   const inputStyle = "w-full px-4 py-3 bg-privacy-black border border-privacy-border rounded-lg text-privacy-text-primary placeholder-privacy-text-secondary focus:outline-none focus:border-primary transition-colors";
 
@@ -27,12 +28,19 @@ export const AccessLinkEntry: React.FC = () => {
 
   const handleValidation = async (e?: React.FormEvent) => {
     e?.preventDefault();
+    setValidationError(null);
     
     if (!encodedToken) {
       setMessage('Link de acesso inválido ou incompleto.');
       setStatus('error');
       setTimeout(() => navigate('/login', { replace: true }), 3000);
       return;
+    }
+    
+    // Validação de Email (Obrigatório)
+    if (!visitorEmail.trim() || !visitorEmail.includes('@')) {
+        setValidationError('O email é obrigatório e deve ser válido.');
+        return;
     }
     
     let tokenNormalized: string;
@@ -60,7 +68,7 @@ export const AccessLinkEntry: React.FC = () => {
     if (grantResponse && grantResponse.ok && grantResponse.grant) {
       saveGrant(grantResponse.grant);
       
-      // PARTE A: Persistir Nome e Email no localStorage
+      // PARTE A: Persistir Nome e Email no localStorage (para pré-preenchimento no login)
       if (visitorName) localStorage.setItem('link_validator_name', visitorName);
       if (visitorEmail) localStorage.setItem('link_validator_email', visitorEmail);
       
@@ -124,9 +132,14 @@ export const AccessLinkEntry: React.FC = () => {
         <p className="text-privacy-text-secondary mb-6">Informe seus dados para validar o acesso.</p>
         
         <form onSubmit={handleValidation} className="space-y-4">
+            {validationError && (
+                <div className="bg-red-500/10 border border-red-500/50 text-red-400 px-4 py-3 rounded-lg text-sm text-left">
+                    {validationError}
+                </div>
+            )}
             <div>
                 <label htmlFor="visitorName" className="block text-sm font-medium text-privacy-text-secondary mb-1 text-left">
-                    Nome (opcional)
+                    Nome
                 </label>
                 <input
                     id="visitorName"
@@ -139,13 +152,14 @@ export const AccessLinkEntry: React.FC = () => {
             </div>
             <div>
                 <label htmlFor="visitorEmail" className="block text-sm font-medium text-privacy-text-secondary mb-1 text-left">
-                    Email (opcional)
+                    Email *
                 </label>
                 <input
                     id="visitorEmail"
                     type="email"
                     value={visitorEmail}
                     onChange={(e) => setVisitorEmail(e.target.value)}
+                    required
                     className={inputStyle}
                     placeholder="seuemail@exemplo.com"
                 />
@@ -156,6 +170,9 @@ export const AccessLinkEntry: React.FC = () => {
             >
                 Validar Acesso
             </button>
+            <p className="text-xs text-privacy-text-secondary text-center pt-1">
+                Lembre que esse email será utilizado sempre que for fazer login.
+            </p>
         </form>
       </div>
     </div>

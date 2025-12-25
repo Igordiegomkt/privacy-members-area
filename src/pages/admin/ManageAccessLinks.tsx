@@ -23,6 +23,8 @@ interface AccessLink {
     created_by: string | null;
     last_used_at: string | null;
     first_used_at: string | null;
+    last_validator_name: string | null; // Novo campo
+    last_validator_email: string | null; // Novo campo
 }
 
 // Tipos para a tabela access_link_visits
@@ -406,7 +408,7 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                             <th scope="col" className="px-4 py-3">Escopo</th>
                             <th scope="col" className="px-4 py-3">Usos</th>
                             <th scope="col" className="px-4 py-3">Expira em</th>
-                            <th scope="col" className="px-4 py-3">Último Acesso</th>
+                            <th scope="col" className="px-4 py-3">Último Validador</th>
                             <th scope="col" className="px-4 py-3">Link</th>
                             <th scope="col" className="px-4 py-3">Ações</th>
                         </tr>
@@ -433,10 +435,11 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                                         {link.uses} / {link.max_uses ?? '∞'}
                                     </td>
                                     <td className="px-4 py-3">
-                                        {link.expires_at ? new Date(link.expires_at).toLocaleString('pt-BR') : 'Nunca'}
+                                        {link.expires_at ? new Date(link.expires_at).toLocaleDateString('pt-BR') : 'Nunca'}
                                     </td>
-                                    <td className="px-4 py-3 text-xs">
-                                        {lastUsed}
+                                    <td className="px-4 py-3">
+                                        <p className="text-white text-xs">{link.last_validator_name || '—'}</p>
+                                        <p className="text-privacy-text-secondary text-[10px] truncate max-w-[100px]">{link.last_validator_email || '—'}</p>
                                     </td>
                                     <td className="px-4 py-3">
                                         {link.token_plain ? (
@@ -518,9 +521,9 @@ export const ManageAccessLinks: React.FC = () => {
         setLoading(true);
         setError(null);
         try {
-            // Buscando token_plain para exibição no Admin
+            // Buscando token_plain, last_validator_name e last_validator_email
             const [linksRes, modelsRes, productsRes] = await Promise.all([
-                supabase.from('access_links').select('*, token_plain').order('created_at', { ascending: false }),
+                supabase.from('access_links').select('*, token_plain, last_validator_name, last_validator_email').order('created_at', { ascending: false }),
                 supabase.from('models').select('id, name, username'),
                 supabase.from('products').select('id, name, type'),
             ]);
@@ -612,7 +615,7 @@ export const ManageAccessLinks: React.FC = () => {
             
             // 2. Chamar EF com o token puro
             const { data, error: invokeError } = await supabase.functions.invoke('validate-access-link', {
-                body: { token: link.token_plain, visitor_name: 'Admin Teste' },
+                body: { token: link.token_plain, visitor_name: 'Admin Teste', visitor_email: 'admin@teste.com' },
             });
             
             if (invokeError) {

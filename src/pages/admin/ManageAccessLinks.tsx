@@ -362,7 +362,7 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
                 scope,
                 link_type: linkType,
                 // Se for Global, model_id e product_id devem ser NULL
-                model_id: scope === 'global' ? null : (scope === 'product' && modelId) ? modelId : modelId || null,
+                model_id: scope === 'global' ? null : (scope === 'product' ? modelId : modelId || null),
                 product_id: scope === 'product' ? productId : null,
                 expires_at: finalExpiresAt,
                 max_uses: finalMaxUses,
@@ -431,6 +431,11 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
                     <option value="model">Modelo Específica</option>
                     <option value="product">Produto Específico</option>
                 </select>
+                {isGlobalScope && !isGrant && (
+                    <p className="text-xs text-primary mt-1">
+                        Access Global: Concede acesso temporário a todos os conteúdos de todas as modelos.
+                    </p>
+                )}
             </div>
 
             {/* Se for Grant, Model ou Product, mostramos o seletor de Modelo */}

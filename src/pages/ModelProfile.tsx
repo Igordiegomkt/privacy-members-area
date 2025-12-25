@@ -17,6 +17,7 @@ import { useCheckout } from '../contexts/CheckoutContext';
 import { trackViewContent, trackAddToCart } from '../lib/tracking';
 import { feedCache } from '../lib/feedCache';
 import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
+import { isModelUnlockedByGrant } from '../lib/accessVisual'; // Importando helper de link
 
 const formatPrice = (cents: number) => (cents / 100).toLocaleString('pt-BR', { style: 'currency', currency: 'BRL' });
 
@@ -26,15 +27,18 @@ interface ProductCardProps {
     modelName: string;
     isFirst: boolean;
     modelCoverUrl?: string | null;
+    isUnlockedByGrant: boolean; // Nova prop
 }
 
-const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelName, isFirst, modelCoverUrl }: ProductCardProps) => {
+const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelName, isFirst, modelCoverUrl, isUnlockedByGrant }: ProductCardProps) => {
     const navigate = useNavigate();
     const { openCheckoutForProduct } = useCheckout();
+    
+    const showCta = !isPurchased && !isUnlockedByGrant;
 
     const handleCtaClick = () => {
-        if (isPurchased) {
-            // Se já comprou, navega para o detalhe do produto
+        if (isPurchased || isUnlockedByGrant) {
+            // Se já comprou ou tem acesso por link, navega para o detalhe do produto
             navigate(`/produto/${product.id}`);
         } else {
             // Se não comprou, abre o modal de checkout
@@ -52,12 +56,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelNa
                     alt={product.name} 
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
                 />
-                {isFirst && !isPurchased && (
+                {isFirst && !isPurchased && !isUnlockedByGrant && (
                     <div className="absolute top-2 left-2 bg-primary text-privacy-black rounded-full px-2 py-1 text-xs font-bold">
                         🔥 Mais vendido de {modelName.split(' ')[0]}
                     </div>
                 )}
-                {isPurchased && (
+                {(isPurchased || isUnlockedByGrant) && (
                     <div className="absolute top-2 left-2 bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold">
                         ✔ Já é seu
                     </div>
@@ -69,12 +73,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelNa
                 <button
                     onClick={handleCtaClick}
                     className={`w-full mt-3 text-sm font-semibold py-2 rounded-lg transition-colors ${
-                        isPurchased
-                            ? 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
-                            : 'bg-primary text-privacy-black hover:opacity-90'
+                        showCta
+                            ? 'bg-primary text-privacy-black hover:opacity-90'
+                            : 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
                     }`}
                 >
-                    {isPurchased ? 'Ver conteúdo' : 'Desbloquear agora'}
+                    {showCta ? 'Desbloquear agora' : 'Ver conteúdo'}
                 </button>
             </div>
         </div>
@@ -349,6 +353,11 @@ export const ModelProfile: React.FC = () => {
 
     // Garantimos que model é Model aqui
     const currentModel = model as Model;
+    
+    // --- PARTE A: VERIFICAÇÃO DE ACESSO POR LINK ---
+    const isUnlockedByGrant = isModelUnlockedByGrant(currentModel.id);
+    const showPurchaseCta = !hasAccess && !isUnlockedByGrant;
+    // ----------------------------------------------
 
     // Usando os contadores totais (fix)
     const stats = mediaCounts || { totalPosts: 0, totalPhotos: 0, totalVideos: 0 };
@@ -399,10 +408,10 @@ export const ModelProfile: React.FC = () => {
                 {/* CTA Principal VIP (Requirement 9B) */}
                 {mainProduct && (
                   <div className="px-4 sm:px-6 my-6">
-                    <div className={`rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3 ${hasAccess ? 'bg-green-500/10 border border-green-500/30' : 'bg-primary/10 border border-primary/30'}`}>
+                    <div className={`rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3 ${!showPurchaseCta ? 'bg-green-500/10 border border-green-500/30' : 'bg-primary/10 border border-primary/30'}`}>
                       <div className="text-center sm:text-left">
-                        {hasAccess ? (
-                            <p className="font-semibold text-green-400 flex items-center gap-2">
+                        {!showPurchaseCta ? (
+                            <p className={`font-semibold flex items-center gap-2 ${isUnlockedByGrant ? 'text-blue-400' : 'text-green-400'}`}>
                                 <CheckCircle size={16} /> Acesso VIP de {currentModel.name} liberado!
                             </p>
                         ) : (
@@ -420,7 +429,7 @@ export const ModelProfile: React.FC = () => {
                         )}
                       </div>
 
-                      {!hasAccess && (
+                      {showPurchaseCta && (
                         <button
                           onClick={handleLockedClick}
                           className="w-full sm:w-auto bg-primary text-privacy-black font-semibold py-2 px-4 rounded-lg hover:opacity-90"
@@ -433,7 +442,7 @@ export const ModelProfile: React.FC = () => {
                 )}
                 
                 {/* Se não houver produto base, mas houver outros produtos, mostra o banner genérico */}
-                {!hasAccess && !mainProduct && products.length > 0 && (
+                {!hasAccess && !mainProduct && products.length > 0 && showPurchaseCta && (
                     <div className="px-4 sm:px-6 my-6">
                         <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3">
                             <p className="font-semibold text-primary">
@@ -516,6 +525,7 @@ export const ModelProfile: React.FC = () => {
                                         modelName={currentModel.name}
                                         isFirst={index === 0}
                                         modelCoverUrl={currentModel.cover_url}
+                                        isUnlockedByGrant={isUnlockedByGrant} // Passando a flag
                                     />
                                 ))}
                             </div>

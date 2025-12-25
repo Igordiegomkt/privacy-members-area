@@ -10,6 +10,7 @@ import { useCheckout } from '../contexts/CheckoutContext';
 import { useNavigate } from 'react-router-dom';
 import { trackAddToCart } from '../lib/tracking'; // Importando tracking
 import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
+import { isModelUnlockedByGrant } from '../lib/accessVisual'; // Importando helper de link
 
 const formatPrice = (cents: number) => {
   return (cents / 100).toLocaleString('pt-BR', {
@@ -26,6 +27,10 @@ interface ProductCardProps {
 const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: ProductCardProps) => {
   const { openCheckoutForProduct } = useCheckout();
   const navigate = useNavigate();
+  
+  // Se for um produto de modelo, verifica se o acesso por link está ativo
+  const isUnlockedByGrant = product.model_id ? isModelUnlockedByGrant(product.model_id) : false;
+  const showCta = !isPurchased && !isUnlockedByGrant;
 
   const handleCtaClick = () => {
     if (isPurchased) {
@@ -69,6 +74,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: Produ
             ✔ Comprado
           </div>
         )}
+        {isUnlockedByGrant && (
+            <div className="absolute top-2 right-2 bg-blue-500/20 text-blue-400 rounded-full px-2 py-1 text-[10px] font-bold">
+                VIP por Link
+            </div>
+        )}
       </div>
       <div className="p-3 flex flex-col gap-1 flex-1">
         <h3 className="font-semibold text-privacy-text-primary text-sm line-clamp-2">
@@ -77,16 +87,21 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: Produ
         <p className="text-sm font-bold text-primary">
           {formatPrice(product.price_cents)}
         </p>
-        <button
-          onClick={handleCtaClick}
-          className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity ${
-            isPurchased
-              ? 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
-              : 'bg-primary text-privacy-black hover:opacity-90'
-          }`}
-        >
-          {isPurchased ? 'Ver Detalhes' : 'Comprar agora via PIX'}
-        </button>
+        {showCta ? (
+            <button
+              onClick={handleCtaClick}
+              className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity bg-primary text-privacy-black hover:opacity-90`}
+            >
+              Comprar agora via PIX
+            </button>
+        ) : (
+            <button
+              onClick={() => navigate(`/produto/${product.id}`)}
+              className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70`}
+            >
+              Ver Detalhes
+            </button>
+        )}
       </div>
     </div>
   );
@@ -103,6 +118,9 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
   const model = product.models;
 
   if (!model) return null;
+  
+  const isUnlockedByGrant = isModelUnlockedByGrant(model.id);
+  const showCta = !isPurchased && !isUnlockedByGrant;
 
   const handleCtaClick = () => {
     if (isPurchased) {
@@ -131,6 +149,11 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
             ✔ VIP Ativo
           </div>
         )}
+        {isUnlockedByGrant && (
+            <div className="absolute top-2 right-2 bg-blue-500/20 text-blue-400 rounded-full px-2 py-1 text-[10px] font-bold">
+                VIP por Link
+            </div>
+        )}
       </div>
       <div className="p-3 flex flex-col gap-1 flex-1">
         <h3 className="font-semibold text-sm text-privacy-text-primary truncate">
@@ -142,16 +165,21 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
         <p className="text-sm font-bold text-primary">
           {formatPrice(product.price_cents)}
         </p>
-        <button
-          onClick={handleCtaClick}
-          className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity ${
-            isPurchased
-              ? 'bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70'
-              : 'bg-primary text-privacy-black hover:opacity-90'
-          }`}
-        >
-          {isPurchased ? 'Acessar Perfil VIP' : 'Desbloquear VIP via PIX'}
-        </button>
+        {showCta ? (
+            <button
+              onClick={handleCtaClick}
+              className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity bg-primary text-privacy-black hover:opacity-90`}
+            >
+              Desbloquear VIP via PIX
+            </button>
+        ) : (
+            <button
+              onClick={() => navigate(`/modelo/${model.username}`)}
+              className={`mt-auto w-full text-xs font-semibold py-1.5 rounded-lg transition-opacity bg-privacy-border text-privacy-text-primary hover:bg-privacy-border/70`}
+            >
+              Acessar Perfil VIP
+            </button>
+        )}
       </div>
     </div>
   );

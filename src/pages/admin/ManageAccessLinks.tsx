@@ -237,7 +237,7 @@ const EditLinkModal: React.FC<EditLinkModalProps> = ({ link, onSave, onClose }: 
 const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string }> = ({ models, products, onLinkCreated, userId }: { models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string }) => {
     const [formData, setFormData] = useState<LinkFormData>({
         scope: 'global',
-        linkType: 'access', // Novo campo
+        linkType: 'access', // Default para access
         modelId: '',
         productId: '',
         expiresAt: '',
@@ -263,9 +263,9 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
                 ...prev, 
                 linkType: newLinkType,
                 scope: newScope,
-                // Limpa modelId/productId se mudar de tipo e o escopo for global (embora já forçado acima)
-                modelId: newLinkType === 'access' && newScope === 'global' ? '' : prev.modelId,
-                productId: newLinkType === 'access' && newScope === 'global' ? '' : prev.productId,
+                // Se mudar para 'access' e o escopo for 'global', limpa IDs
+                modelId: newScope === 'global' ? '' : prev.modelId,
+                productId: newScope === 'global' ? '' : prev.productId,
             }));
             return;
         }
@@ -298,36 +298,41 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
 
         const { scope, linkType, modelId, productId, expiresAt, maxUses } = formData;
         
-        // --- Validação de Coerência ---
         const isGrant = linkType === 'grant';
         
+        // --- Validação de Coerência ---
+        
+        // 1. Grant não pode ser Global
         if (isGrant && scope === 'global') {
             setError('Links do tipo "Grant" não podem ter escopo "Global".');
             setLoading(false);
             return;
         }
         
-        if (scope === 'model' && !modelId) {
+        // 2. Grant deve ter modelo OU produto
+        if (isGrant && !modelId && !productId) {
+            setError('Links do tipo "Grant" devem ser vinculados a uma Modelo ou Produto específico.');
+            setLoading(false);
+            return;
+        }
+        
+        // 3. Access/Model exige modelId
+        if (linkType === 'access' && scope === 'model' && !modelId) {
             setError('Selecione uma modelo para o escopo "Modelo".');
             setLoading(false);
             return;
         }
         
+        // 4. Access/Product exige productId
         if (scope === 'product' && !productId) {
             setError('Selecione um produto para o escopo "Produto".');
             setLoading(false);
             return;
         }
         
-        // Validação crítica para Grant: deve ter modelId ou productId
-        if (isGrant && !modelId && !productId) {
-            setError('Links do tipo "Grant" devem ser vinculados a uma Modelo ou Produto específico.');
-            setLoading(false);
-            return;
-        }
         // -----------------------------
         
-        // 1. Tratar maxUses: já tratado no handleNumberChange (null para 0/vazio)
+        // 5. Tratar maxUses
         let finalMaxUses: number | null = maxUses;
         if (finalMaxUses !== null && finalMaxUses < 1) {
             setError('Usos máximos deve ser um número positivo ou vazio/zero.');
@@ -335,11 +340,10 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
             return;
         }
         
-        // 2. Tratar expiresAt: vazio => null. Se tiver data, converte para ISO.
+        // 6. Tratar expiresAt
         let finalExpiresAt: string | null = null;
         if (expiresAt) {
             let dateToConvert = expiresAt;
-            // Se o input é apenas data (YYYY-MM-DD), adicionamos 23:59:59 local antes de converter para UTC/ISO
             if (expiresAt.length === 10) { 
                 dateToConvert = `${expiresAt}T23:59:59`;
             }
@@ -347,31 +351,30 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
         }
 
         try {
-            // 3. Gerar token forte
+            // 7. Gerar token forte e hash
             const rawToken = generateStrongToken();
-            
-            // 4. Calcular SHA256 hash
             const tokenHash = await sha256Hex(rawToken);
 
-            // 5. Preparar payload
+            // 8. Preparar payload
             const payload = {
                 token_hash: tokenHash,
-                token_plain: rawToken, // Salvando o token puro para o Admin
+                token_plain: rawToken,
                 scope,
-                link_type: linkType, // Novo campo
-                model_id: scope === 'model' || (scope === 'product' && modelId) ? modelId : null,
+                link_type: linkType,
+                // Se for Global, model_id e product_id devem ser NULL
+                model_id: scope === 'global' ? null : (scope === 'product' && modelId) ? modelId : modelId || null,
                 product_id: scope === 'product' ? productId : null,
                 expires_at: finalExpiresAt,
                 max_uses: finalMaxUses,
                 created_by: userId,
             };
             
-            // 6. Inserir no Supabase
+            // 9. Inserir no Supabase
             const { error: insertError } = await supabase.from('access_links').insert([payload]);
 
             if (insertError) throw insertError;
 
-            // 7. Mostrar link final no formato de trilha
+            // 10. Mostrar link final
             const finalLink = `${DOMAIN}/acesso/${encodeURIComponent(rawToken)}`;
             onLinkCreated(finalLink);
 
@@ -386,6 +389,7 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
     const isGrant = formData.linkType === 'grant';
     const isProductScope = formData.scope === 'product';
     const isModelScope = formData.scope === 'model';
+    const isGlobalScope = formData.scope === 'global';
     
     const filteredProducts = formData.modelId 
         ? products.filter(p => p.model_id === formData.modelId)
@@ -429,7 +433,8 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
                 </select>
             </div>
 
-            {(isModelScope || isProductScope) && (
+            {/* Se for Grant, Model ou Product, mostramos o seletor de Modelo */}
+            {(!isGlobalScope || isGrant) && (
                 <div>
                     <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Modelo</label>
                     <select 

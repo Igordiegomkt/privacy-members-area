@@ -34,10 +34,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelNa
     const navigate = useNavigate();
     const { openCheckoutForProduct } = useCheckout();
     
-    const showCta = !isPurchased && !isUnlockedByGrant;
+    const isUnlocked = isPurchased || isUnlockedByGrant;
+    const showCta = !isUnlocked;
 
     const handleCtaClick = () => {
-        if (isPurchased || isUnlockedByGrant) {
+        if (isUnlocked) {
             // Se já comprou ou tem acesso por link, navega para o detalhe do produto
             navigate(`/produto/${product.id}`);
         } else {
@@ -56,12 +57,12 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased, modelNa
                     alt={product.name} 
                     className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" 
                 />
-                {isFirst && !isPurchased && !isUnlockedByGrant && (
+                {isFirst && !isUnlocked && (
                     <div className="absolute top-2 left-2 bg-primary text-privacy-black rounded-full px-2 py-1 text-xs font-bold">
                         🔥 Mais vendido de {modelName.split(' ')[0]}
                     </div>
                 )}
-                {(isPurchased || isUnlockedByGrant) && (
+                {isUnlocked && (
                     <div className="absolute top-2 left-2 bg-green-500 text-white rounded-full px-2 py-1 text-xs font-bold">
                         ✔ Já é seu
                     </div>
@@ -356,7 +357,8 @@ export const ModelProfile: React.FC = () => {
     
     // --- PARTE A: VERIFICAÇÃO DE ACESSO POR LINK ---
     const isUnlockedByGrant = isModelUnlockedByGrant(currentModel.id);
-    const showPurchaseCta = !hasAccess && !isUnlockedByGrant;
+    const isFullyUnlocked = hasAccess || isUnlockedByGrant; // Acesso por compra OU link
+    const showPurchaseCta = !isFullyUnlocked;
     // ----------------------------------------------
 
     // Usando os contadores totais (fix)
@@ -411,7 +413,7 @@ export const ModelProfile: React.FC = () => {
                     <div className={`rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3 ${!showPurchaseCta ? 'bg-green-500/10 border border-green-500/30' : 'bg-primary/10 border border-primary/30'}`}>
                       <div className="text-center sm:text-left">
                         {!showPurchaseCta ? (
-                            <p className={`font-semibold flex items-center gap-2 ${isUnlockedByGrant ? 'text-blue-400' : 'text-green-400'}`}>
+                            <p className={`font-semibold flex items-center gap-2 text-green-400`}>
                                 <CheckCircle size={16} /> Acesso VIP de {currentModel.name} liberado!
                             </p>
                         ) : (
@@ -442,7 +444,7 @@ export const ModelProfile: React.FC = () => {
                 )}
                 
                 {/* Se não houver produto base, mas houver outros produtos, mostra o banner genérico */}
-                {!hasAccess && !mainProduct && products.length > 0 && showPurchaseCta && (
+                {!isFullyUnlocked && !mainProduct && products.length > 0 && (
                     <div className="px-4 sm:px-6 my-6">
                         <div className="bg-primary/10 border border-primary/30 rounded-lg p-4 text-sm flex flex-col sm:flex-row items-center justify-between gap-3">
                             <p className="font-semibold text-primary">

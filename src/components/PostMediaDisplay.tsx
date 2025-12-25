@@ -3,7 +3,7 @@ import { useRef } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { Lock, Video, Camera, Play } from 'lucide-react';
 import { useVideoAutoplay } from '../hooks/useVideoAutoplay';
-import { isModelUnlockedByGrant, getVipBadgeLabel } from '../lib/accessVisual'; // Novo import
+import { isModelUnlockedByGrant } from '../lib/accessVisual'; // Novo import
 
 interface PostMediaDisplayProps {
   media: MediaItemWithAccess;
@@ -86,13 +86,6 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
             {isVideo ? <Video size={12} /> : <Camera size={12} />}
             {isVideo ? 'Vídeo' : 'Foto'}
           </span>
-        </div>
-      )}
-      
-      {/* Badge VIP por Link */}
-      {isUnlockedByGrant && (
-        <div className="absolute top-2 right-2 bg-blue-500/20 text-blue-400 rounded-full px-2 py-1 text-[10px] font-bold z-30">
-            {getVipBadgeLabel()}
         </div>
       )}
       

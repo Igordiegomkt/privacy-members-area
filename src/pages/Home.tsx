@@ -7,7 +7,7 @@ import { fetchUserPurchases } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
 import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
-import { isModelUnlockedByGrant, getVipBadgeLabel } from '../lib/accessVisual'; // Novo import
+import { isModelUnlockedByGrant } from '../lib/accessVisual'; // Novo import
 
 interface ModelWithAccess extends Model {
   isUnlocked: boolean;
@@ -18,8 +18,9 @@ interface ModelWithAccess extends Model {
 const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: ModelWithAccess }) => {
   const navigate = useNavigate();
   
+  // Acesso por link ou por compra
   const isUnlockedByGrant = isModelUnlockedByGrant(model.id);
-  const isUnlocked = model.isUnlocked || isUnlockedByGrant;
+  const isUnlocked = model.isUnlocked || isUnlockedByGrant; // isUnlocked já inclui a compra real
 
   const formattedPrice =
     model.mainProductPriceCents != null
@@ -44,9 +45,10 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: Mod
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
 
-        {isUnlockedByGrant && (
-            <div className="absolute top-2 right-2 bg-blue-500/20 text-blue-400 rounded-full px-2 py-1 text-[10px] font-bold">
-                {getVipBadgeLabel()}
+        {/* Badge de VIP Ativo (Compra ou Link) */}
+        {isUnlocked && (
+            <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full px-2 py-1 text-[10px] font-bold">
+                ✔ VIP Ativo
             </div>
         )}
 
@@ -64,7 +66,7 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: Mod
       {/* CTA fixo embaixo do card */}
       <div className="p-2 border-t border-privacy-border flex flex-col gap-1">
         {isUnlocked && (
-          <span className={`text-[11px] flex items-center gap-1 ${isUnlockedByGrant ? 'text-blue-400' : 'text-green-400'}`}>
+          <span className={`text-[11px] flex items-center gap-1 text-green-400`}>
             ✔ Acesso VIP liberado
           </span>
         )}
@@ -124,8 +126,15 @@ export const Home: React.FC = () => {
       });
 
       modelsWithAccess.sort((a, b) => {
-        if (a.isUnlocked && !b.isUnlocked) return -1;
-        if (!a.isUnlocked && b.isUnlocked) return 1;
+        // Prioriza modelos desbloqueadas (compra ou link)
+        const aIsUnlockedByGrant = isModelUnlockedByGrant(a.id);
+        const bIsUnlockedByGrant = isModelUnlockedByGrant(b.id);
+        
+        const aIsFullyUnlocked = a.isUnlocked || aIsUnlockedByGrant;
+        const bIsFullyUnlocked = b.isUnlocked || bIsUnlockedByGrant;
+
+        if (aIsFullyUnlocked && !bIsFullyUnlocked) return -1;
+        if (!aIsFullyUnlocked && bIsFullyUnlocked) return 1;
         return 0;
       });
 

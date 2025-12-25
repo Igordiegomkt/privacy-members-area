@@ -3,6 +3,7 @@ import { useRef, useState } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { Lock, Video, Camera } from 'lucide-react';
 import { useVideoAutoplay } from '../hooks/useVideoAutoplay'; // Importando o hook
+import { isModelUnlockedByGrant } from '../lib/accessVisual';
 
 interface GridMediaCardProps {
   media: MediaItemWithAccess;
@@ -19,9 +20,13 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
   const isLocked = media.accessStatus === 'locked';
   const videoRef = useRef<HTMLVideoElement | null>(null);
   const [thumbError, setThumbError] = useState(false);
+  
+  // Se o acesso for concedido por link, tratamos visualmente como desbloqueado
+  const isUnlockedByGrant = media.model?.id ? isModelUnlockedByGrant(media.model.id) : false;
+  const showLockedOverlay = isLocked && !isUnlockedByGrant;
 
   // Hook para autoplay
-  useVideoAutoplay(videoRef, isVideo, isLocked);
+  useVideoAutoplay(videoRef, isVideo, showLockedOverlay);
 
   // PosterSrc é usado como thumbnail da imagem ou poster do vídeo
   const posterSrc = media.thumbnail || (isVideo ? undefined : media.url);
@@ -29,7 +34,7 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
-    if (isLocked) return onLockedClick?.();
+    if (showLockedOverlay) return onLockedClick?.();
     
     // Pausa o autoplay antes de abrir o modal
     if (videoRef.current) {
@@ -48,7 +53,7 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
         src={imageSrc}
         alt={media.title || 'Conteúdo'}
         className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 z-10 ${
-          isLocked ? 'blur-xl brightness-25 scale-105' : ''
+          showLockedOverlay ? 'blur-xl brightness-25 scale-105' : ''
         }`}
         loading="lazy"
         draggable={false}
@@ -56,7 +61,7 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
       />
       
       {/* VÍDEO (Autoplay) - Z-index 20 */}
-      {isVideo && !isLocked && (
+      {isVideo && !showLockedOverlay && (
         <video
           ref={videoRef}
           src={media.url}
@@ -76,7 +81,7 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
         </span>
       </div>
 
-      {isLocked && (
+      {showLockedOverlay && (
         <div className="absolute inset-0 flex flex-col items-center justify-center bg-black/70 text-center px-3 z-30">
           <Lock className="w-8 h-8 text-white/80 mb-2" />
           <p className="text-sm text-white font-semibold mb-3">

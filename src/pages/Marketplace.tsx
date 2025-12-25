@@ -30,10 +30,11 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: Produ
   
   // Se for um produto de modelo, verifica se o acesso por link está ativo
   const isUnlockedByGrant = product.model_id ? isModelUnlockedByGrant(product.model_id) : false;
-  const showCta = !isPurchased && !isUnlockedByGrant;
+  const isUnlocked = isPurchased || isUnlockedByGrant;
+  const showCta = !isUnlocked;
 
   const handleCtaClick = () => {
-    if (isPurchased) {
+    if (isUnlocked) {
       navigate(`/produto/${product.id}`);
     } else {
       // ADDTOCART
@@ -69,15 +70,10 @@ const ProductCard: React.FC<ProductCardProps> = ({ product, isPurchased }: Produ
           {product.type === 'single_media' && 'Conteúdo'}
           {product.type === 'subscription' && 'Assinatura'}
         </div>
-        {isPurchased && (
+        {isUnlocked && (
           <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full px-2 py-1 text-[10px] font-bold">
             ✔ Comprado
           </div>
-        )}
-        {isUnlockedByGrant && (
-            <div className="absolute top-2 right-2 bg-blue-500/20 text-blue-400 rounded-full px-2 py-1 text-[10px] font-bold">
-                VIP por Link
-            </div>
         )}
       </div>
       <div className="p-3 flex flex-col gap-1 flex-1">
@@ -120,10 +116,11 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
   if (!model) return null;
   
   const isUnlockedByGrant = isModelUnlockedByGrant(model.id);
-  const showCta = !isPurchased && !isUnlockedByGrant;
+  const isUnlocked = isPurchased || isUnlockedByGrant;
+  const showCta = !isUnlocked;
 
   const handleCtaClick = () => {
-    if (isPurchased) {
+    if (isUnlocked) {
       navigate(`/modelo/${model.username}`);
     } else {
       // ADDTOCART
@@ -144,15 +141,10 @@ const ModelVipCard: React.FC<ModelVipCardProps> = ({ product, isPurchased }: Mod
     <div className="bg-privacy-surface rounded-lg overflow-hidden group flex flex-col">
       <div className="relative aspect-square">
         <img src={imageSrc} alt={model.name} className="w-full h-full object-cover transition-transform duration-300 group-hover:scale-105" />
-        {isPurchased && (
+        {isUnlocked && (
           <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full px-2 py-1 text-[10px] font-bold">
             ✔ VIP Ativo
           </div>
-        )}
-        {isUnlockedByGrant && (
-            <div className="absolute top-2 right-2 bg-blue-500/20 text-blue-400 rounded-full px-2 py-1 text-[10px] font-bold">
-                VIP por Link
-            </div>
         )}
       </div>
       <div className="p-3 flex flex-col gap-1 flex-1">

@@ -22,10 +22,3 @@ export function isModelUnlockedByGrant(modelId: string): boolean {
   // 3. Acesso por Produto (Não consideramos aqui para evitar complexidade no feed/listagem de modelos)
   return false;
 }
-
-/**
- * Retorna o rótulo visual para o badge de acesso por link.
- */
-export function getVipBadgeLabel(): string {
-  return "VIP por Link";
-}

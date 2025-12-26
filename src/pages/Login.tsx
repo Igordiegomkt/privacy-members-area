@@ -19,14 +19,26 @@ export const Login: React.FC = () => {
   const navigate = useNavigate();
   const [searchParams] = useSearchParams();
   const returnTo = searchParams.get('returnTo'); // Captura o parâmetro returnTo
+  const prefillEmail = searchParams.get('prefillEmail'); // Novo: Email para pré-preenchimento
+  const prefillName = searchParams.get('prefillName'); // Novo: Nome para pré-preenchimento
 
   useEffect(() => {
     // Pré-preencher com dados do validador de link, se existirem
     const storedName = localStorage.getItem('link_validator_name');
     const storedEmail = localStorage.getItem('link_validator_email');
     
-    if (storedName) setName(storedName);
-    if (storedEmail) setEmail(storedEmail);
+    // Prioridade: 1. URL (prefillEmail/Name) > 2. localStorage (link_validator) > 3. State inicial
+    if (prefillEmail) {
+        setEmail(prefillEmail);
+    } else if (storedEmail) {
+        setEmail(storedEmail);
+    }
+    
+    if (prefillName) {
+        setName(prefillName);
+    } else if (storedName) {
+        setName(storedName);
+    }
     
     // Verifica se já existe uma sessão Supabase ativa
     supabase.auth.getSession().then(({ data: { session } }) => {
@@ -37,7 +49,7 @@ export const Login: React.FC = () => {
       }
       saveUTMsToLocalStorage();
     });
-  }, [navigate, returnTo]);
+  }, [navigate, returnTo, prefillEmail, prefillName]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();

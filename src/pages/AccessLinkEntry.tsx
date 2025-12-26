@@ -104,8 +104,13 @@ export const AccessLinkEntry: React.FC = () => {
               email: email,
           } as PendingGrant));
           
-          // Redireciona para o login, voltando para esta mesma rota
-          setTimeout(() => navigate(`/login?returnTo=/acesso/${encodedToken}`, { replace: true }), 500);
+          // Redireciona para o login, voltando para esta mesma rota, com prefill
+          const prefillParams = new URLSearchParams();
+          prefillParams.set('returnTo', `/acesso/${encodedToken}`);
+          if (email) prefillParams.set('prefillEmail', email);
+          if (name) prefillParams.set('prefillName', name);
+          
+          setTimeout(() => navigate(`/login?${prefillParams.toString()}`, { replace: true }), 500);
           return;
       }
       

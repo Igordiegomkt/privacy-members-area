@@ -5,7 +5,7 @@ import { saveUTMsToLocalStorage } from '../utils/utmParser';
 import { registerFirstAccess } from '../lib/accessLogger';
 import { Logo } from '../components/Logo';
 import { supabase } from '../lib/supabase';
-// Removendo AuthApiError, pois usaremos a Edge Function
+import { AuthApiError } from '@supabase/supabase-js'; // Importando AuthApiError
 
 const FIXED_PASSWORD = '12345678'; // Senha fixa para todos os usuários
 
@@ -33,7 +33,7 @@ export const Login: React.FC = () => {
     const storedEmail = localStorage.getItem('link_validator_email');
     
     // 1. Verificar se há um GRANT pendente no sessionStorage
-    const pendingGrantRaw = sessionStorage.getItem('grant_pending'); // Usando a nova chave
+    const pendingGrantRaw = sessionStorage.getItem('access_link_pending');
     if (pendingGrantRaw) {
         try {
             const pendingGrant = JSON.parse(pendingGrantRaw);
@@ -42,7 +42,7 @@ export const Login: React.FC = () => {
             setEmail(normalizedPendingEmail); // Pré-preenche com o email do link
             setName(pendingGrant.visitor_name || '');
         } catch (e) {
-            sessionStorage.removeItem('grant_pending');
+            sessionStorage.removeItem('access_link_pending');
         }
     } else {
         // 2. Prioridade: URL > localStorage > State inicial
@@ -89,44 +89,71 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      // Prepara metadados para o perfil (usado na criação)
-      const [firstName, ...lastNameParts] = name.trim().split(' ');
-      const lastName = lastNameParts.join(' ') || null;
+      let user;
       
-      // 1. Chama a Edge Function para criar ou logar o usuário
-      // A Edge Function 'create-user-and-login' lida com a lógica de tentar login,
-      // e se falhar, tentar criar o usuário e logar em seguida.
-      const { data, error: invokeError } = await supabase.functions.invoke('create-user-and-login', {
-        body: {
-          email: normalizedEmail,
-          password: FIXED_PASSWORD,
-          userData: {
-            first_name: firstName || null,
-            last_name: lastName,
-          },
-        },
+      // 1. Tenta fazer login
+      let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+        email: normalizedEmail,
+        password: FIXED_PASSWORD,
       });
 
-      if (invokeError) {
-        console.error('[Login] Edge Function invoke error:', invokeError);
-        throw new Error(invokeError.message || 'Erro de comunicação com o servidor.');
-      }
-      
-      if (!data || data.ok === false) {
-        console.error('[Login] Edge Function logic error:', data);
-        // Se a EF falhar, ela retorna uma mensagem de erro.
-        throw new Error(data?.message || 'Falha ao autenticar. Tente novamente.');
-      }
-      
-      const { user, session } = data;
+      // 2. Se falhar por credenciais inválidas ou usuário não encontrado, tenta criar
+      if (signInError) {
+        const isAuthError = signInError instanceof AuthApiError;
+        const isUserNotFound = isAuthError && (signInError.message.includes('Invalid login credentials') || signInError.message.includes('User not found'));
 
-      if (!user || !session) {
+        if (isUserNotFound) {
+          
+          // Prepara metadados para o perfil
+          const [firstName, ...lastNameParts] = name.trim().split(' ');
+          const lastName = lastNameParts.join(' ') || null;
+
+          const { error: signUpError } = await supabase.auth.signUp({
+            email: normalizedEmail,
+            password: FIXED_PASSWORD,
+            options: {
+              data: {
+                first_name: firstName || null,
+                last_name: lastName,
+              },
+            },
+          });
+
+          if (signUpError) {
+            // Se o erro for que o usuário já existe (o que pode acontecer se o email não estiver confirmado),
+            // tentamos o login novamente. Se for outro erro, lançamos.
+            if (!signUpError.message.includes('User already exists')) {
+                throw signUpError;
+            }
+          }
+
+          // 3. Tenta login novamente após o cadastro (ou se já existia)
+          ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
+            email: normalizedEmail,
+            password: FIXED_PASSWORD,
+          }));
+        }
+      }
+      
+      if (signInError) {
+        // Se o erro for 'Email not confirmed', o usuário precisa desabilitar a confirmação no painel Supabase.
+        if (signInError.message.includes('Email not confirmed')) {
+            setError('Seu e-mail não está confirmado. Por favor, peça ao administrador para desabilitar a confirmação de e-mail no painel do Supabase.');
+            setIsLoading(false);
+            return;
+        }
+        throw signInError;
+      }
+      
+      if (!signInData.user) {
         throw new Error('Falha ao obter sessão após autenticação.');
       }
       
+      user = signInData.user;
+      
       console.log("[Login] logged in", { userId: user.id, email: user.email });
       
-      // 2. Pós-login: Registrar acesso
+      // 4. Pós-login: Registrar acesso
       
       // O ID do usuário agora é o ID do Supabase Auth
       localStorage.setItem('userName', name.trim() || user.email || 'Usuário');
@@ -139,7 +166,7 @@ export const Login: React.FC = () => {
         landingPage: window.location.href,
       });
 
-      // 3. Redireciona para a rota de retorno ou para a raiz.
+      // Redireciona para a rota de retorno ou para a raiz.
       navigate(returnTo || '/', { replace: true });
 
     } catch (err: any) {
@@ -203,6 +230,8 @@ export const Login: React.FC = () => {
               disabled={isLoading}
             />
           </div>
+
+          {/* Campo de Senha Fixa REMOVIDO */}
 
           <div>
             <label className="flex items-center gap-3 cursor-pointer">

@@ -2,7 +2,6 @@ import * as React from 'react';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
-import { stripTrackingParams } from '../lib/utils'; // Importando utilitário
 
 interface MediaViewerFullscreenProps {
   mediaList: MediaItemWithAccess[];
@@ -36,7 +35,7 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
 
     document.addEventListener('keydown', handleKeyDown);
     return () => document.removeEventListener('keydown', handleKeyDown);
-  }, [isOpen, onClose, mediaList.length, handlePrev, handleNext]);
+  }, [isOpen, onClose, mediaList.length]);
 
   const handlePrev = useCallback(() => {
     if (currentIndex > 0) {
@@ -53,12 +52,7 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
   if (!isOpen || !currentMedia) return null;
 
   const isVideo = currentMedia.type === 'video';
-  
-  // APLICANDO SANITIZAÇÃO AQUI
-  const cleanMediaUrl = stripTrackingParams(currentMedia.url);
-  const cleanThumbnailUrl = currentMedia.thumbnail ? stripTrackingParams(currentMedia.thumbnail) : undefined;
-  
-  const backgroundSrc = cleanThumbnailUrl || (isVideo ? '/video-fallback.svg' : cleanMediaUrl);
+  const backgroundSrc = currentMedia.thumbnail || (isVideo ? '/video-fallback.svg' : currentMedia.url);
 
   return (
     <div
@@ -82,8 +76,8 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
             <video
               key={currentMedia.id} // Key change forces re-render and re-load
               ref={videoRef}
-              src={cleanMediaUrl} // USANDO URL SANITIZADA
-              poster={cleanThumbnailUrl || '/video-fallback.svg'}
+              src={currentMedia.url}
+              poster={currentMedia.thumbnail || '/video-fallback.svg'}
               controls
               autoPlay
               playsInline
@@ -97,7 +91,7 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
           ) : (
             <img
               key={currentMedia.id} // Key change forces re-render
-              src={cleanMediaUrl} // USANDO URL SANITIZADA
+              src={currentMedia.url}
               alt={currentMedia.title || 'Media content'}
               // Usando w-full h-full e object-contain para maximizar o tamanho dentro do container
               className="w-full h-full object-contain rounded-lg"

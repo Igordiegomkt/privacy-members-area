@@ -1,6 +1,6 @@
 import * as React from 'react';
 import { useState, useEffect } from 'react';
-import { useNavigate } from 'react-router-dom';
+import { useNavigate, useSearchParams } from 'react-router-dom';
 import { saveUTMsToLocalStorage } from '../utils/utmParser';
 import { registerFirstAccess } from '../lib/accessLogger';
 import { Logo } from '../components/Logo';
@@ -17,6 +17,8 @@ export const Login: React.FC = () => {
   const [isLoading, setIsLoading] = useState(false);
   const [error, setError] = useState('');
   const navigate = useNavigate();
+  const [searchParams] = useSearchParams();
+  const returnTo = searchParams.get('returnTo'); // Captura o parâmetro returnTo
 
   useEffect(() => {
     // Pré-preencher com dados do validador de link, se existirem
@@ -29,12 +31,13 @@ export const Login: React.FC = () => {
     // Verifica se já existe uma sessão Supabase ativa
     supabase.auth.getSession().then(({ data: { session } }) => {
       if (session) {
-        navigate('/', { replace: true });
+        // Se já estiver logado, redireciona para returnTo ou para a Home
+        navigate(returnTo || '/', { replace: true });
         return;
       }
       saveUTMsToLocalStorage();
     });
-  }, [navigate]);
+  }, [navigate, returnTo]);
 
   const handleAuth = async (e: React.FormEvent) => {
     e.preventDefault();
@@ -144,8 +147,8 @@ export const Login: React.FC = () => {
         landingPage: window.location.href,
       });
 
-      // Redireciona para a raiz.
-      navigate('/', { replace: true });
+      // Redireciona para a rota de retorno ou para a raiz.
+      navigate(returnTo || '/', { replace: true });
 
     } catch (err: any) {
       console.error('Falha crítica no processo de autenticação:', err);

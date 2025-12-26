@@ -1,11 +1,16 @@
 import { supabase } from './supabase';
 import { sha256Hex } from './crypto'; // Importando sha256Hex
 
-export interface AccessGrant {
+// Server response structure for the grant object
+export interface ServerAccessGrant {
   scope: 'global' | 'model' | 'product';
   model_id: string | null;
   product_id: string | null;
   expires_at: string | null; // Expiration set by Admin
+  link_type: 'access' | 'grant'; // Adicionado link_type
+}
+
+export interface AccessGrant extends ServerAccessGrant {
   local_expires_at: string; // Local TTL (24h)
 }
 
@@ -21,7 +26,7 @@ interface EFResponse {
     ok: boolean;
     code?: string;
     message?: string;
-    grant?: Omit<AccessGrant, 'local_expires_at'>;
+    grant?: ServerAccessGrant; // Usando o tipo ServerAccessGrant
 }
 
 /**
@@ -55,7 +60,7 @@ export const validateAccessToken = async (token: string, payload: ValidationPayl
 /**
  * Salva o grant no localStorage, adicionando um TTL local de 24h.
  */
-export const saveGrant = (grantFromServer: Omit<AccessGrant, 'local_expires_at'>): void => {
+export const saveGrant = (grantFromServer: ServerAccessGrant): void => {
   const now = new Date();
   const localExpiresAt = new Date(now.getTime() + 24 * 60 * 60 * 1000).toISOString(); // 24 horas
   

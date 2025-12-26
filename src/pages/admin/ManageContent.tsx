@@ -68,7 +68,7 @@ const generateMetadata = async (context: string, type: 'image' | 'video', imageU
  */
 const createMediaItemAndFeeds = async (modelId: string, mediaPayload: {
     file_url: string;
-    thumbnail_url: string | null; // Agora aceita null
+    thumbnail_url: string; // Agora é obrigatório, mas para vídeo pode ser a URL do vídeo ou um fallback
     content_type: 'image' | 'video';
     is_free: boolean;
     product_id?: string;
@@ -184,8 +184,7 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
                 tags: formData.tags,
                 is_free: formData.is_free,
                 url: formData.url,
-                // Se for vídeo, garante que o thumbnail seja NULL ao salvar
-                thumbnail: formData.type === 'video' ? null : formData.thumbnail,
+                thumbnail: formData.thumbnail,
                 type: formData.type,
             };
             await onSave(item.id, updates);
@@ -400,8 +399,8 @@ export const ManageContent: React.FC = () => {
             return;
         }
         
-        // CORREÇÃO: Se for vídeo, a thumbnail deve ser NULL no banco. Se for imagem, é a URL da mídia.
-        const finalThumbnailUrl = manualType === 'image' ? manualUrl : null;
+        // Thumbnail URL: para imagem é a própria URL, para vídeo é o fallback genérico
+        const finalThumbnailUrl = manualType === 'image' ? manualUrl : '/video-fallback.svg';
 
         let finalTitle = manualTitle.trim();
         let finalSubtitle = manualSubtitle.trim();
@@ -441,7 +440,7 @@ export const ManageContent: React.FC = () => {
 
             const mediaId = await createMediaItemAndFeeds(modelId!, {
                 file_url: manualUrl,
-                thumbnail_url: finalThumbnailUrl, // Usando a URL resolvida (null para vídeo)
+                thumbnail_url: finalThumbnailUrl, // Usando a URL resolvida
                 content_type: manualType,
                 is_free: manualIsFree,
                 product_id: manualProductId || undefined,
@@ -477,16 +476,15 @@ export const ManageContent: React.FC = () => {
             const itemsToInsert = Array.from({ length: batchCount }, (_, i) => {
                 const index = i + 1;
                 const fileUrl = `${batchBaseUrl}${index}${batchExtension}`;
-                // CORREÇÃO: Se for vídeo, a thumbnail deve ser NULL no banco. Se for imagem, é a URL da mídia.
-                const thumbnailUrl = batchType === 'image' ? fileUrl : null; 
+                // Thumbnail URL: para imagem é a própria URL, para vídeo é o fallback genérico
+                const thumbnailUrl = batchType === 'image' ? fileUrl : '/video-fallback.svg'; 
                 return { fileUrl, thumbnailUrl, index };
             });
             
             const insertionPromises = itemsToInsert.map(async ({ fileUrl, thumbnailUrl }) => {
                 try {
                     // 1) Tenta IA (apenas texto para vídeo, ou imagem para foto)
-                    // CORREÇÃO: Usamos (thumbnailUrl || undefined) para garantir que o tipo seja string | undefined, resolvendo o erro TS2345.
-                    const imageUrlForAi = batchType === 'image' ? (thumbnailUrl || undefined) : undefined;
+                    const imageUrlForAi = batchType === 'image' ? thumbnailUrl : undefined;
                     let aiResult = await generateMetadata(genericContext, batchType, imageUrlForAi);
 
                     // 2) Se mesmo assim não voltar nada, cria uma copy padrão (FALLBACK FINAL)
@@ -619,7 +617,6 @@ export const ManageContent: React.FC = () => {
                             </h3>
                             <div className="flex items-center gap-4 mb-3">
                                 <img 
-                                    // Se for vídeo, usa o fallback para o preview, mas o valor persistido é null
                                     src={manualType === 'image' ? manualUrl : '/video-fallback.svg'} 
                                     alt="Preview" 
                                     className="w-20 h-20 object-cover rounded-md border border-privacy-border"
@@ -669,7 +666,7 @@ export const ManageContent: React.FC = () => {
                     <input value={batchExtension} onChange={e => setBatchExtension(e.target.value)} placeholder="Extensão (ex: .png ou .mp4)" className={inputStyle} required />
                     <p className="text-xs text-privacy-text-secondary">
                         {batchType === 'video' 
-                            ? 'Para vídeos, a thumbnail será NULL no banco. A Edge Function de thumbnail deve ser configurada separadamente.'
+                            ? 'Para vídeos, a thumbnail será o fallback genérico. A Edge Function de thumbnail deve ser configurada separadamente.'
                             : 'Para fotos, a URL da mídia é usada como thumbnail.'
                         }
                     </p>

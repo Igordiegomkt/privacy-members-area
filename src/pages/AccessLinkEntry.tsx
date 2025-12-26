@@ -8,6 +8,7 @@ import { registerFirstAccess } from '../lib/accessLogger';
 
 // Chave para armazenar dados pendentes de validação GRANT
 const PENDING_GRANT_KEY = 'pending_grant_validation';
+const PENDING_ATTEMPT_KEY = 'pending_grant_attempted'; // Novo guarda
 const ACCESS_LOG_KEY = 'vip_link_access_logged';
 
 interface PendingGrant {
@@ -67,11 +68,10 @@ export const AccessLinkEntry: React.FC = () => {
       }
       
       setStatus('success');
-      // Redireciona para a raiz para forçar o AuthContext a reavaliar a sessão
-      setTimeout(() => navigate('/', { replace: true }), 1000);
       
       // Limpa o estado pendente se houver
       sessionStorage.removeItem(PENDING_GRANT_KEY);
+      sessionStorage.removeItem(PENDING_ATTEMPT_KEY); // Limpa o guarda
       
       // Registra o acesso (para fins de analytics/tracking)
       registerFirstAccess({
@@ -81,6 +81,9 @@ export const AccessLinkEntry: React.FC = () => {
       }).catch(err => {
         console.error('[AccessLinkEntry] Failed to log access:', err);
       });
+      
+      // Redireciona para a raiz para forçar o AuthContext a reavaliar a sessão
+      setTimeout(() => navigate('/', { replace: true }), 1000);
 
     } else {
       const code = grantResponse?.code || 'UNKNOWN_ERROR';
@@ -98,11 +101,13 @@ export const AccessLinkEntry: React.FC = () => {
           setStatus('loading');
           
           // Salva o estado pendente
+          sessionStorage.setItem('skip_welcome_purchase', '1'); // CRÍTICO: Pula a compra de boas-vindas
           sessionStorage.setItem(PENDING_GRANT_KEY, JSON.stringify({
               token: token,
               name: name,
               email: email,
           } as PendingGrant));
+          sessionStorage.setItem(PENDING_ATTEMPT_KEY, '0'); // Reseta a tentativa
           
           // Redireciona para o login, voltando para esta mesma rota, com prefill
           const prefillParams = new URLSearchParams();
@@ -145,25 +150,31 @@ export const AccessLinkEntry: React.FC = () => {
 
     // Tenta carregar o estado pendente
     const pendingGrantRaw = sessionStorage.getItem(PENDING_GRANT_KEY);
+    const attempted = sessionStorage.getItem(PENDING_ATTEMPT_KEY);
     
-    // 1. Retomada Pós-Login (Usuário logado E estado pendente)
-    if (user?.id && pendingGrantRaw) {
+    // 1. Retomada Pós-Login (Usuário logado E estado pendente E não tentado)
+    if (user?.id && pendingGrantRaw && attempted !== '1') {
         const pendingGrant: PendingGrant = JSON.parse(pendingGrantRaw);
         
         // Se o token do URL for diferente do token pendente, ignora o pendente
         if (pendingGrant.token !== tokenNormalized) {
             sessionStorage.removeItem(PENDING_GRANT_KEY);
+            sessionStorage.removeItem(PENDING_ATTEMPT_KEY);
             // Continua para o fluxo normal (2.)
         } else {
             // Auto-submete a validação com o user_id
             setVisitorName(pendingGrant.name);
             setVisitorEmail(pendingGrant.email);
+            
+            // CRÍTICO: Marca como tentado ANTES de chamar a validação
+            sessionStorage.setItem(PENDING_ATTEMPT_KEY, '1'); 
+            
             handleValidation(pendingGrant.token, pendingGrant.name, pendingGrant.email, user.id);
             return;
         }
     }
     
-    // 2. Fluxo Normal (Usuário logado ou deslogado, sem estado pendente)
+    // 2. Fluxo Normal (Usuário logado ou deslogado, sem estado pendente ou já tentado)
     if (status === 'initial') {
         // Pré-preencher com dados do validador de link, se existirem
         const storedName = localStorage.getItem('link_validator_name');

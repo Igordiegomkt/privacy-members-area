@@ -231,19 +231,7 @@ export const Login: React.FC = () => {
             />
           </div>
 
-          <div>
-            <label className="block text-sm font-medium text-privacy-text-secondary mb-2 text-left">
-              Senha (Fixa)
-            </label>
-            <input
-              id="password"
-              type="password"
-              value={FIXED_PASSWORD}
-              readOnly
-              className={`${inputStyle} opacity-70 cursor-not-allowed`}
-              disabled={isLoading}
-            />
-          </div>
+          {/* Campo de Senha Fixa REMOVIDO */}
 
           <div>
             <label className="flex items-center gap-3 cursor-pointer">

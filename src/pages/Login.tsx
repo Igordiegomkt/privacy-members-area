@@ -5,7 +5,7 @@ import { saveUTMsToLocalStorage } from '../utils/utmParser';
 import { registerFirstAccess } from '../lib/accessLogger';
 import { Logo } from '../components/Logo';
 import { supabase } from '../lib/supabase';
-import { AuthApiError } from '@supabase/supabase-js'; // Importando AuthApiError
+// Removendo AuthApiError, pois usaremos a Edge Function
 
 const FIXED_PASSWORD = '12345678'; // Senha fixa para todos os usuários
 
@@ -89,71 +89,41 @@ export const Login: React.FC = () => {
     setIsLoading(true);
 
     try {
-      let user;
+      // Prepara metadados para o perfil (usado na criação)
+      const [firstName, ...lastNameParts] = name.trim().split(' ');
+      const lastName = lastNameParts.join(' ') || null;
       
-      // 1. Tenta fazer login
-      let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email: normalizedEmail,
-        password: FIXED_PASSWORD,
+      // 1. Chama a Edge Function para criar ou logar o usuário
+      const { data, error: invokeError } = await supabase.functions.invoke('create-user-and-login', {
+        body: {
+          email: normalizedEmail,
+          password: FIXED_PASSWORD,
+          userData: {
+            first_name: firstName || null,
+            last_name: lastName,
+          },
+        },
       });
 
-      // 2. Se falhar por credenciais inválidas ou usuário não encontrado, tenta criar
-      if (signInError) {
-        const isAuthError = signInError instanceof AuthApiError;
-        const isUserNotFound = isAuthError && (signInError.message.includes('Invalid login credentials') || signInError.message.includes('User not found'));
-
-        if (isUserNotFound) {
-          
-          // Prepara metadados para o perfil
-          const [firstName, ...lastNameParts] = name.trim().split(' ');
-          const lastName = lastNameParts.join(' ') || null;
-
-          const { error: signUpError } = await supabase.auth.signUp({
-            email: normalizedEmail,
-            password: FIXED_PASSWORD,
-            options: {
-              data: {
-                first_name: firstName || null,
-                last_name: lastName,
-              },
-            },
-          });
-
-          if (signUpError) {
-            // Se o erro for que o usuário já existe (o que pode acontecer se o email não estiver confirmado),
-            // tentamos o login novamente. Se for outro erro, lançamos.
-            if (!signUpError.message.includes('User already exists')) {
-                throw signUpError;
-            }
-          }
-
-          // 3. Tenta login novamente após o cadastro (ou se já existia)
-          ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email: normalizedEmail,
-            password: FIXED_PASSWORD,
-          }));
-        }
+      if (invokeError) {
+        console.error('[Login] Edge Function invoke error:', invokeError);
+        throw new Error(invokeError.message || 'Erro de comunicação com o servidor.');
       }
       
-      if (signInError) {
-        // Se o erro for 'Email not confirmed', o usuário precisa desabilitar a confirmação no painel Supabase.
-        if (signInError.message.includes('Email not confirmed')) {
-            setError('Seu e-mail não está confirmado. Por favor, peça ao administrador para desabilitar a confirmação de e-mail no painel do Supabase.');
-            setIsLoading(false);
-            return;
-        }
-        throw signInError;
+      if (!data || data.ok === false) {
+        console.error('[Login] Edge Function logic error:', data);
+        throw new Error(data?.message || 'Falha ao autenticar. Tente novamente.');
       }
       
-      if (!signInData.user) {
+      const { user, session } = data;
+
+      if (!user || !session) {
         throw new Error('Falha ao obter sessão após autenticação.');
       }
       
-      user = signInData.user;
-      
       console.log("[Login] logged in", { userId: user.id, email: user.email });
       
-      // 4. Pós-login: Registrar acesso
+      // 2. Pós-login: Registrar acesso
       
       // O ID do usuário agora é o ID do Supabase Auth
       localStorage.setItem('userName', name.trim() || user.email || 'Usuário');
@@ -166,7 +136,7 @@ export const Login: React.FC = () => {
         landingPage: window.location.href,
       });
 
-      // Redireciona para a rota de retorno ou para a raiz.
+      // 3. Redireciona para a rota de retorno ou para a raiz.
       navigate(returnTo || '/', { replace: true });
 
     } catch (err: any) {
@@ -230,8 +200,6 @@ export const Login: React.FC = () => {
               disabled={isLoading}
             />
           </div>
-
-          {/* Campo de Senha Fixa REMOVIDO */}
 
           <div>
             <label className="flex items-center gap-3 cursor-pointer">

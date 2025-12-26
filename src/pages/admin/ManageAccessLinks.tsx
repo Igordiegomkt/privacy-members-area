@@ -234,17 +234,15 @@ const EditLinkModal: React.FC<EditLinkModalProps> = ({ link, onSave, onClose }: 
 };
 
 // --- Componente de Criação ---
-const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string }> = ({ models, products, onLinkCreated, userId }: { models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string }) => {
-    const [formData, setFormData] = useState<LinkFormData>({
-        scope: 'global',
-        linkType: 'access', // Default para access
-        modelId: '',
-        productId: '',
-        expiresAt: '',
-        maxUses: null,
-    });
+const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string, debugState: LinkFormData }> = ({ models, products, onLinkCreated, userId, debugState }: { models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string, debugState: LinkFormData }) => {
+    const [formData, setFormData] = useState<LinkFormData>(debugState);
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
+
+    // Sincroniza o estado interno com o estado de debug (que é o estado inicial)
+    useEffect(() => {
+        setFormData(debugState);
+    }, [debugState]);
 
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
@@ -623,6 +621,18 @@ export const ManageAccessLinks: React.FC = () => {
     const [linkIdToView, setLinkIdToView] = useState<string | null>(null);
     const [isTestModalOpen, setIsTestModalOpen] = useState(false);
     const [testResult, setTestResult] = useState<{ ok: boolean, code: string, message: string } | null>(null);
+    
+    // Estado inicial do formulário para debug
+    const initialFormState: LinkFormData = {
+        scope: 'global',
+        linkType: 'access',
+        modelId: '',
+        productId: '',
+        expiresAt: '',
+        maxUses: null,
+    };
+    const [debugFormState, setDebugFormState] = useState<LinkFormData>(initialFormState);
+
 
     const fetchData = useCallback(async () => {
         setLoading(true);
@@ -651,6 +661,7 @@ export const ManageAccessLinks: React.FC = () => {
     }, []);
 
     useEffect(() => {
+        console.log('[ManageAccessLinks] DEBUG VERSION v2025-12-25');
         fetchData();
     }, [fetchData]);
 
@@ -748,6 +759,10 @@ export const ManageAccessLinks: React.FC = () => {
 
     return (
         <div>
+            <div className="bg-red-800/20 border border-red-500/50 p-2 mb-4 text-xs text-white">
+                <p className="text-lg font-bold text-red-400">ManageAccessLinks DEBUG v2025-12-25</p>
+                <p>Form State: Type={debugFormState.linkType} | Scope={debugFormState.scope}</p>
+            </div>
             <h1 className="text-3xl font-bold text-white mb-6">Gerenciar Links de Acesso</h1>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -756,6 +771,7 @@ export const ManageAccessLinks: React.FC = () => {
                     products={products} 
                     onLinkCreated={handleLinkCreated} 
                     userId={user.id}
+                    debugState={debugFormState}
                 />
             </div>
 

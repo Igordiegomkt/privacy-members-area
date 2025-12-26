@@ -184,7 +184,8 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
                 tags: formData.tags,
                 is_free: formData.is_free,
                 url: formData.url,
-                thumbnail: formData.thumbnail,
+                // Se for vídeo, garante que o thumbnail seja NULL ao salvar
+                thumbnail: formData.type === 'video' ? null : formData.thumbnail,
                 type: formData.type,
             };
             await onSave(item.id, updates);

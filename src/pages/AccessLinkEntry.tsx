@@ -173,12 +173,17 @@ export const AccessLinkEntry: React.FC = () => {
         const storedName = localStorage.getItem('link_validator_name');
         const storedEmail = localStorage.getItem('link_validator_email');
         
-        if (user) {
-            setVisitorEmail(normalizeEmail(user.email || storedEmail || ''));
-            setVisitorName(user.first_name || storedName || '');
-        } else {
-            setVisitorEmail(normalizeEmail(storedEmail || ''));
-            setVisitorName(storedName || '');
+        const initialEmail = user ? normalizeEmail(user.email || storedEmail || '') : normalizeEmail(storedEmail || '');
+        const initialName = user ? user.first_name || storedName || '' : storedName || '';
+        
+        setVisitorEmail(initialEmail);
+        setVisitorName(initialName);
+        
+        // NOVO: Se o usuário está logado e temos um email, tenta validar imediatamente (para links ACCESS ou GRANT que não exigem formulário)
+        if (user?.id && initialEmail) {
+            // Auto-submete a validação
+            handleValidation(tokenNormalized, initialName, initialEmail, user.id);
+            return; // Sai do useEffect para evitar renderizar o formulário
         }
     }
     

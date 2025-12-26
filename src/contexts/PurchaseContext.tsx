@@ -31,6 +31,12 @@ export const PurchaseProvider: React.FC<{ children: React.ReactNode }> = ({ chil
             const productId = p.product_id;
             const priceCents = p.price_paid_cents;
             
+            // FASE 5: Adicionar filtro para ignorar compras de links externos (GRANT)
+            if (p.payment_provider === 'external_link' || p.payment_provider === 'whatsapp_welcome') {
+                // console.log(`[Tracking] Ignorando purchase para link externo/welcome: ${purchaseId}`);
+                return; 
+            }
+            
             // Usamos o ID da compra (user_purchases.id) para garantir unicidade
             const storageKey = `purchased-sent-${purchaseId}`; 
 

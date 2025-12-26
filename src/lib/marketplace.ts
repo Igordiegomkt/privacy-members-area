@@ -10,6 +10,7 @@ export interface UserPurchaseWithProduct {
   paid_at: string | null;
   amount_cents: number; // Valor do produto no momento da compra
   price_paid_cents: number; // Valor efetivamente pago
+  payment_provider: string | null; // Adicionado payment_provider
   products: (Product & {
     models: Model | null;
   }) | null;
@@ -82,6 +83,7 @@ export const fetchUserPurchases = async (userId: string): Promise<UserPurchaseWi
       paid_at,
       amount_cents,
       price_paid_cents,
+      payment_provider,
       products (
         id,
         name,
@@ -156,6 +158,7 @@ export const fetchUserPurchases = async (userId: string): Promise<UserPurchaseWi
       paid_at: row.paid_at,
       amount_cents: row.amount_cents ?? 0,
       price_paid_cents: row.price_paid_cents ?? 0,
+      payment_provider: row.payment_provider ?? null, // Incluindo payment_provider
       products: normalizedProduct,
     };
 

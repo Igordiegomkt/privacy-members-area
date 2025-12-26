@@ -4,6 +4,7 @@ import { MediaItemWithAccess } from '../lib/models';
 import { Lock, Video, Camera } from 'lucide-react';
 import { useVideoAutoplay } from '../hooks/useVideoAutoplay'; // Importando o hook
 import { isModelUnlockedByGrant } from '../lib/accessVisual';
+import { stripTrackingParams } from '../lib/urlUtils'; // Novo import
 
 interface GridMediaCardProps {
   media: MediaItemWithAccess;
@@ -30,7 +31,9 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
 
   // PosterSrc é usado como thumbnail da imagem ou poster do vídeo
   const posterSrc = media.thumbnail || (isVideo ? undefined : media.url);
-  const imageSrc = posterSrc || '/video-fallback.svg'; // Fallback para imagem se não houver thumbnail
+  const imageSrc = stripTrackingParams(posterSrc || '/video-fallback.svg'); // Limpando a URL da imagem/poster
+  
+  const videoUrl = stripTrackingParams(media.url); // Limpando a URL do vídeo
 
   const handleClick = (e: React.MouseEvent) => {
     e.stopPropagation();
@@ -64,7 +67,7 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
       {isVideo && !showLockedOverlay && (
         <video
           ref={videoRef}
-          src={media.url}
+          src={videoUrl}
           poster={imageSrc}
           className={`absolute inset-0 w-full h-full object-cover z-20`}
           preload="metadata"

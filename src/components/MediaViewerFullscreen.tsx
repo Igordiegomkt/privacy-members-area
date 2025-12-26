@@ -2,6 +2,7 @@ import * as React from 'react';
 import { useEffect, useRef, useState, useCallback } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
 import { X, ChevronLeft, ChevronRight } from 'lucide-react';
+import { stripTrackingParams } from '../lib/urlUtils'; // Novo import
 
 interface MediaViewerFullscreenProps {
   mediaList: MediaItemWithAccess[];
@@ -52,7 +53,11 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
   if (!isOpen || !currentMedia) return null;
 
   const isVideo = currentMedia.type === 'video';
-  const backgroundSrc = currentMedia.thumbnail || (isVideo ? '/video-fallback.svg' : currentMedia.url);
+  
+  // Limpando todas as URLs antes de usar
+  const mediaUrl = stripTrackingParams(currentMedia.url);
+  const thumbnail = currentMedia.thumbnail ? stripTrackingParams(currentMedia.thumbnail) : null;
+  const backgroundSrc = thumbnail || (isVideo ? '/video-fallback.svg' : mediaUrl);
 
   return (
     <div
@@ -76,8 +81,8 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
             <video
               key={currentMedia.id} // Key change forces re-render and re-load
               ref={videoRef}
-              src={currentMedia.url}
-              poster={currentMedia.thumbnail || '/video-fallback.svg'}
+              src={mediaUrl}
+              poster={thumbnail || '/video-fallback.svg'}
               controls
               autoPlay
               playsInline
@@ -91,7 +96,7 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
           ) : (
             <img
               key={currentMedia.id} // Key change forces re-render
-              src={currentMedia.url}
+              src={mediaUrl}
               alt={currentMedia.title || 'Media content'}
               // Usando w-full h-full e object-contain para maximizar o tamanho dentro do container
               className="w-full h-full object-contain rounded-lg"

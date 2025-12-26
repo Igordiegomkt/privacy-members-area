@@ -4,6 +4,7 @@ import { useParams, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { MediaItem, Model, Product } from '../../types';
 import { Check, X, Save, Edit, Trash2, Sparkles, ChevronDown, ChevronUp } from 'lucide-react';
+import { stripTrackingParams } from '../../lib/urlUtils'; // Importando utilitário
 
 interface AiResult {
   title: string;
@@ -198,6 +199,9 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
     };
     
     const inputStyle = "w-full px-2 py-1 bg-privacy-black border border-privacy-border rounded-md text-privacy-text-primary text-xs focus:outline-none focus:border-primary transition-colors";
+    
+    // Sanitiza a URL para exibição
+    const cleanUrl = stripTrackingParams(item.url);
 
     return (
         <>
@@ -222,7 +226,7 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
                     </div>
                 </td>
                 <td className="px-4 py-2 truncate max-w-[150px]">
-                    <a href={item.url} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-xs truncate block">{item.url}</a>
+                    <a href={cleanUrl} target="_blank" rel="noopener noreferrer" className="text-blue-400 hover:underline text-xs truncate block">{cleanUrl}</a>
                 </td>
                 <td className="px-4 py-2 capitalize">
                     {item.type}
@@ -254,7 +258,7 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
                                 />
                                 <div className="text-xs">
                                     <p className="font-semibold text-white">Thumbnail usada na IA:</p>
-                                    <p className="text-privacy-text-secondary break-all">{item.thumbnail || item.url}</p>
+                                    <p className="text-privacy-text-secondary break-all">{stripTrackingParams(item.thumbnail || item.url)}</p>
                                 </div>
                             </div>
                             {error && <p className="text-red-400 text-xs mb-2">{error}</p>}
@@ -295,6 +299,8 @@ const MediaItemEditor: React.FC<MediaItemEditorProps> = ({ item, modelName, onSa
 
 
 export const ManageContent: React.FC = () => {
+// ... (restante do componente ManageContent)
+// ... (o código abaixo permanece inalterado, exceto pelo import de stripTrackingParams)
     const { id: modelId } = useParams<{ id: string }>();
     const [model, setModel] = useState<Model | null>(null);
     const [modelProducts, setModelProducts] = useState<Product[]>([]);
@@ -617,13 +623,13 @@ export const ManageContent: React.FC = () => {
                             </h3>
                             <div className="flex items-center gap-4 mb-3">
                                 <img 
-                                    src={manualType === 'image' ? manualUrl : '/video-fallback.svg'} 
+                                    src={manualType === 'image' ? stripTrackingParams(manualUrl) : '/video-fallback.svg'} 
                                     alt="Preview" 
                                     className="w-20 h-20 object-cover rounded-md border border-privacy-border"
                                 />
                                 <div className="text-xs">
                                     <p className="font-semibold text-white">URL da Mídia:</p>
-                                    <p className="text-privacy-text-secondary break-all">{manualUrl}</p>
+                                    <p className="text-privacy-text-secondary break-all">{stripTrackingParams(manualUrl)}</p>
                                 </div>
                             </div>
                             {aiPreview && (

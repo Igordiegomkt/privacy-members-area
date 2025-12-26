@@ -7,15 +7,19 @@ import { useAuth } from '../contexts/AuthContext';
 import { registerFirstAccess } from '../lib/accessLogger';
 
 // Chave para armazenar dados pendentes de validação GRANT
-const PENDING_GRANT_KEY = 'pending_grant_validation';
-const PENDING_ATTEMPT_KEY = 'pending_grant_attempted'; // Novo guarda
+const PENDING_GRANT_KEY = 'access_link_pending'; // Nome da chave unificada
 const ACCESS_LOG_KEY = 'vip_link_access_logged';
 
 interface PendingGrant {
     token: string;
-    name: string;
-    email: string;
+    visitor_name: string;
+    visitor_email: string;
 }
+
+// Helper para normalizar o email
+const normalizeEmail = (email: string): string => {
+    return email.trim().toLowerCase();
+};
 
 export const AccessLinkEntry: React.FC = () => {
   const { token: encodedToken } = useParams<{ token: string }>();
@@ -35,11 +39,13 @@ export const AccessLinkEntry: React.FC = () => {
     setValidationError(null);
     setStatus('loading');
     setMessage('Validando seu link de acesso...');
+    
+    const normalizedEmail = normalizeEmail(email);
 
     // 2. Chamar a EF com dados do visitante e token normalizado
     const grantResponse = await validateAccessToken(token, {
         visitor_name: name,
-        visitor_email: email,
+        visitor_email: normalizedEmail,
         user_id: userId,
     });
 
@@ -48,7 +54,7 @@ export const AccessLinkEntry: React.FC = () => {
       
       // PARTE A: Persistir Nome e Email no localStorage (para pré-preenchimento no login)
       if (name) localStorage.setItem('link_validator_name', name);
-      if (email) localStorage.setItem('link_validator_email', email);
+      if (normalizedEmail) localStorage.setItem('link_validator_email', normalizedEmail);
       
       // 3. Roteamento baseado no link_type
       if (grant.link_type === 'access') {
@@ -57,7 +63,6 @@ export const AccessLinkEntry: React.FC = () => {
         setMessage('Acesso temporário liberado com sucesso! Redirecionando...');
       } else if (grant.link_type === 'grant') {
         // GRANT: A compra permanente foi criada pela RPC grant_access_link.
-        // NÃO salva grant local.
         setMessage('Acesso permanente liberado com sucesso! Redirecionando...');
       }
       
@@ -65,11 +70,10 @@ export const AccessLinkEntry: React.FC = () => {
       
       // Limpa o estado pendente se houver
       sessionStorage.removeItem(PENDING_GRANT_KEY);
-      sessionStorage.removeItem(PENDING_ATTEMPT_KEY); // Limpa o guarda
       
       // Registra o acesso (para fins de analytics/tracking)
       registerFirstAccess({
-        name: name || email || 'Usuário VIP Link',
+        name: name || normalizedEmail || 'Usuário VIP Link',
         isAdult: localStorage.getItem('userIsAdult') === 'true',
         landingPage: `${window.location.origin}/acesso-link-validado`,
       }).catch(err => {
@@ -95,17 +99,17 @@ export const AccessLinkEntry: React.FC = () => {
           setStatus('loading');
           
           // Salva o estado pendente
-          sessionStorage.setItem(PENDING_GRANT_KEY, JSON.stringify({
+          const pendingGrant: PendingGrant = {
               token: token,
-              name: name,
-              email: email,
-          } as PendingGrant));
-          sessionStorage.setItem(PENDING_ATTEMPT_KEY, '0'); // Reseta a tentativa
+              visitor_name: name,
+              visitor_email: normalizedEmail,
+          };
+          sessionStorage.setItem(PENDING_GRANT_KEY, JSON.stringify(pendingGrant));
           
           // Redireciona para o login, voltando para esta mesma rota, com prefill
           const prefillParams = new URLSearchParams();
           prefillParams.set('returnTo', `/acesso/${encodedToken}`);
-          if (email) prefillParams.set('prefillEmail', email);
+          prefillParams.set('prefillEmail', normalizedEmail);
           if (name) prefillParams.set('prefillName', name);
           
           setTimeout(() => navigate(`/login?${prefillParams.toString()}`, { replace: true }), 500);
@@ -143,41 +147,37 @@ export const AccessLinkEntry: React.FC = () => {
 
     // Tenta carregar o estado pendente
     const pendingGrantRaw = sessionStorage.getItem(PENDING_GRANT_KEY);
-    const attempted = sessionStorage.getItem(PENDING_ATTEMPT_KEY);
     
-    // 1. Retomada Pós-Login (Usuário logado E estado pendente E não tentado)
-    if (user?.id && pendingGrantRaw && attempted !== '1') {
+    // 1. Retomada Pós-Login (Usuário logado E estado pendente)
+    if (user?.id && pendingGrantRaw) {
         const pendingGrant: PendingGrant = JSON.parse(pendingGrantRaw);
         
         // Se o token do URL for diferente do token pendente, ignora o pendente
         if (pendingGrant.token !== tokenNormalized) {
             sessionStorage.removeItem(PENDING_GRANT_KEY);
-            sessionStorage.removeItem(PENDING_ATTEMPT_KEY);
             // Continua para o fluxo normal (2.)
         } else {
             // Auto-submete a validação com o user_id
-            setVisitorName(pendingGrant.name);
-            setVisitorEmail(pendingGrant.email);
+            setVisitorName(pendingGrant.visitor_name);
+            setVisitorEmail(pendingGrant.visitor_email);
             
-            // CRÍTICO: Marca como tentado ANTES de chamar a validação
-            sessionStorage.setItem(PENDING_ATTEMPT_KEY, '1'); 
-            
-            handleValidation(pendingGrant.token, pendingGrant.name, pendingGrant.email, user.id);
+            // Chama a validação com o user.id
+            handleValidation(pendingGrant.token, pendingGrant.visitor_name, pendingGrant.visitor_email, user.id);
             return;
         }
     }
     
-    // 2. Fluxo Normal (Usuário logado ou deslogado, sem estado pendente ou já tentado)
+    // 2. Fluxo Normal (Usuário logado ou deslogado, sem estado pendente)
     if (status === 'initial') {
         // Pré-preencher com dados do validador de link, se existirem
         const storedName = localStorage.getItem('link_validator_name');
         const storedEmail = localStorage.getItem('link_validator_email');
         
         if (user) {
-            setVisitorEmail(user.email || storedEmail || '');
+            setVisitorEmail(normalizeEmail(user.email || storedEmail || ''));
             setVisitorName(user.first_name || storedName || '');
         } else {
-            setVisitorEmail(storedEmail || '');
+            setVisitorEmail(normalizeEmail(storedEmail || ''));
             setVisitorName(storedName || '');
         }
     }
@@ -199,14 +199,16 @@ export const AccessLinkEntry: React.FC = () => {
         return;
     }
     
+    const normalizedEmail = normalizeEmail(visitorEmail);
+    
     // Validação de Email (Obrigatório no frontend antes de chamar a EF)
-    if (!visitorEmail.trim()) {
+    if (!normalizedEmail) {
         setValidationError('O email é obrigatório.');
         return;
     }
     
     // Chama a validação com o user.id se estiver logado, senão undefined
-    handleValidation(tokenNormalized, visitorName, visitorEmail, user?.id);
+    handleValidation(tokenNormalized, visitorName, normalizedEmail, user?.id);
   };
 
 

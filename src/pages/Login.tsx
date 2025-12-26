@@ -9,6 +9,11 @@ import { AuthApiError } from '@supabase/supabase-js'; // Importando AuthApiError
 
 const FIXED_PASSWORD = '12345678'; // Senha fixa para todos os usuários
 
+// Helper para normalizar o email
+const normalizeEmail = (email: string): string => {
+    return email.trim().toLowerCase();
+};
+
 export const Login: React.FC = () => {
   const [name, setName] = useState('');
   const [email, setEmail] = useState('');
@@ -20,23 +25,38 @@ export const Login: React.FC = () => {
   const returnTo = searchParams.get('returnTo'); // Captura o parâmetro returnTo
   const prefillEmail = searchParams.get('prefillEmail'); // Novo: Email para pré-preenchimento
   const prefillName = searchParams.get('prefillName'); // Novo: Nome para pré-preenchimento
+  const [pendingGrantEmail, setPendingGrantEmail] = useState<string | null>(null);
 
   useEffect(() => {
     // Pré-preencher com dados do validador de link, se existirem
     const storedName = localStorage.getItem('link_validator_name');
     const storedEmail = localStorage.getItem('link_validator_email');
     
-    // Prioridade: 1. URL (prefillEmail/Name) > 2. localStorage (link_validator) > 3. State inicial
-    if (prefillEmail) {
-        setEmail(prefillEmail);
-    } else if (storedEmail) {
-        setEmail(storedEmail);
-    }
-    
-    if (prefillName) {
-        setName(prefillName);
-    } else if (storedName) {
-        setName(storedName);
+    // 1. Verificar se há um GRANT pendente no sessionStorage
+    const pendingGrantRaw = sessionStorage.getItem('access_link_pending');
+    if (pendingGrantRaw) {
+        try {
+            const pendingGrant = JSON.parse(pendingGrantRaw);
+            const normalizedPendingEmail = normalizeEmail(pendingGrant.visitor_email);
+            setPendingGrantEmail(normalizedPendingEmail);
+            setEmail(normalizedPendingEmail); // Pré-preenche com o email do link
+            setName(pendingGrant.visitor_name || '');
+        } catch (e) {
+            sessionStorage.removeItem('access_link_pending');
+        }
+    } else {
+        // 2. Prioridade: URL > localStorage > State inicial
+        if (prefillEmail) {
+            setEmail(normalizeEmail(prefillEmail));
+        } else if (storedEmail) {
+            setEmail(normalizeEmail(storedEmail));
+        }
+        
+        if (prefillName) {
+            setName(prefillName);
+        } else if (storedName) {
+            setName(storedName);
+        }
     }
     
     // Verifica se já existe uma sessão Supabase ativa
@@ -54,7 +74,9 @@ export const Login: React.FC = () => {
     e.preventDefault();
     setError('');
 
-    if (!email.trim()) {
+    const normalizedEmail = normalizeEmail(email);
+
+    if (!normalizedEmail) {
       setError('Por favor, informe seu e-mail.');
       return;
     }
@@ -66,14 +88,12 @@ export const Login: React.FC = () => {
     
     setIsLoading(true);
 
-    // A lógica de skip_welcome_purchase foi removida, pois a compra de boas-vindas foi descontinuada.
-
     try {
       let user;
       
       // 1. Tenta fazer login
       let { data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-        email,
+        email: normalizedEmail,
         password: FIXED_PASSWORD,
       });
 
@@ -89,7 +109,7 @@ export const Login: React.FC = () => {
           const lastName = lastNameParts.join(' ') || null;
 
           const { error: signUpError } = await supabase.auth.signUp({
-            email,
+            email: normalizedEmail,
             password: FIXED_PASSWORD,
             options: {
               data: {
@@ -109,7 +129,7 @@ export const Login: React.FC = () => {
 
           // 3. Tenta login novamente após o cadastro (ou se já existia)
           ({ data: signInData, error: signInError } = await supabase.auth.signInWithPassword({
-            email,
+            email: normalizedEmail,
             password: FIXED_PASSWORD,
           }));
         }
@@ -138,8 +158,6 @@ export const Login: React.FC = () => {
       // O ID do usuário agora é o ID do Supabase Auth
       localStorage.setItem('userName', name.trim() || user.email || 'Usuário');
       localStorage.setItem('userIsAdult', isAdult.toString());
-      
-      // A compra de boas-vindas foi removida.
       
       // Registra o primeiro acesso (para fins de analytics/tracking)
       await registerFirstAccess({
@@ -174,6 +192,13 @@ export const Login: React.FC = () => {
               {error}
             </div>
           )}
+          
+          {pendingGrantEmail && (
+            <div className="bg-blue-500/10 border border-blue-500/50 text-blue-400 px-4 py-3 rounded-lg text-sm">
+                <p className="font-semibold">Acesso VIP Pendente!</p>
+                <p className="text-xs mt-1">Use este email para entrar na conta correta e liberar seu acesso permanente.</p>
+            </div>
+          )}
 
           <div>
             <label htmlFor="email" className="block text-sm font-medium text-privacy-text-secondary mb-2 text-left">
@@ -202,6 +227,20 @@ export const Login: React.FC = () => {
               onChange={(e) => setName(e.target.value)}
               className={inputStyle}
               placeholder="Seu nome (opcional)"
+              disabled={isLoading}
+            />
+          </div>
+
+          <div>
+            <label className="block text-sm font-medium text-privacy-text-secondary mb-2 text-left">
+              Senha (Fixa)
+            </label>
+            <input
+              id="password"
+              type="password"
+              value={FIXED_PASSWORD}
+              readOnly
+              className={`${inputStyle} opacity-70 cursor-not-allowed`}
               disabled={isLoading}
             />
           </div>

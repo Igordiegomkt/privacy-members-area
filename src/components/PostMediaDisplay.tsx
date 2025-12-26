@@ -4,6 +4,7 @@ import { MediaItemWithAccess } from '../lib/models';
 import { Lock, Video, Camera, Play } from 'lucide-react';
 import { useVideoAutoplay } from '../hooks/useVideoAutoplay';
 import { isModelUnlockedByGrant } from '../lib/accessVisual'; // Novo import
+import { stripTrackingParams } from '../lib/utils'; // Importando utilitário
 
 interface PostMediaDisplayProps {
   media: MediaItemWithAccess;
@@ -39,7 +40,11 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
   useVideoAutoplay(videoRef, isVideo, showLockedOverlay);
 
   // Prioriza thumbnail, depois a URL da mídia (se for imagem), senão o fallback genérico
-  const imageSrc = media.thumbnail || (isVideo ? '/video-fallback.svg' : media.url);
+  // APLICANDO SANITIZAÇÃO AQUI
+  const cleanMediaUrl = stripTrackingParams(media.url);
+  const cleanThumbnailUrl = media.thumbnail ? stripTrackingParams(media.thumbnail) : undefined;
+  
+  const imageSrc = cleanThumbnailUrl || (isVideo ? '/video-fallback.svg' : cleanMediaUrl);
   const backgroundSrc = imageSrc;
 
   const handleClick = (e: React.MouseEvent) => {
@@ -107,7 +112,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
       <video
         key={media.id}
         ref={videoRef}
-        src={media.url}
+        src={cleanMediaUrl} // USANDO URL SANITIZADA
         poster={imageSrc}
         // Usamos object-cover para garantir que o vídeo preencha o espaço, evitando bordas da imagem de fundo
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 z-20`}

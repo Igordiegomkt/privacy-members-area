@@ -26,7 +26,8 @@ export function dispatchEvent(eventName: string, gtmName: string, payload: Event
     currency: payload.currency ?? 'BRL',
   };
 
-  // 1. Facebook Pixel (Client-side)
+  // 1. Facebook Pixel (Client-side) - Agora apenas loga, pois o script foi removido
+  // Se o script for reintroduzido, esta lógica voltará a funcionar.
   if (window.fbq) {
     // O FB Pixel espera o valor em R$ (não em centavos)
     window.fbq('track', eventName, {

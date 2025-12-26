@@ -1,5 +1,5 @@
 import * as React from 'react';
-import { useEffect, useState, useCallback } from 'react';
+import { useEffect, useState, useCallback, useRef } from 'react';
 import { useParams, useNavigate } from 'react-router-dom';
 import { validateAccessToken, saveGrant } from '../lib/accessGrant';
 import { LinkIcon } from 'lucide-react';
@@ -7,13 +7,15 @@ import { useAuth } from '../contexts/AuthContext';
 import { registerFirstAccess } from '../lib/accessLogger';
 
 // Chave para armazenar dados pendentes de validação GRANT
-const PENDING_GRANT_KEY = 'access_link_pending'; // Nome da chave unificada
+const PENDING_GRANT_KEY = 'grant_pending'; // Chave unificada
 const ACCESS_LOG_KEY = 'vip_link_access_logged';
 
 interface PendingGrant {
     token: string;
     visitor_name: string;
     visitor_email: string;
+    created_at: string;
+    attempt: number;
 }
 
 // Helper para normalizar o email
@@ -32,10 +34,21 @@ export const AccessLinkEntry: React.FC = () => {
   const [visitorEmail, setVisitorEmail] = useState('');
   const [validationError, setValidationError] = useState<string | null>(null);
   
+  const hasSubmittedRef = useRef(false); // Trava anti-loop
+  
   const inputStyle = "w-full px-4 py-3 bg-privacy-black border border-privacy-border rounded-lg text-privacy-text-primary placeholder-privacy-text-secondary focus:outline-none focus:border-primary transition-colors";
+
+  // Resetar a trava quando o token muda (embora o componente seja montado/desmontado)
+  useEffect(() => {
+      hasSubmittedRef.current = false;
+  }, [encodedToken]);
+
 
   // 1. Lógica de Validação Centralizada
   const handleValidation = useCallback(async (token: string, name: string, email: string, userId: string | undefined) => {
+    if (hasSubmittedRef.current) return;
+    hasSubmittedRef.current = true;
+    
     setValidationError(null);
     setStatus('loading');
     setMessage('Validando seu link de acesso...');
@@ -103,6 +116,8 @@ export const AccessLinkEntry: React.FC = () => {
               token: token,
               visitor_name: name,
               visitor_email: normalizedEmail,
+              created_at: new Date().toISOString(),
+              attempt: 0, // Primeira tentativa
           };
           sessionStorage.setItem(PENDING_GRANT_KEY, JSON.stringify(pendingGrant));
           
@@ -120,6 +135,7 @@ export const AccessLinkEntry: React.FC = () => {
       if (code === 'EMAIL_REQUIRED') {
           setValidationError(errorMessage);
           setStatus('initial');
+          hasSubmittedRef.current = false; // Permite nova tentativa
           return;
       }
       
@@ -176,13 +192,25 @@ export const AccessLinkEntry: React.FC = () => {
         if (user) {
             setVisitorEmail(normalizeEmail(user.email || storedEmail || ''));
             setVisitorName(user.first_name || storedName || '');
+            
+            // Se o usuário já está logado, mas não tem pending, tenta validar o link ACCESS (Tipo A)
+            // Se for um link GRANT, ele falhará com LOGIN_REQUIRED se não tiver sido validado antes.
+            // Se for um link ACCESS, ele será validado e salvo no localStorage.
+            if (!pendingGrantRaw) {
+                // Se o usuário está logado e não há pending, tentamos validar o link imediatamente
+                // Isso cobre o caso de um link ACCESS (Tipo A) ou um link GRANT que foi validado
+                // em outro navegador e o usuário logou aqui.
+                handleValidation(tokenNormalized, visitorName, visitorEmail, user.id);
+                return;
+            }
+            
         } else {
             setVisitorEmail(normalizeEmail(storedEmail || ''));
             setVisitorName(storedName || '');
         }
     }
     
-  }, [encodedToken, user, isLoadingAuth, navigate, handleValidation, status]);
+  }, [encodedToken, user, isLoadingAuth, navigate, handleValidation, status, visitorName, visitorEmail]);
 
 
   const handleSubmit = (e: React.FormEvent) => {

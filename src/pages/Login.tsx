@@ -33,7 +33,7 @@ export const Login: React.FC = () => {
     const storedEmail = localStorage.getItem('link_validator_email');
     
     // 1. Verificar se há um GRANT pendente no sessionStorage
-    const pendingGrantRaw = sessionStorage.getItem('access_link_pending');
+    const pendingGrantRaw = sessionStorage.getItem('grant_pending'); // Usando a nova chave
     if (pendingGrantRaw) {
         try {
             const pendingGrant = JSON.parse(pendingGrantRaw);
@@ -42,7 +42,7 @@ export const Login: React.FC = () => {
             setEmail(normalizedPendingEmail); // Pré-preenche com o email do link
             setName(pendingGrant.visitor_name || '');
         } catch (e) {
-            sessionStorage.removeItem('access_link_pending');
+            sessionStorage.removeItem('grant_pending');
         }
     } else {
         // 2. Prioridade: URL > localStorage > State inicial
@@ -94,6 +94,8 @@ export const Login: React.FC = () => {
       const lastName = lastNameParts.join(' ') || null;
       
       // 1. Chama a Edge Function para criar ou logar o usuário
+      // A Edge Function 'create-user-and-login' lida com a lógica de tentar login,
+      // e se falhar, tentar criar o usuário e logar em seguida.
       const { data, error: invokeError } = await supabase.functions.invoke('create-user-and-login', {
         body: {
           email: normalizedEmail,
@@ -112,6 +114,7 @@ export const Login: React.FC = () => {
       
       if (!data || data.ok === false) {
         console.error('[Login] Edge Function logic error:', data);
+        // Se a EF falhar, ela retorna uma mensagem de erro.
         throw new Error(data?.message || 'Falha ao autenticar. Tente novamente.');
       }
       

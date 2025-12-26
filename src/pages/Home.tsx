@@ -6,6 +6,8 @@ import { Model } from '../types';
 import { fetchUserPurchases } from '../lib/marketplace';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
+import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
+import { isModelUnlockedByGrant } from '../lib/accessVisual'; // Novo import
 
 interface ModelWithAccess extends Model {
   isUnlocked: boolean;
@@ -15,7 +17,10 @@ interface ModelWithAccess extends Model {
 
 const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: ModelWithAccess }) => {
   const navigate = useNavigate();
-  // Removendo openCheckoutForProduct daqui, pois a Home só navega para o perfil.
+  
+  // Acesso por link ou por compra
+  const isUnlockedByGrant = isModelUnlockedByGrant(model.id);
+  const isUnlocked = model.isUnlocked || isUnlockedByGrant; // isUnlocked já inclui a compra real
 
   const formattedPrice =
     model.mainProductPriceCents != null
@@ -35,10 +40,17 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: Mod
           src={model.avatar_url ?? ''}
           alt={model.name}
           className={`w-full h-full object-cover transition-all duration-300 ${
-            !model.isUnlocked ? 'grayscale' : ''
+            !isUnlocked ? 'grayscale' : ''
           }`}
         />
         <div className="absolute inset-0 bg-gradient-to-t from-black/80 via-black/40 to-transparent" />
+
+        {/* Badge de VIP Ativo (Compra ou Link) */}
+        {isUnlocked && (
+            <div className="absolute top-2 right-2 bg-green-500 text-white rounded-full px-2 py-1 text-[10px] font-bold">
+                ✔ VIP Ativo
+            </div>
+        )}
 
         <div className="absolute bottom-2 left-2 right-2">
           <h3 className="font-bold text-white text-sm truncate">{model.name}</h3>
@@ -53,8 +65,8 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: Mod
 
       {/* CTA fixo embaixo do card */}
       <div className="p-2 border-t border-privacy-border flex flex-col gap-1">
-        {model.isUnlocked && (
-          <span className="text-[11px] text-green-400 flex items-center gap-1">
+        {isUnlocked && (
+          <span className={`text-[11px] flex items-center gap-1 text-green-400`}>
             ✔ Acesso VIP liberado
           </span>
         )}
@@ -62,7 +74,7 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: Mod
           onClick={() => navigate(`/modelo/${model.username}`)}
           className="w-full bg-primary text-privacy-black text-xs font-semibold py-1.5 rounded-lg hover:opacity-90"
         >
-          Ver perfil da modelo
+          {isUnlocked ? 'Acessar Perfil' : 'Ver perfil da modelo'}
         </button>
       </div>
     </div>
@@ -70,18 +82,22 @@ const ModelCard: React.FC<{ model: ModelWithAccess }> = ({ model }: { model: Mod
 };
 
 export const Home: React.FC = () => {
+  const { user, isLoading: isLoadingAuth } = useAuth();
   const [models, setModels] = useState<ModelWithAccess[]>([]);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
+    if (isLoadingAuth || !user?.id) {
+        if (!isLoadingAuth) setLoading(false);
+        return;
+    }
+    
     const loadModels = async () => {
       setLoading(true);
       
-      const hasWelcomeCarolina = localStorage.getItem('welcomePurchaseCarolina') === 'true';
-
       const [modelsRes, purchasesRes, productsRes] = await Promise.all([
         supabase.from('models').select('*'),
-        fetchUserPurchases(),
+        fetchUserPurchases(user.id), // Passando userId
         supabase.from('products').select('id, model_id, is_base_membership, price_cents')
       ]);
 
@@ -95,8 +111,8 @@ export const Home: React.FC = () => {
       const purchasedModelIds = new Set(purchasesRes.map(p => p.products?.model_id).filter(Boolean));
 
       const modelsWithAccess = modelsRes.data.map(model => {
-        const isCarolina = model.username === 'carolina-andrade';
-        const isUnlocked = (isCarolina && hasWelcomeCarolina) || purchasedModelIds.has(model.id);
+        // A lógica de acesso agora é unificada: se comprou qualquer produto da modelo, está desbloqueado.
+        const isUnlocked = purchasedModelIds.has(model.id);
         
         const modelProducts = products.filter(p => p.model_id === model.id);
         const mainProduct = modelProducts.find(p => p.is_base_membership) || modelProducts[0];
@@ -110,8 +126,15 @@ export const Home: React.FC = () => {
       });
 
       modelsWithAccess.sort((a, b) => {
-        if (a.isUnlocked && !b.isUnlocked) return -1;
-        if (!a.isUnlocked && b.isUnlocked) return 1;
+        // Prioriza modelos desbloqueadas (compra ou link)
+        const aIsUnlockedByGrant = isModelUnlockedByGrant(a.id);
+        const bIsUnlockedByGrant = isModelUnlockedByGrant(b.id);
+        
+        const aIsFullyUnlocked = a.isUnlocked || aIsUnlockedByGrant;
+        const bIsFullyUnlocked = b.isUnlocked || bIsUnlockedByGrant;
+
+        if (aIsFullyUnlocked && !bIsFullyUnlocked) return -1;
+        if (!aIsFullyUnlocked && bIsFullyUnlocked) return 1;
         return 0;
       });
 
@@ -120,7 +143,11 @@ export const Home: React.FC = () => {
     };
 
     loadModels();
-  }, []);
+  }, [user?.id, isLoadingAuth]);
+
+  if (isLoadingAuth || loading) {
+    return <div className="min-h-screen bg-privacy-black flex items-center justify-center text-white">Carregando...</div>;
+  }
 
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">
@@ -131,15 +158,11 @@ export const Home: React.FC = () => {
           <p className="text-privacy-text-secondary mt-1">Explore os perfis das modelos.</p>
         </div>
 
-        {loading ? (
-          <div className="text-center py-10">Carregando modelos...</div>
-        ) : (
-          <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
-            {models.map(model => (
-              <ModelCard key={model.id} model={model} />
-            ))}
-          </div>
-        )}
+        <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 gap-4">
+          {models.map(model => (
+            <ModelCard key={model.id} model={model} />
+          ))}
+        </div>
       </main>
       <BottomNavigation />
     </div>

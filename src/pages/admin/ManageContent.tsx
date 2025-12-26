@@ -17,7 +17,7 @@ interface AiResult {
  * Gera metadados de copy usando a IA, com suporte a análise visual e fallback para texto.
  * @param context Contexto textual adicional.
  * @param type Tipo de mídia ('image' ou 'video').
- * @param imageUrl URL da imagem/thumbnail para análise visual.
+ * @param imageUrl URL da imagem/thumbnail para análise visual (opcional).
  */
 const generateMetadata = async (context: string, type: 'image' | 'video', imageUrl?: string): Promise<AiResult | null> => {
     if (!context.trim() && !imageUrl) return null;
@@ -68,7 +68,7 @@ const generateMetadata = async (context: string, type: 'image' | 'video', imageU
  */
 const createMediaItemAndFeeds = async (modelId: string, mediaPayload: {
     file_url: string;
-    thumbnail_url: string;
+    thumbnail_url: string; // Agora é obrigatório, mas para vídeo pode ser a URL do vídeo ou um fallback
     content_type: 'image' | 'video';
     is_free: boolean;
     product_id?: string;
@@ -305,7 +305,6 @@ export const ManageContent: React.FC = () => {
 
     // Form States - Manual
     const [manualUrl, setManualUrl] = useState('');
-    const [manualThumbnailUrl, setManualThumbnailUrl] = useState(''); // Novo campo para thumbnail
     const [manualType, setManualType] = useState<'image' | 'video'>('image');
     const [manualIsFree, setManualIsFree] = useState(false);
     const [manualProductId, setManualProductId] = useState<string>('');
@@ -343,14 +342,6 @@ export const ManageContent: React.FC = () => {
 
     useEffect(() => { fetchData(); }, [fetchData]);
 
-    // Atualiza a URL da thumbnail automaticamente se for imagem
-    useEffect(() => {
-        if (manualType === 'image') {
-            setManualThumbnailUrl(manualUrl);
-        }
-    }, [manualType, manualUrl]);
-
-
     const handleSelectOne = (id: string, isSelected: boolean) => {
         setSelectedIds(prev => {
             const newSet = new Set(prev);
@@ -373,7 +364,7 @@ export const ManageContent: React.FC = () => {
     };
 
     const handleGenerateManualMetadata = async () => {
-        const imageUrl = manualType === 'image' ? manualUrl : manualThumbnailUrl;
+        const imageUrl = manualType === 'image' ? manualUrl : undefined; // Apenas imagens usam URL para visão
         
         if (!manualContext.trim() && !imageUrl) {
             alert('Forneça um contexto ou a URL da mídia/thumbnail para a IA.');
@@ -403,10 +394,13 @@ export const ManageContent: React.FC = () => {
         e.preventDefault();
         setError(null);
         
-        if (!manualUrl || (manualType === 'video' && !manualThumbnailUrl)) {
-            setError('URL da Mídia e URL da Thumbnail (para vídeo) são obrigatórios.');
+        if (!manualUrl) {
+            setError('URL da Mídia é obrigatória.');
             return;
         }
+        
+        // Thumbnail URL: para imagem é a própria URL, para vídeo é o fallback genérico
+        const finalThumbnailUrl = manualType === 'image' ? manualUrl : '/video-fallback.svg';
 
         let finalTitle = manualTitle.trim();
         let finalSubtitle = manualSubtitle.trim();
@@ -419,7 +413,7 @@ export const ManageContent: React.FC = () => {
         // 1. Se o contexto foi fornecido, mas os campos de copy estão vazios, gera automaticamente
         if (manualContext.trim() && (!finalTitle || !finalDescription || !finalSubtitle || !finalCta)) {
             setIsGeneratingManual(true);
-            const imageUrl = manualType === 'image' ? manualUrl : manualThumbnailUrl;
+            const imageUrl = manualType === 'image' ? manualUrl : undefined; // Apenas imagens usam URL para visão
             aiResult = await generateMetadata(manualContext, manualType, imageUrl);
             setIsGeneratingManual(false);
             
@@ -446,7 +440,7 @@ export const ManageContent: React.FC = () => {
 
             const mediaId = await createMediaItemAndFeeds(modelId!, {
                 file_url: manualUrl,
-                thumbnail_url: manualThumbnailUrl || manualUrl,
+                thumbnail_url: finalThumbnailUrl, // Usando a URL resolvida
                 content_type: manualType,
                 is_free: manualIsFree,
                 product_id: manualProductId || undefined,
@@ -457,7 +451,6 @@ export const ManageContent: React.FC = () => {
             
             // Limpar formulário
             setManualUrl('');
-            setManualThumbnailUrl('');
             setManualTitle('');
             setManualSubtitle('');
             setManualDescription('');
@@ -483,15 +476,16 @@ export const ManageContent: React.FC = () => {
             const itemsToInsert = Array.from({ length: batchCount }, (_, i) => {
                 const index = i + 1;
                 const fileUrl = `${batchBaseUrl}${index}${batchExtension}`;
-                // Para vídeos, assumimos que a thumbnail é .jpg (convenção R2/CDN)
-                const thumbnailUrl = batchType === 'image' ? fileUrl : `${batchBaseUrl}${index}.jpg`; 
+                // Thumbnail URL: para imagem é a própria URL, para vídeo é o fallback genérico
+                const thumbnailUrl = batchType === 'image' ? fileUrl : '/video-fallback.svg'; 
                 return { fileUrl, thumbnailUrl, index };
             });
             
             const insertionPromises = itemsToInsert.map(async ({ fileUrl, thumbnailUrl }) => {
                 try {
-                    // 1) Tenta IA (com visão + fallback texto)
-                    let aiResult = await generateMetadata(genericContext, batchType, thumbnailUrl);
+                    // 1) Tenta IA (apenas texto para vídeo, ou imagem para foto)
+                    const imageUrlForAi = batchType === 'image' ? thumbnailUrl : undefined;
+                    let aiResult = await generateMetadata(genericContext, batchType, imageUrlForAi);
 
                     // 2) Se mesmo assim não voltar nada, cria uma copy padrão (FALLBACK FINAL)
                     if (!aiResult) {
@@ -599,16 +593,6 @@ export const ManageContent: React.FC = () => {
                         <option value="video">Vídeo</option>
                     </select>
                     
-                    {manualType === 'video' && (
-                        <input 
-                            value={manualThumbnailUrl} 
-                            onChange={e => setManualThumbnailUrl(e.target.value)} 
-                            placeholder="URL da Thumbnail/Capa (Obrigatório para Vídeo)" 
-                            className={inputStyle} 
-                            required
-                        />
-                    )}
-
                     {/* Campo de Contexto para IA */}
                     <div className="space-y-2">
                         <div className="flex justify-between items-center">
@@ -633,13 +617,13 @@ export const ManageContent: React.FC = () => {
                             </h3>
                             <div className="flex items-center gap-4 mb-3">
                                 <img 
-                                    src={manualType === 'image' ? manualUrl : manualThumbnailUrl || '/video-fallback.svg'} 
+                                    src={manualType === 'image' ? manualUrl : '/video-fallback.svg'} 
                                     alt="Preview" 
                                     className="w-20 h-20 object-cover rounded-md border border-privacy-border"
                                 />
                                 <div className="text-xs">
-                                    <p className="font-semibold text-white">Thumbnail para IA:</p>
-                                    <p className="text-privacy-text-secondary break-all">{manualType === 'image' ? manualUrl : manualThumbnailUrl || 'N/A'}</p>
+                                    <p className="font-semibold text-white">URL da Mídia:</p>
+                                    <p className="text-privacy-text-secondary break-all">{manualUrl}</p>
                                 </div>
                             </div>
                             {aiPreview && (
@@ -682,7 +666,7 @@ export const ManageContent: React.FC = () => {
                     <input value={batchExtension} onChange={e => setBatchExtension(e.target.value)} placeholder="Extensão (ex: .png ou .mp4)" className={inputStyle} required />
                     <p className="text-xs text-privacy-text-secondary">
                         {batchType === 'video' 
-                            ? 'Para vídeos, a IA usará a URL base com extensão .jpg para a thumbnail (ex: foto1.jpg).'
+                            ? 'Para vídeos, a thumbnail será o fallback genérico. A Edge Function de thumbnail deve ser configurada separadamente.'
                             : 'Para fotos, a URL da mídia é usada como thumbnail.'
                         }
                     </p>

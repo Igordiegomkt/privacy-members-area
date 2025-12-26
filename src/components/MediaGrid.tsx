@@ -1,9 +1,8 @@
 import * as React from 'react';
 import { useState } from 'react';
 import { MediaItemWithAccess } from '../lib/models';
-import { MediaCard } from './MediaCard';
-import { VideoPlayerModal } from './VideoPlayerModal';
-import { MediaModal } from './MediaModal';
+import { GridMediaCard } from './GridMediaCard';
+import { MediaViewerFullscreen } from './MediaViewerFullscreen';
 
 interface MediaGridProps {
   media: MediaItemWithAccess[];
@@ -11,8 +10,11 @@ interface MediaGridProps {
 }
 
 export const MediaGrid: React.FC<MediaGridProps> = ({ media, onLockedClick }: MediaGridProps) => {
-  const [openVideo, setOpenVideo] = useState<MediaItemWithAccess | null>(null);
-  const [openImage, setOpenImage] = useState<MediaItemWithAccess | null>(null);
+  const [openMediaIndex, setOpenMediaIndex] = useState<number | null>(null);
+
+  const handleMediaClick = (index: number) => {
+    setOpenMediaIndex(index);
+  };
 
   if (media.length === 0) {
     return (
@@ -22,32 +24,34 @@ export const MediaGrid: React.FC<MediaGridProps> = ({ media, onLockedClick }: Me
     );
   }
 
+  // Filter out locked media for the viewer list, as per typical UX (only view unlocked content)
+  const unlockedMedia = media.filter(m => m.accessStatus !== 'locked');
+  const initialIndex = openMediaIndex !== null ? unlockedMedia.findIndex(m => m.id === media[openMediaIndex].id) : 0;
+
+
   return (
     <>
       <div className="w-full px-2 sm:px-4 pb-8">
         <div className="grid grid-cols-2 sm:grid-cols-3 gap-2 sm:gap-3">
-          {media.map((item: MediaItemWithAccess) => (
-            <MediaCard
+          {media.map((item: MediaItemWithAccess, index: number) => (
+            <GridMediaCard
               key={item.id}
               media={item}
               onLockedClick={onLockedClick ? () => onLockedClick(item) : undefined}
-              onOpenVideo={() => setOpenVideo(item)}
-              onOpenImage={() => setOpenImage(item)}
+              onMediaClick={() => handleMediaClick(index)}
             />
           ))}
         </div>
       </div>
 
-      <VideoPlayerModal
-        media={openVideo}
-        isOpen={!!openVideo}
-        onClose={() => setOpenVideo(null)}
-      />
-      <MediaModal
-        media={openImage}
-        isOpen={!!openImage}
-        onClose={() => setOpenImage(null)}
-      />
+      {openMediaIndex !== null && unlockedMedia.length > 0 && (
+        <MediaViewerFullscreen
+          mediaList={unlockedMedia}
+          initialIndex={initialIndex}
+          isOpen={openMediaIndex !== null}
+          onClose={() => setOpenMediaIndex(null)}
+        />
+      )}
     </>
   );
 };

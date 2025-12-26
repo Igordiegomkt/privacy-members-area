@@ -5,14 +5,13 @@ import { RealtimeChannel } from '@supabase/supabase-js';
 
 const REALTIME_CHANNEL = 'site-activity';
 
-export const useRealtimeTracker = () => {
+export const useRealtimeTracker = (userName: string) => {
   const location = useLocation();
-  const userName = localStorage.getItem('userName');
   const channelRef = useRef<RealtimeChannel | null>(null);
 
   // Efeito para criar e remover o canal (executa apenas uma vez)
   useEffect(() => {
-    if (!supabase || !userName) return;
+    if (!supabase || !userName || userName === 'Anonymous') return;
 
     const channel = supabase.channel(REALTIME_CHANNEL, {
       config: {
@@ -44,7 +43,7 @@ export const useRealtimeTracker = () => {
 
   // Efeito para rastrear mudanças de página
   useEffect(() => {
-    if (channelRef.current && channelRef.current.state === 'joined' && userName) {
+    if (channelRef.current && channelRef.current.state === 'joined' && userName && userName !== 'Anonymous') {
       channelRef.current.track({
         page: location.pathname,
         user: userName,

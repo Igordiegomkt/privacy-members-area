@@ -2,7 +2,7 @@ import * as React from 'react';
 import { useLocation, useNavigate, Link } from 'react-router-dom';
 import { supabase } from '../../lib/supabase';
 import { Logo } from '../Logo';
-import { LayoutDashboard, Users, Settings, LogOut, Image as ImageIcon, Sparkles, Bell } from 'lucide-react';
+import { LayoutDashboard, Users, Settings, LogOut, Image as ImageIcon, Sparkles, Bell, Link as LinkIcon } from 'lucide-react';
 
 export function Sidebar(): React.ReactElement {
   const navigate = useNavigate();
@@ -28,6 +28,11 @@ export function Sidebar(): React.ReactElement {
       path: '/admin/notificacoes', // Novo item
       label: 'Notificações',
       icon: <Bell className="w-5 h-5" />
+    },
+    {
+      path: '/admin/links-acesso', // Novo item
+      label: 'Links de Acesso',
+      icon: <LinkIcon className="w-5 h-5" />
     },
     {
       path: '/admin/ia',

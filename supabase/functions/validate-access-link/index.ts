@@ -35,7 +35,6 @@ interface Grant {
   model_id: string | null;
   product_id: string | null;
   expires_at: string | null;
-  link_type: 'access' | 'grant';
 }
 
 /**
@@ -72,6 +71,11 @@ serve(async (req: Request) => {
       return createResponse(false, { code: "INVALID_LINK", message: "Token inválido." });
     }
     
+    // 3. Validação de Email Obrigatório
+    if (!visitor_email || typeof visitor_email !== 'string' || !visitor_email.includes('@')) {
+        return createResponse(false, { code: "EMAIL_REQUIRED", message: "O email é obrigatório para validar o acesso." });
+    }
+    
     // 1. Normalização do Token
     const token = rawToken.trim();
 
@@ -86,58 +90,9 @@ serve(async (req: Request) => {
     if (ipAddress && ipAddress.includes(',')) {
         ipAddress = ipAddress.split(',')[0].trim();
     }
-    
-    // 4. Pré-busca do link para determinar o tipo (Access ou Grant)
-    const { data: linkData, error: linkError } = await supabaseAdmin
-        .from('access_links')
-        .select('scope, model_id, product_id, expires_at, link_type')
-        .eq('token_hash', tokenHash)
-        .single();
-        
-    if (linkError || !linkData) {
-        // Se não encontrou, chama a RPC consume_access_link (que fará a mesma checagem e retornará INVALID_LINK)
-        // Isso garante que a RPC de Access ainda é o ponto de falha primário para links não encontrados.
-        const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('consume_access_link', {
-            p_token_hash: tokenHash,
-            p_visitor_name: visitor_name,
-            p_visitor_email: visitor_email,
-            p_user_id: user_id || null,
-            p_user_agent: userAgent,
-            p_ip: ipAddress,
-        });
-        
-        if (rpcError) {
-            console.error("[validate-access-link] RPC Error (Fallback):", rpcError);
-            return createResponse(false, { code: "RPC_ERROR", message: rpcError.message });
-        }
-        
-        const result = rpcData?.[0];
-        if (!result || result.ok === false) {
-            return createResponse(false, { code: result?.code || 'UNKNOWN_VALIDATION_ERROR', message: result?.message || 'Falha na validação do link.' });
-        }
-        
-        // Se o fallback for OK, significa que era um link Access válido
-        const grant: Grant = {
-            scope: result.scope as 'global' | 'model' | 'product',
-            model_id: result.model_id,
-            product_id: result.product_id,
-            expires_at: result.expires_at,
-            link_type: 'access', // Forçamos 'access' no fallback
-        };
-        return createResponse(true, { grant });
-    }
-    
-    const linkType = linkData.link_type as 'access' | 'grant';
-    let rpcName: 'consume_access_link' | 'grant_access_link';
-    
-    if (linkType === 'grant') {
-        rpcName = 'grant_access_link';
-    } else {
-        rpcName = 'consume_access_link';
-    }
 
-    // 5. Chamar a RPC correta para validação e consumo/concessão
-    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc(rpcName, {
+    // 4. Chamar a RPC para validação e consumo atômico
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('consume_access_link', {
         p_token_hash: tokenHash,
         p_visitor_name: visitor_name,
         p_visitor_email: visitor_email,
@@ -147,7 +102,7 @@ serve(async (req: Request) => {
     });
 
     if (rpcError) {
-      console.error(`[validate-access-link] RPC Error (${rpcName}):`, rpcError);
+      console.error("[validate-access-link] RPC Error:", rpcError);
       return createResponse(false, { code: "RPC_ERROR", message: rpcError.message });
     }
     
@@ -158,14 +113,13 @@ serve(async (req: Request) => {
         const message = result?.message || 'Falha na validação do link.';
         return createResponse(false, { code, message });
     }
-    
-    // 6. Sucesso: Retorna o grant
+
+    // 5. Sucesso: Retorna o grant
     const grant: Grant = {
         scope: result.scope as 'global' | 'model' | 'product',
         model_id: result.model_id,
         product_id: result.product_id,
         expires_at: result.expires_at,
-        link_type: linkType,
     };
     
     return createResponse(true, { grant });

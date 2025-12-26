@@ -13,7 +13,6 @@ interface AccessLink {
     token_hash: string;
     token_plain: string | null; // Novo campo
     scope: 'global' | 'model' | 'product';
-    link_type: 'access' | 'grant'; // Novo campo
     model_id: string | null;
     product_id: string | null;
     expires_at: string | null;
@@ -43,7 +42,6 @@ interface AccessLinkVisit {
 // Tipos para o formulário
 interface LinkFormData {
     scope: 'global' | 'model' | 'product';
-    linkType: 'access' | 'grant'; // Novo campo
     modelId: string;
     productId: string;
     expiresAt: string;
@@ -185,7 +183,6 @@ const EditLinkModal: React.FC<EditLinkModalProps> = ({ link, onSave, onClose }: 
             </DialogHeader>
             <div className="space-y-4">
                 <p className="text-sm text-privacy-text-secondary">Escopo: <span className="font-semibold text-white capitalize">{link.scope}</span></p>
-                <p className="text-sm text-privacy-text-secondary">Tipo: <span className={`font-semibold text-white capitalize ${link.link_type === 'grant' ? 'text-green-400' : 'text-primary'}`}>{link.link_type}</span></p>
                 
                 <div>
                     <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Expira em (Opcional)</label>
@@ -234,53 +231,21 @@ const EditLinkModal: React.FC<EditLinkModalProps> = ({ link, onSave, onClose }: 
 };
 
 // --- Componente de Criação ---
-const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string, debugState: LinkFormData }> = ({ models, products, onLinkCreated, userId, debugState }: { models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string, debugState: LinkFormData }) => {
-    const [formData, setFormData] = useState<LinkFormData>(debugState);
+const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string }> = ({ models, products, onLinkCreated, userId }: { models: Model[], products: Product[], onLinkCreated: (link: string) => void, userId: string }) => {
+    const [formData, setFormData] = useState<LinkFormData>({
+        scope: 'global',
+        modelId: '',
+        productId: '',
+        expiresAt: '',
+        maxUses: null,
+    });
     const [loading, setLoading] = useState(false);
     const [error, setError] = useState<string | null>(null);
 
-    // Sincroniza o estado interno com o estado de debug (que é o estado inicial)
-    useEffect(() => {
-        setFormData(debugState);
-    }, [debugState]);
-
     const handleChange = (e: React.ChangeEvent<HTMLInputElement | HTMLSelectElement | HTMLTextAreaElement>) => {
         const { name, value } = e.target;
-        setError(null);
-
-        if (name === 'linkType') {
-            const newLinkType = value as 'access' | 'grant';
-            let newScope = formData.scope;
-            
-            // Se mudar para 'grant', força o escopo para 'model' se for 'global'
-            if (newLinkType === 'grant' && newScope === 'global') {
-                newScope = 'model';
-            }
-            
-            setFormData(prev => ({ 
-                ...prev, 
-                linkType: newLinkType,
-                scope: newScope,
-                // Se mudar para 'access' e o escopo for 'global', limpa IDs
-                modelId: newScope === 'global' ? '' : prev.modelId,
-                productId: newScope === 'global' ? '' : prev.productId,
-            }));
-            return;
-        }
-        
-        if (name === 'scope') {
-            const newScope = value as 'global' | 'model' | 'product';
-            setFormData(prev => ({ 
-                ...prev, 
-                scope: newScope,
-                // Limpa IDs se mudar de escopo
-                modelId: newScope === 'global' ? '' : prev.modelId,
-                productId: newScope !== 'product' ? '' : prev.productId,
-            }));
-            return;
-        }
-
         setFormData(prev => ({ ...prev, [name]: value }));
+        setError(null);
     };
     
     const handleNumberChange = (e: React.ChangeEvent<HTMLInputElement>) => {
@@ -294,43 +259,21 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
         setLoading(true);
         setError(null);
 
-        const { scope, linkType, modelId, productId, expiresAt, maxUses } = formData;
-        
-        const isGrant = linkType === 'grant';
-        
-        // --- Validação de Coerência ---
-        
-        // 1. Grant não pode ser Global
-        if (isGrant && scope === 'global') {
-            setError('Links do tipo "Grant" não podem ter escopo "Global".');
-            setLoading(false);
-            return;
-        }
-        
-        // 2. Grant deve ter modelo OU produto
-        if (isGrant && !modelId && !productId) {
-            setError('Links do tipo "Grant" devem ser vinculados a uma Modelo ou Produto específico.');
-            setLoading(false);
-            return;
-        }
-        
-        // 3. Access/Model exige modelId
-        if (linkType === 'access' && scope === 'model' && !modelId) {
+        const { scope, modelId, productId, expiresAt, maxUses } = formData;
+
+        // Validação de coerência no frontend
+        if (scope === 'model' && !modelId) {
             setError('Selecione uma modelo para o escopo "Modelo".');
             setLoading(false);
             return;
         }
-        
-        // 4. Access/Product exige productId
         if (scope === 'product' && !productId) {
             setError('Selecione um produto para o escopo "Produto".');
             setLoading(false);
             return;
         }
         
-        // -----------------------------
-        
-        // 5. Tratar maxUses
+        // 1. Tratar maxUses: já tratado no handleNumberChange (null para 0/vazio)
         let finalMaxUses: number | null = maxUses;
         if (finalMaxUses !== null && finalMaxUses < 1) {
             setError('Usos máximos deve ser um número positivo ou vazio/zero.');
@@ -338,10 +281,11 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
             return;
         }
         
-        // 6. Tratar expiresAt
+        // 2. Tratar expiresAt: vazio => null. Se tiver data, converte para ISO.
         let finalExpiresAt: string | null = null;
         if (expiresAt) {
             let dateToConvert = expiresAt;
+            // Se o input é apenas data (YYYY-MM-DD), adicionamos 23:59:59 local antes de converter para UTC/ISO
             if (expiresAt.length === 10) { 
                 dateToConvert = `${expiresAt}T23:59:59`;
             }
@@ -349,30 +293,30 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
         }
 
         try {
-            // 7. Gerar token forte e hash
+            // 3. Gerar token forte
             const rawToken = generateStrongToken();
+            
+            // 4. Calcular SHA256 hash
             const tokenHash = await sha256Hex(rawToken);
 
-            // 8. Preparar payload
+            // 5. Preparar payload
             const payload = {
                 token_hash: tokenHash,
-                token_plain: rawToken,
+                token_plain: rawToken, // Salvando o token puro para o Admin
                 scope,
-                link_type: linkType,
-                // Se for Global, model_id e product_id devem ser NULL
-                model_id: scope === 'global' ? null : (scope === 'product' ? modelId : modelId || null),
+                model_id: scope === 'model' ? modelId : null,
                 product_id: scope === 'product' ? productId : null,
                 expires_at: finalExpiresAt,
                 max_uses: finalMaxUses,
                 created_by: userId,
             };
-            
-            // 9. Inserir no Supabase
+
+            // 6. Inserir no Supabase
             const { error: insertError } = await supabase.from('access_links').insert([payload]);
 
             if (insertError) throw insertError;
 
-            // 10. Mostrar link final
+            // 7. Mostrar link final no formato de trilha
             const finalLink = `${DOMAIN}/acesso/${encodeURIComponent(rawToken)}`;
             onLinkCreated(finalLink);
 
@@ -384,25 +328,6 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
         }
     };
     
-    const isGrant = formData.linkType === 'grant';
-    const isProductScope = formData.scope === 'product';
-    const isModelScope = formData.scope === 'model';
-    const isGlobalScope = formData.scope === 'global';
-    
-    const filteredProducts = formData.modelId 
-        ? products.filter(p => p.model_id === formData.modelId)
-        : products;
-        
-    const selectedProduct = products.find(p => p.id === formData.productId);
-    
-    // Efeito para garantir que o modelId seja preenchido se o produto for selecionado
-    useEffect(() => {
-        if (isProductScope && selectedProduct?.model_id && formData.modelId !== selectedProduct.model_id) {
-            setFormData(prev => ({ ...prev, modelId: selectedProduct.model_id || '' }));
-        }
-    }, [isProductScope, formData.productId, selectedProduct?.model_id]);
-
-
     return (
         <form onSubmit={handleGenerateToken} className="bg-privacy-surface p-6 rounded-lg space-y-4">
             <h2 className="text-xl font-bold text-white mb-4">Gerar Novo Link de Acesso</h2>
@@ -410,56 +335,30 @@ const LinkForm: React.FC<{ models: Model[], products: Product[], onLinkCreated: 
             {error && <p className="text-red-400 bg-red-500/10 p-3 rounded-md text-sm">{error}</p>}
 
             <div>
-                <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Tipo de Link</label>
-                <select name="linkType" value={formData.linkType} onChange={handleChange} className={inputStyle} required>
-                    <option value="access">Access (Temporário - Acesso via token)</option>
-                    <option value="grant">Grant (Permanente - Cria compra no 1º acesso)</option>
-                </select>
-                {isGrant && (
-                    <p className="text-xs text-green-400 mt-1">
-                        ⚠️ Grant: Cria um registro de compra permanente (status 'paid') no banco de dados para o usuário no primeiro acesso.
-                    </p>
-                )}
-            </div>
-
-            <div>
                 <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Escopo de Acesso</label>
                 <select name="scope" value={formData.scope} onChange={handleChange} className={inputStyle} required>
-                    <option value="global" disabled={isGrant}>Global (Acesso a tudo)</option>
+                    <option value="global">Global (Acesso a tudo)</option>
                     <option value="model">Modelo Específica</option>
                     <option value="product">Produto Específico</option>
                 </select>
-                {isGlobalScope && !isGrant && (
-                    <p className="text-xs text-primary mt-1">
-                        Access Global: Concede acesso temporário a todos os conteúdos de todas as modelos.
-                    </p>
-                )}
             </div>
 
-            {/* Se for Grant, Model ou Product, mostramos o seletor de Modelo */}
-            {(!isGlobalScope || isGrant) && (
+            {formData.scope === 'model' && (
                 <div>
                     <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Modelo</label>
-                    <select 
-                        name="modelId" 
-                        value={formData.modelId} 
-                        onChange={handleChange} 
-                        className={inputStyle} 
-                        required={isModelScope && !isProductScope}
-                        disabled={isProductScope && !!selectedProduct?.model_id} // Desabilita se o produto já define a modelo
-                    >
-                        <option value="">{isModelScope ? 'Selecione uma modelo' : 'Filtrar por modelo (Opcional)'}</option>
+                    <select name="modelId" value={formData.modelId} onChange={handleChange} className={inputStyle} required>
+                        <option value="">Selecione uma modelo</option>
                         {models.map(m => <option key={m.id} value={m.id}>{m.name} (@{m.username})</option>)}
                     </select>
                 </div>
             )}
 
-            {isProductScope && (
+            {formData.scope === 'product' && (
                 <div>
                     <label className="block text-sm font-medium text-privacy-text-secondary mb-1">Produto</label>
                     <select name="productId" value={formData.productId} onChange={handleChange} className={inputStyle} required>
                         <option value="">Selecione um produto</option>
-                        {filteredProducts.map(p => <option key={p.id} value={p.id}>{p.name} ({p.type})</option>)}
+                        {products.map(p => <option key={p.id} value={p.id}>{p.name} ({p.type})</option>)}
                     </select>
                 </div>
             )}
@@ -506,7 +405,6 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                     <thead className="text-xs text-privacy-text-secondary uppercase bg-privacy-border">
                         <tr>
                             <th scope="col" className="px-4 py-3">Status</th>
-                            <th scope="col" className="px-4 py-3">Tipo</th>
                             <th scope="col" className="px-4 py-3">Escopo</th>
                             <th scope="col" className="px-4 py-3">Usos</th>
                             <th scope="col" className="px-4 py-3">Expira em</th>
@@ -521,15 +419,12 @@ const LinkList: React.FC<{ links: AccessLink[], onToggleActive: (id: string, act
                             const maxUses = isMaxUses(link);
                             const statusColor = link.active && !expired && !maxUses ? 'text-green-400' : 'text-red-400';
                             const statusText = expired ? 'Expirado' : maxUses ? 'Esgotado' : link.active ? 'Ativo' : 'Inativo';
-                            const linkTypeColor = link.link_type === 'grant' ? 'text-green-400' : 'text-primary';
+                            const lastUsed = link.last_used_at ? new Date(link.last_used_at).toLocaleString('pt-BR') : 'Nunca usado';
 
                             return (
                                 <tr key={link.id} className="bg-privacy-surface border-b border-privacy-border hover:bg-privacy-border/50">
                                     <td className={`px-4 py-3 font-medium ${statusColor}`}>
                                         {statusText}
-                                    </td>
-                                    <td className={`px-4 py-3 font-medium capitalize ${linkTypeColor}`}>
-                                        {link.link_type}
                                     </td>
                                     <td className="px-4 py-3 capitalize">
                                         {link.scope}
@@ -621,28 +516,16 @@ export const ManageAccessLinks: React.FC = () => {
     const [linkIdToView, setLinkIdToView] = useState<string | null>(null);
     const [isTestModalOpen, setIsTestModalOpen] = useState(false);
     const [testResult, setTestResult] = useState<{ ok: boolean, code: string, message: string } | null>(null);
-    
-    // Estado inicial do formulário para debug
-    const initialFormState: LinkFormData = {
-        scope: 'global',
-        linkType: 'access',
-        modelId: '',
-        productId: '',
-        expiresAt: '',
-        maxUses: null,
-    };
-    const [debugFormState, setDebugFormState] = useState<LinkFormData>(initialFormState);
-
 
     const fetchData = useCallback(async () => {
         setLoading(true);
         setError(null);
         try {
-            // Buscando token_plain, link_type, last_validator_name e last_validator_email
+            // Buscando token_plain, last_validator_name e last_validator_email
             const [linksRes, modelsRes, productsRes] = await Promise.all([
-                supabase.from('access_links').select('*, token_plain, link_type, last_validator_name, last_validator_email').order('created_at', { ascending: false }),
+                supabase.from('access_links').select('*, token_plain, last_validator_name, last_validator_email').order('created_at', { ascending: false }),
                 supabase.from('models').select('id, name, username'),
-                supabase.from('products').select('id, name, type, model_id'), // Adicionado model_id para filtrar no form
+                supabase.from('products').select('id, name, type'),
             ]);
 
             if (linksRes.error) throw linksRes.error;
@@ -661,7 +544,6 @@ export const ManageAccessLinks: React.FC = () => {
     }, []);
 
     useEffect(() => {
-        console.log('[ManageAccessLinks] DEBUG VERSION v2025-12-25');
         fetchData();
     }, [fetchData]);
 
@@ -733,7 +615,7 @@ export const ManageAccessLinks: React.FC = () => {
             
             // 2. Chamar EF com o token puro
             const { data, error: invokeError } = await supabase.functions.invoke('validate-access-link', {
-                body: { token: link.token_plain, visitor_name: 'Admin Teste', visitor_email: 'admin@teste.com', user_id: user?.id },
+                body: { token: link.token_plain, visitor_name: 'Admin Teste', visitor_email: 'admin@teste.com' },
             });
             
             if (invokeError) {
@@ -744,7 +626,7 @@ export const ManageAccessLinks: React.FC = () => {
             if (data.ok === false) {
                 setTestResult({ ok: false, code: data.code, message: data.message });
             } else {
-                setTestResult({ ok: true, code: 'OK', message: `Link validado com sucesso! (Uso registrado). Tipo: ${data.grant?.link_type}` });
+                setTestResult({ ok: true, code: 'OK', message: 'Link validado com sucesso! (Uso registrado)' });
                 fetchData(); // Atualiza a lista para mostrar o incremento de 'uses'
             }
             
@@ -759,10 +641,6 @@ export const ManageAccessLinks: React.FC = () => {
 
     return (
         <div>
-            <div className="bg-red-800/20 border border-red-500/50 p-2 mb-4 text-xs text-white">
-                <p className="text-lg font-bold text-red-400">ManageAccessLinks DEBUG v2025-12-25</p>
-                <p>Form State: Type={debugFormState.linkType} | Scope={debugFormState.scope}</p>
-            </div>
             <h1 className="text-3xl font-bold text-white mb-6">Gerenciar Links de Acesso</h1>
             
             <div className="grid grid-cols-1 lg:grid-cols-2 gap-8">
@@ -771,7 +649,6 @@ export const ManageAccessLinks: React.FC = () => {
                     products={products} 
                     onLinkCreated={handleLinkCreated} 
                     userId={user.id}
-                    debugState={debugFormState}
                 />
             </div>
 

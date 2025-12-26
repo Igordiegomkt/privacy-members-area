@@ -3,7 +3,7 @@ import { useEffect, useState, useRef } from 'react';
 import { supabase } from '../../lib/supabase';
 import { NotificationWithStatus } from '../../types/notifications';
 import { Bell, X } from 'lucide-react';
-import { Session } from '@supabase/supabase-js';
+import { useAuth } from '../../contexts/AuthContext'; // Importando useAuth
 
 interface NotificationBellProps {
   onNavigateToProduct: (productId: string) => void;
@@ -12,13 +12,14 @@ interface NotificationBellProps {
 export const NotificationBell: React.FC<NotificationBellProps> = ({
   onNavigateToProduct,
 }: NotificationBellProps) => {
-  const [session, setSession] = useState<Session | null>(null);
+  const { user, isLoading: isLoadingAuth } = useAuth(); // Usando useAuth
+  const userId = user?.id ?? null;
+  
   const [open, setOpen] = useState(false);
   const [notifications, setNotifications] = useState<NotificationWithStatus[]>([]);
   const [loading, setLoading] = useState(false);
   const bellRef = useRef<HTMLDivElement>(null);
 
-  const userId = session?.user?.id;
   const unreadCount = notifications.filter((n) => !n.is_read).length;
 
   const fetchNotifications = React.useCallback(async (currentUserId: string) => {
@@ -35,7 +36,13 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
           title,
           body,
           product_id,
-          created_at
+          created_at,
+          products:product_id (
+            cover_thumbnail,
+            model:model_id (
+              avatar_url
+            )
+          )
         )
       `)
       .eq('user_id', currentUserId)
@@ -57,26 +64,17 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
         product_id: row.notifications?.product_id ?? null,
         created_at: row.created_at,
         is_read: row.is_read,
+        // Extract thumbnail (products.cover_thumbnail)
+        product_thumbnail: row.notifications?.products?.cover_thumbnail ?? null,
+        // Extract model avatar (products.model.avatar_url)
+        model_avatar_url: row.notifications?.products?.model?.avatar_url ?? null,
       }));
 
     setNotifications(mapped);
     setLoading(false);
   }, []);
 
-  // 1. Handle Auth State
-  useEffect(() => {
-    supabase.auth.getSession().then(({ data: { session } }) => {
-      setSession(session);
-    });
-
-    const { data: { subscription } } = supabase.auth.onAuthStateChange((_event, session) => {
-      setSession(session);
-    });
-
-    return () => subscription.unsubscribe();
-  }, []);
-
-  // 2. Fetch and Realtime Subscription
+  // 1. Fetch and Realtime Subscription (Depende apenas de userId)
   useEffect(() => {
     if (!userId) {
       setNotifications([]);
@@ -96,8 +94,6 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
           filter: `user_id=eq.${userId}`,
         },
         (payload: any) => {
-          // When a new user_notification is inserted, re-fetch the list
-          // to get the full notification details (title, body, product_id) via JOIN.
           console.log('[NotificationBell] Realtime notification received, refetching...');
           fetchNotifications(userId);
         },
@@ -109,7 +105,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     };
   }, [userId, fetchNotifications]);
 
-  // 3. Handle click outside to close menu
+  // 2. Handle click outside to close menu
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
       if (bellRef.current && !bellRef.current.contains(event.target as Node)) {
@@ -152,7 +148,7 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
     }
   };
 
-  if (!userId) return null;
+  if (isLoadingAuth || !userId) return null; // Renderiza apenas se houver userId e Auth não estiver carregando
 
   return (
     <div className="relative" ref={bellRef}>
@@ -196,27 +192,37 @@ export const NotificationBell: React.FC<NotificationBellProps> = ({
               </p>
             )}
 
-            {notifications.map((n) => (
-              <button
-                key={n.id}
-                onClick={() => handleClickNotification(n)}
-                className={`w-full text-left px-4 py-3 border-b border-privacy-border/40 text-sm transition-colors ${
-                  n.is_read ? 'bg-transparent' : 'bg-primary/10 hover:bg-primary/20'
-                } hover:bg-privacy-border/60`}
-              >
-                <div className="flex flex-col gap-1">
-                    <p className="font-semibold text-privacy-text-primary">
-                      {n.title}
-                    </p>
-                    <p className="text-xs text-privacy-text-secondary">
-                      {n.body}
-                    </p>
-                    <p className="text-[10px] text-privacy-text-secondary/70 mt-1">
-                        {new Date(n.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
-                    </p>
-                </div>
-              </button>
-            ))}
+            {notifications.map((n) => {
+                // Lógica de fallback: product_thumbnail > model_avatar_url > fallback genérico
+                const thumbSrc = n.product_thumbnail ?? n.model_avatar_url ?? '/video-fallback.svg';
+                
+                return (
+                    <button
+                        key={n.id}
+                        onClick={() => handleClickNotification(n)}
+                        className={`w-full text-left px-4 py-3 border-b border-privacy-border/40 text-sm transition-colors flex items-start gap-3 ${
+                        n.is_read ? 'bg-transparent' : 'bg-primary/10 hover:bg-primary/20'
+                        } hover:bg-privacy-border/60`}
+                    >
+                        <img 
+                            src={thumbSrc} 
+                            alt="Produto" 
+                            className="w-10 h-10 object-cover rounded-md flex-shrink-0"
+                        />
+                        <div className="flex flex-col gap-1 flex-1">
+                            <p className="font-semibold text-privacy-text-primary">
+                            {n.title}
+                            </p>
+                            <p className="text-xs text-privacy-text-secondary">
+                            {n.body}
+                            </p>
+                            <p className="text-[10px] text-privacy-text-secondary/70 mt-1">
+                                {new Date(n.created_at).toLocaleDateString('pt-BR', { day: '2-digit', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                            </p>
+                        </div>
+                    </button>
+                );
+            })}
           </div>
         </div>
       )}

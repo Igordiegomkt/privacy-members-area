@@ -8,7 +8,6 @@ DECLARE
   v_link public.access_links%ROWTYPE;
   v_message text;
 BEGIN
-  -- 1. Busca o link
   SELECT *
   INTO v_link
   FROM public.access_links
@@ -24,20 +23,6 @@ BEGIN
       NULL::uuid,
       NULL::uuid,
       NULL::timestamptz;
-    RETURN;
-  END IF;
-
-  -- 2. Validações de Access
-  IF v_link.link_type != 'access' THEN
-    v_message := 'Este link não é do tipo Access. Use a função grant_access_link.';
-    RETURN QUERY SELECT
-      false,
-      'NOT_AN_ACCESS',
-      v_message,
-      v_link.scope::text,
-      v_link.model_id,
-      v_link.product_id,
-      v_link.expires_at;
     RETURN;
   END IF;
 
@@ -80,7 +65,7 @@ BEGIN
     RETURN;
   END IF;
 
-  -- 3. Atualiza o registro do link (incrementa usos e registra último validador)
+  -- 1. Atualiza o registro do link (incrementa usos e registra último validador)
   UPDATE public.access_links
   SET
     uses = uses + 1,
@@ -90,7 +75,7 @@ BEGIN
     last_validator_email = p_visitor_email
   WHERE id = v_link.id;
 
-  -- 4. Insere o registro de visita (log)
+  -- 2. Insere o registro de visita (log)
   INSERT INTO public.access_link_visits (
     access_link_id,
     visitor_name,

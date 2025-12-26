@@ -8,6 +8,8 @@
 import * as React from 'react';
 import { createContext, useContext, useState, useCallback } from 'react';
 import { supabase } from '../lib/supabase';
+import { trackInitiateCheckout } from '../lib/tracking';
+import { useAuth } from './AuthContext'; // Importando useAuth
 
 type CheckoutState = {
   isOpen: boolean;
@@ -30,6 +32,8 @@ type CheckoutContextValue = {
 const CheckoutContext = createContext<CheckoutContextValue | undefined>(undefined);
 
 export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ children }: { children: React.ReactNode }) => {
+  const { user } = useAuth(); // Usando useAuth para obter o usuário logado
+  
   const [state, setState] = useState<CheckoutState>({
     isOpen: false,
     loading: false,
@@ -46,14 +50,12 @@ export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ chil
 
   const openCheckoutForProduct = useCallback(async (productId: string) => {
     // 1) Garantir que tem usuário logado
-    const { data: { user }, error: userError } = await supabase.auth.getUser();
-
-    if (userError || !user) {
+    if (!user) {
       setState(prev => ({
         ...prev,
         isOpen: false,
         loading: false,
-        error: 'Sua sessão expirou ou não foi possível identificar seu usuário. Faça login novamente.',
+        error: 'Sua sessão expirou ou não foi possível identificar seu usuário. Por favor, faça login novamente.',
       }));
       return;
     }
@@ -70,6 +72,20 @@ export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       modelName: undefined,
       error: null,
     }));
+    
+    // --- RASTREAMENTO: InitiateCheckout ---
+    const { data: productData } = await supabase.from('products').select('price_cents, model_id').eq('id', productId).single();
+    
+    if (productData) {
+        trackInitiateCheckout({
+            content_ids: [productId],
+            value: productData.price_cents / 100,
+            currency: 'BRL',
+            model_id: productData.model_id
+        });
+    }
+    // --------------------------------------
+
 
     // 2) Chamar a Edge Function passando productId + userId
     supabase.functions
@@ -82,10 +98,11 @@ export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ chil
       .then(({ data, error }) => {
         if (error) {
           console.error('[CheckoutContext] invoke error', error);
+          const errorMessage = (error as any).context?.error_description || error.message;
           setState(prev => ({
             ...prev,
             loading: false,
-            error: error.message || 'Erro ao iniciar pagamento PIX.',
+            error: errorMessage || 'Erro ao iniciar pagamento PIX.',
           }));
           return;
         }
@@ -102,7 +119,6 @@ export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ chil
         if (data.ok === false) {
           let errorMessage = data.message || 'Erro ao criar cobrança PIX.';
           
-          // Tratamento de erros de autenticação específicos
           if (data.code === 'MISSING_TOKEN' || data.code === 'INVALID_USER') {
             errorMessage = 'Sua sessão expirou ou não foi possível identificar seu usuário. Faça login novamente e tente comprar de novo.';
           }
@@ -133,7 +149,7 @@ export const CheckoutProvider: React.FC<{ children: React.ReactNode }> = ({ chil
           error: err?.message || 'Erro inesperado ao criar o checkout PIX.',
         }));
       });
-  }, []);
+  }, [user]); // Depende do objeto user do AuthContext
 
   return (
     <CheckoutContext.Provider value={{ state, openCheckoutForProduct, closeCheckout }}>

@@ -3,7 +3,8 @@ import { useEffect, useState } from 'react';
 import { useNavigate } from 'react-router-dom';
 import { Header } from '../components/Header';
 import { BottomNavigation } from '../components/BottomNavigation';
-import { fetchUserPurchases, UserPurchaseWithProduct } from '../lib/marketplace';
+import { fetchUserPurchases, UserPurchaseWithProduct, getProductImageSrc } from '../lib/marketplace';
+import { useAuth } from '../contexts/AuthContext'; // Importando useAuth
 
 const formatPrice = (cents: number | null | undefined) => {
   if (cents == null) return '';
@@ -14,19 +15,25 @@ const formatPrice = (cents: number | null | undefined) => {
 };
 
 export const MyPurchases: React.FC = () => {
+  const { user, isLoading: isLoadingAuth } = useAuth();
   const [purchases, setPurchases] = useState<UserPurchaseWithProduct[]>([]);
   const [loading, setLoading] = useState(true);
   const navigate = useNavigate();
 
   useEffect(() => {
+    if (isLoadingAuth || !user?.id) {
+        if (!isLoadingAuth) setLoading(false);
+        return;
+    }
+    
     const load = async () => {
       setLoading(true);
-      const data = await fetchUserPurchases();
+      const data = await fetchUserPurchases(user.id); // Corrigido: Passando userId
       setPurchases(data);
       setLoading(false);
     };
     load();
-  }, []);
+  }, [user?.id, isLoadingAuth]);
 
   // 🔐 Garante que só lidamos com compras que realmente têm products
   const purchasesWithProduct = purchases.filter((p): p is UserPurchaseWithProduct & { products: NonNullable<UserPurchaseWithProduct['products']> } => p.products !== null);
@@ -53,15 +60,19 @@ export const MyPurchases: React.FC = () => {
     navigate(`/produto/${productId}`);
   };
 
+  if (isLoadingAuth || loading) {
+    return (
+        <div className="min-h-screen bg-privacy-black text-white flex items-center justify-center">
+            <div className="animate-spin rounded-full h-12 w-12 border-t-2 border-b-2 border-primary"></div>
+        </div>
+    );
+  }
+
   return (
     <div className="min-h-screen bg-privacy-black text-white pb-24">
       <Header />
       <main className="mx-auto w-full max-w-4xl px-4 py-6">
         <h1 className="text-2xl font-bold mb-4">Minhas Compras</h1>
-
-        {loading && (
-          <p className="text-privacy-text-secondary text-sm">Carregando suas compras...</p>
-        )}
 
         {!loading && purchasesWithProduct.length === 0 && (
           <p className="text-privacy-text-secondary text-sm">
@@ -80,6 +91,7 @@ export const MyPurchases: React.FC = () => {
                   {vipPurchases.map((p) => {
                     const product = p.products;
                     const model = product.models;
+                    const productImageSrc = getProductImageSrc(product, model);
 
                     return (
                       <button
@@ -89,10 +101,10 @@ export const MyPurchases: React.FC = () => {
                         className="bg-privacy-surface rounded-lg overflow-hidden text-left group"
                       >
                         <div className="relative aspect-[3/4]">
-                          {model?.avatar_url ? (
+                          {productImageSrc ? (
                             <img
-                              src={model.avatar_url}
-                              alt={model.name || 'Modelo'}
+                              src={productImageSrc}
+                              alt={model?.name || 'Modelo'}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
                           ) : (
@@ -124,6 +136,7 @@ export const MyPurchases: React.FC = () => {
                   {packPurchases.map((p) => {
                     const product = p.products;
                     const model = product.models;
+                    const productImageSrc = getProductImageSrc(product, model);
 
                     return (
                       <button
@@ -133,9 +146,9 @@ export const MyPurchases: React.FC = () => {
                         className="bg-privacy-surface rounded-lg overflow-hidden text-left group"
                       >
                         <div className="relative aspect-[3/4]">
-                          {product.cover_thumbnail ? (
+                          {productImageSrc ? (
                             <img
-                              src={product.cover_thumbnail}
+                              src={productImageSrc}
                               alt={product.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />
@@ -171,6 +184,7 @@ export const MyPurchases: React.FC = () => {
                   {singlePurchases.map((p) => {
                     const product = p.products;
                     const model = product.models;
+                    const productImageSrc = getProductImageSrc(product, model);
 
                     return (
                       <button
@@ -180,9 +194,9 @@ export const MyPurchases: React.FC = () => {
                         className="bg-privacy-surface rounded-lg overflow-hidden text-left group"
                       >
                         <div className="relative aspect-[3/4]">
-                          {product.cover_thumbnail ? (
+                          {productImageSrc ? (
                             <img
-                              src={product.cover_thumbnail}
+                              src={productImageSrc}
                               alt={product.name}
                               className="w-full h-full object-cover group-hover:scale-105 transition-transform duration-300"
                             />

@@ -1,89 +1,95 @@
-import { SupabaseClient } from '@supabase/supabase-js';
+import { supabase } from './supabase'; // Importando o cliente Supabase
 
 /**
  * Garante que o usuário tenha pelo menos 1 produto da Carolina Andrade
  * marcado como comprado (compra de boas-vindas).
  *
- * Regras:
- * - Procura a modelo "carolina-andrade" na tabela models.
- * - Procura um produto dessa modelo na tabela products (model_id = id da modelo).
- *   Se existir um produto de assinatura base (is_base_membership = true),
- *   prioriza ele. Senão, usa o primeiro produto encontrado.
- * - Cria um registro em user_purchases (user_id, product_id) se ainda não existir.
- *
- * Se der qualquer erro, só loga no console e não quebra o fluxo.
+ * @param userId - O ID do usuário autenticado.
  */
 export const ensureWelcomePurchaseForCarolina = async (
-  supabase: SupabaseClient,
   userId: string
 ): Promise<void> => {
+  console.log("[welcomePurchase] start", { userId });
+  
   try {
-    // console.log('[welcomePurchase] Iniciando para user:', userId); // Removido log verboso
-
     // 1) Buscar modelo da Carolina
     const { data: model, error: modelError } = await supabase
       .from('models')
-      .select('id, username')
+      .select('id')
       .eq('username', 'carolina-andrade')
       .single();
 
     if (modelError || !model) {
-      console.error('[welcomePurchase] Modelo carolina-andrade não encontrado:', modelError);
+      console.error('[welcomePurchase] Modelo carolina-andrade não encontrado:', modelError?.message);
       return;
     }
+    
+    console.log("[welcomePurchase] Model found:", { modelId: model.id });
 
-    // console.log('[welcomePurchase] Modelo encontrado:', model.id); // Removido log verboso
-
-    // 2) Buscar produtos dessa modelo
-    const { data: products, error: productsError } = await supabase
+    // 2) Buscar o produto de assinatura base (VIP)
+    const { data: product, error: productError } = await supabase
       .from('products')
-      .select('*')
-      .eq('model_id', model.id);
+      .select('id, price_cents')
+      .eq('model_id', model.id)
+      .eq('is_base_membership', true)
+      .eq('status', 'active') // Garantindo que o produto esteja ativo
+      .single();
 
-    if (productsError || !products || products.length === 0) {
-      console.error('[welcomePurchase] Nenhum produto encontrado para a modelo:', productsError);
+    if (productError || !product) {
+      console.error('[welcomePurchase] Produto VIP base da Carolina não encontrado:', productError?.message);
       return;
     }
+    
+    const productId = product.id;
+    const priceCents = product.price_cents;
+    console.log("[welcomePurchase] VIP Product found:", { productId, priceCents });
 
-    // Tenta pegar um produto marcado como assinatura base; se não tiver, pega o primeiro
-    const baseMembership =
-      products.find((p: any) => p.is_base_membership === true) ?? products[0];
-
-    // console.log('[welcomePurchase] Produto escolhido para boas-vindas:', baseMembership.id); // Removido log verboso
 
     // 3) Verificar se já existe compra desse produto para esse usuário
     const { data: existing, error: existingError } = await supabase
       .from('user_purchases')
       .select('id')
       .eq('user_id', userId)
-      .eq('product_id', baseMembership.id)
+      .eq('product_id', productId)
+      .eq('status', 'paid')
       .maybeSingle();
 
     if (existingError && existingError.code !== 'PGRST116') {
-      console.error('[welcomePurchase] Erro verificando compra existente:', existingError);
+      console.error('[welcomePurchase] Erro verificando compra existente:', existingError.message);
       return;
     }
 
     if (existing) {
-      // console.log('[welcomePurchase] Compra de boas-vindas já existe. Nada a fazer.'); // Removido log verboso
+      console.log("[welcomePurchase] purchase already exists", { purchaseId: existing.id });
       return;
     }
 
-    // 4) Criar a compra de boas-vindas
+    // 4) Criar a compra de boas-vindas (status: paid)
     const { error: insertError } = await supabase.from('user_purchases').insert({
       user_id: userId,
-      product_id: baseMembership.id,
-      price_paid_cents: 0,
+      product_id: productId,
+      price_paid_cents: priceCents,
+      amount_cents: priceCents,
       status: 'paid',
+      payment_provider: 'whatsapp_welcome',
+      payment_data: { source: 'whatsapp_migration' },
+      paid_at: new Date().toISOString(),
     });
 
     if (insertError) {
-      console.error('[welcomePurchase] Erro ao criar compra de boas-vindas:', insertError);
+      // Se for unique_violation (o que pode acontecer em condições de corrida), apenas logamos.
+      if (insertError.code === '23505') { // PostgreSQL unique_violation code
+        console.warn('[welcomePurchase] Unique constraint violation (race condition). Purchase already exists.');
+        return;
+      }
+      console.error('[welcomePurchase] Erro ao criar compra de boas-vindas:', insertError.message);
       return;
     }
+    
+    console.log(`[welcomePurchase] Compra VIP da Carolina registrada com sucesso para o usuário ${userId}.`);
 
-    // console.log('[welcomePurchase] Compra de boas-vindas criada com sucesso!'); // Removido log verboso
   } catch (err) {
-    console.error('[welcomePurchase] Erro inesperado:', err);
+    const e = err as Error;
+    console.error('[welcomePurchase] Erro inesperado no fluxo:', e.message);
   }
 };

@@ -485,7 +485,8 @@ export const ManageContent: React.FC = () => {
             const insertionPromises = itemsToInsert.map(async ({ fileUrl, thumbnailUrl }) => {
                 try {
                     // 1) Tenta IA (apenas texto para vídeo, ou imagem para foto)
-                    const imageUrlForAi = batchType === 'image' ? thumbnailUrl : undefined;
+                    // FIX: Adicionando verificação de nulidade para resolver o erro de tipagem
+                    const imageUrlForAi = (batchType === 'image' && thumbnailUrl) ? thumbnailUrl : undefined;
                     let aiResult = await generateMetadata(genericContext, batchType, imageUrlForAi);
 
                     // 2) Se mesmo assim não voltar nada, cria uma copy padrão (FALLBACK FINAL)

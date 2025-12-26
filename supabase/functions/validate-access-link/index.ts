@@ -62,7 +62,7 @@ serve(async (req: Request) => {
   try {
     const body = await req.json();
     const rawToken = body.token;
-    const user_id = body.user_id;
+    const user_id = body.user_id; // user_id pode ser null (deslogado)
 
     // Compatibilidade de nomes de campos
     const visitor_name = body.visitor_name || body.name || body.nome || null;
@@ -120,7 +120,7 @@ serve(async (req: Request) => {
             p_token_hash: tokenHash,
             p_visitor_name: visitor_name,
             p_visitor_email: visitor_email,
-            p_user_id: user_id,
+            p_user_id: user_id, // user_id é obrigatório e não nulo aqui
             p_user_agent: userAgent,
             p_ip: ipAddress,
         };
@@ -131,7 +131,7 @@ serve(async (req: Request) => {
             p_token_hash: tokenHash,
             p_visitor_name: visitor_name,
             p_visitor_email: visitor_email,
-            p_user_id: user_id || null, // user_id é opcional para ACCESS
+            p_user_id: user_id || null, // user_id é opcional e pode ser nulo
             p_user_agent: userAgent,
             p_ip: ipAddress,
         };

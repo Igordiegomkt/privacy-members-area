@@ -54,16 +54,10 @@ export const AccessLinkEntry: React.FC = () => {
       if (grant.link_type === 'access') {
         // ACCESS: Salva grant temporário no localStorage
         saveGrant(grant);
-        // Define flag para pular a compra de boas-vindas no login (se for o primeiro acesso)
-        sessionStorage.setItem('skip_welcome_purchase', '1');
-        
         setMessage('Acesso temporário liberado com sucesso! Redirecionando...');
       } else if (grant.link_type === 'grant') {
         // GRANT: A compra permanente foi criada pela RPC grant_access_link.
         // NÃO salva grant local.
-        // Define flag para pular a compra de boas-vindas no login (se for o primeiro acesso)
-        sessionStorage.setItem('skip_welcome_purchase', '1');
-        
         setMessage('Acesso permanente liberado com sucesso! Redirecionando...');
       }
       
@@ -101,7 +95,6 @@ export const AccessLinkEntry: React.FC = () => {
           setStatus('loading');
           
           // Salva o estado pendente
-          sessionStorage.setItem('skip_welcome_purchase', '1'); // CRÍTICO: Pula a compra de boas-vindas
           sessionStorage.setItem(PENDING_GRANT_KEY, JSON.stringify({
               token: token,
               name: name,

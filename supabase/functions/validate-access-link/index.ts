@@ -35,6 +35,7 @@ interface Grant {
   model_id: string | null;
   product_id: string | null;
   expires_at: string | null;
+  link_type: 'access' | 'grant'; // Adicionado link_type
 }
 
 /**
@@ -71,38 +72,76 @@ serve(async (req: Request) => {
       return createResponse(false, { code: "INVALID_LINK", message: "Token inválido." });
     }
     
-    // 3. Validação de Email Obrigatório
+    // 1. Validação de Email Obrigatório (Frontend já faz, mas reforçamos)
     if (!visitor_email || typeof visitor_email !== 'string' || !visitor_email.includes('@')) {
         return createResponse(false, { code: "EMAIL_REQUIRED", message: "O email é obrigatório para validar o acesso." });
     }
     
-    // 1. Normalização do Token
+    // 2. Normalização do Token e Hash
     const token = rawToken.trim();
-
-    // 2. Calcular token_hash (SHA-256 Hex Lowercase)
     const tokenHash = await sha256Hex(token);
     
     // 3. Obter dados do visitante e IP
     const userAgent = req.headers.get('user-agent') || null;
-    
-    // Ajuste de IP: pega o primeiro IP se for uma lista
     let ipAddress = req.headers.get('x-forwarded-for') || req.headers.get('x-real-ip') || null;
     if (ipAddress && ipAddress.includes(',')) {
         ipAddress = ipAddress.split(',')[0].trim();
     }
 
-    // 4. Chamar a RPC para validação e consumo atômico
-    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc('consume_access_link', {
-        p_token_hash: tokenHash,
-        p_visitor_name: visitor_name,
-        p_visitor_email: visitor_email,
-        p_user_id: user_id || null,
-        p_user_agent: userAgent,
-        p_ip: ipAddress,
-    });
+    // 4. Buscar o link para determinar o tipo (usando Service Role Key para ignorar RLS)
+    const { data: linkData, error: linkError } = await supabaseAdmin
+        .from('access_links')
+        .select('id, link_type, scope, model_id, product_id, expires_at, max_uses, uses, active')
+        .eq('token_hash', tokenHash)
+        .single();
+        
+    if (linkError && linkError.code !== 'PGRST116') {
+        console.error("[validate-access-link] DB Link Fetch Error:", linkError);
+        return createResponse(false, { code: "DB_ERROR", message: linkError.message });
+    }
+    
+    if (!linkData) {
+        return createResponse(false, { code: "INVALID_LINK", message: "Link de acesso não encontrado." });
+    }
+    
+    const linkType = linkData.link_type as 'access' | 'grant';
+    
+    let rpcName: 'consume_access_link' | 'grant_access_link';
+    let rpcPayload: any;
+    
+    // 5. DECISÃO DE ROTEAMENTO
+    if (linkType === 'grant') {
+        // 5.1. Roteamento GRANT: Exige user_id e chama grant_access_link
+        if (!user_id) {
+            return createResponse(false, { code: "LOGIN_REQUIRED", message: "Login é obrigatório para ativar o acesso permanente." });
+        }
+        rpcName = 'grant_access_link';
+        rpcPayload = {
+            p_token_hash: tokenHash,
+            p_visitor_name: visitor_name,
+            p_visitor_email: visitor_email,
+            p_user_id: user_id,
+            p_user_agent: userAgent,
+            p_ip: ipAddress,
+        };
+    } else {
+        // 5.2. Roteamento ACCESS: Comportamento IDÊNTICO ao atual (chama consume_access_link)
+        rpcName = 'consume_access_link';
+        rpcPayload = {
+            p_token_hash: tokenHash,
+            p_visitor_name: visitor_name,
+            p_visitor_email: visitor_email,
+            p_user_id: user_id || null, // user_id é opcional para ACCESS
+            p_user_agent: userAgent,
+            p_ip: ipAddress,
+        };
+    }
+
+    // 6. Chamar a RPC
+    const { data: rpcData, error: rpcError } = await supabaseAdmin.rpc(rpcName, rpcPayload);
 
     if (rpcError) {
-      console.error("[validate-access-link] RPC Error:", rpcError);
+      console.error(`[validate-access-link] RPC ${rpcName} Error:`, rpcError);
       return createResponse(false, { code: "RPC_ERROR", message: rpcError.message });
     }
     
@@ -114,12 +153,13 @@ serve(async (req: Request) => {
         return createResponse(false, { code, message });
     }
 
-    // 5. Sucesso: Retorna o grant
+    // 7. Sucesso: Retorna o grant (incluindo link_type)
     const grant: Grant = {
         scope: result.scope as 'global' | 'model' | 'product',
         model_id: result.model_id,
         product_id: result.product_id,
         expires_at: result.expires_at,
+        link_type: linkType, // Adicionando o tipo de link
     };
     
     return createResponse(true, { grant });

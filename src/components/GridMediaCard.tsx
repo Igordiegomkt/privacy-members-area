@@ -30,9 +30,7 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
   useVideoAutoplay(videoRef, isVideo, showLockedOverlay);
 
   // Lógica de poster/thumbnail:
-  // 1. Se for vídeo E não tiver thumbnail, imageSrc é null/undefined.
-  // 2. Se for imagem, usa a URL da mídia ou o fallback genérico.
-  // 3. Se for vídeo E tiver thumbnail, usa a thumbnail.
+  // Se for vídeo, só usa a thumbnail se ela existir. Se for imagem, usa a URL da mídia ou o fallback genérico.
   const posterOrThumbnail = media.thumbnail;
   
   let imageSrc: string | undefined = undefined;
@@ -57,6 +55,9 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
     }
     return onMediaClick();
   };
+  
+  // Atributo poster condicional
+  const posterProps = imageSrc ? { poster: imageSrc } : {};
 
   return (
     <div
@@ -85,7 +86,7 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
           key={media.id} // Key change forces re-render and re-load
           ref={videoRef}
           src={videoUrl}
-          poster={imageSrc} // Usamos imageSrc como poster (pode ser undefined)
+          {...posterProps} // Passa o poster condicionalmente
           className={`absolute inset-0 w-full h-full object-cover z-20`}
           preload="metadata"
           playsInline

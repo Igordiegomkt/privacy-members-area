@@ -70,6 +70,10 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
       onMediaClick();
     }
   };
+  
+  // Atributo poster condicional
+  const posterProps = imageSrc ? { poster: imageSrc } : {};
+
 
   // --- Renderização da Capa (Thumbnail) ---
   const renderCover = () => (
@@ -128,7 +132,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
         key={media.id}
         ref={videoRef}
         src={videoUrl}
-        poster={imageSrc} // Usamos imageSrc como poster (pode ser undefined)
+        {...posterProps} // Passa o poster condicionalmente
         // Usamos object-cover para garantir que o vídeo preencha o espaço, evitando bordas da imagem de fundo
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 z-20`}
         preload="metadata"

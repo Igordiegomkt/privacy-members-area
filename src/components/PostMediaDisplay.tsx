@@ -42,7 +42,8 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
   // Prioriza thumbnail, depois a URL da mídia (se for imagem). Se for vídeo e não tiver thumbnail, usamos undefined.
   const posterOrThumbnail = media.thumbnail || (isVideo ? undefined : media.url);
   
-  // Se for vídeo e não tiver poster/thumbnail, não usamos o fallback genérico.
+  // Se for vídeo e não tiver poster/thumbnail, usamos undefined.
+  // Se for imagem e não tiver poster/thumbnail, usamos o fallback genérico.
   const imageSrc = stripTrackingParams(posterOrThumbnail || (isVideo ? undefined : '/video-fallback.svg'));
   const backgroundSrc = imageSrc;
   const videoUrl = stripTrackingParams(media.url); // Limpando a URL do vídeo

@@ -57,18 +57,22 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
   // Limpando todas as URLs antes de usar
   const mediaUrl = stripTrackingParams(currentMedia.url);
   const thumbnail = currentMedia.thumbnail ? stripTrackingParams(currentMedia.thumbnail) : null;
-  const backgroundSrc = thumbnail || (isVideo ? '/video-fallback.svg' : mediaUrl);
+  
+  // Se for vídeo e não tiver thumbnail, não usamos o fallback genérico.
+  const backgroundSrc = thumbnail || (isVideo ? undefined : '/video-fallback.svg');
 
   return (
     <div
       className="fixed inset-0 z-[1000] flex items-center justify-center bg-black/95 backdrop-blur-sm"
       onClick={onClose}
     >
-      {/* Background Blur Effect */}
-      <div
-        className={`absolute inset-0 bg-center bg-cover blur-xl scale-110 opacity-30 transition-opacity duration-500`}
-        style={{ backgroundImage: `url(${backgroundSrc})` }}
-      />
+      {/* Background Blur Effect - Renderiza apenas se houver backgroundSrc */}
+      {backgroundSrc && (
+        <div
+          className={`absolute inset-0 bg-center bg-cover blur-xl scale-110 opacity-30 transition-opacity duration-500`}
+          style={{ backgroundImage: `url(${backgroundSrc})` }}
+        />
+      )}
 
       {/* Content Area */}
       <div
@@ -82,7 +86,7 @@ export const MediaViewerFullscreen: React.FC<MediaViewerFullscreenProps> = ({
               key={currentMedia.id} // Key change forces re-render and re-load
               ref={videoRef}
               src={mediaUrl}
-              poster={thumbnail || '/video-fallback.svg'}
+              poster={thumbnail || undefined} // Usamos undefined se não houver thumbnail
               controls
               autoPlay
               playsInline

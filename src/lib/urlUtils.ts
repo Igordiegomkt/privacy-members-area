@@ -9,8 +9,8 @@ const TRACKING_PARAMS_RE = /^(utm_|fbclid|gclid|sck|xcod)/i;
  * @param urlString A URL que pode conter parâmetros de tracking.
  * @returns A URL sanitizada.
  */
-export function stripTrackingParams(urlString: string): string {
-  if (!urlString) return urlString;
+export function stripTrackingParams(urlString: string | undefined | null): string {
+  if (!urlString) return ''; // Retorna string vazia se for null, undefined ou vazio
 
   try {
     const url = new URL(urlString);

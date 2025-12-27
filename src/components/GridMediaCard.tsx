@@ -30,8 +30,12 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
   useVideoAutoplay(videoRef, isVideo, showLockedOverlay);
 
   // PosterSrc é usado como thumbnail da imagem ou poster do vídeo
+  // Se for vídeo e não tiver thumbnail, usamos undefined para que o navegador use o poster padrão.
   const posterSrc = media.thumbnail || (isVideo ? undefined : media.url);
-  const imageSrc = stripTrackingParams(posterSrc || '/video-fallback.svg'); // Limpando a URL da imagem/poster
+  
+  // Se for vídeo e não tiver poster/thumbnail, não usamos o fallback genérico.
+  // stripTrackingParams agora aceita undefined/null.
+  const imageSrc = stripTrackingParams(posterSrc || (isVideo ? undefined : '/video-fallback.svg'));
   
   const videoUrl = stripTrackingParams(media.url); // Limpando a URL do vídeo
 
@@ -52,23 +56,26 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
       onClick={handleClick}
     >
       {/* IMAGEM (ou poster de vídeo) - Z-index 10 */}
-      <img
-        src={imageSrc}
-        alt={media.title || 'Conteúdo'}
-        className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 z-10 ${
-          showLockedOverlay ? 'blur-xl brightness-25 scale-105' : ''
-        }`}
-        loading="lazy"
-        draggable={false}
-        onError={() => setThumbError(true)}
-      />
+      {/* Renderiza a imagem/poster apenas se houver uma URL válida (imageSrc) */}
+      {imageSrc && (
+        <img
+          src={imageSrc}
+          alt={media.title || 'Conteúdo'}
+          className={`w-full h-full object-cover transition-all duration-300 group-hover:scale-105 z-10 ${
+            showLockedOverlay ? 'blur-xl brightness-25 scale-105' : ''
+          }`}
+          loading="lazy"
+          draggable={false}
+          onError={() => setThumbError(true)}
+        />
+      )}
       
       {/* VÍDEO (Autoplay) - Z-index 20 */}
       {isVideo && !showLockedOverlay && (
         <video
           ref={videoRef}
           src={videoUrl}
-          poster={imageSrc}
+          poster={imageSrc} // Usamos imageSrc como poster (pode ser undefined)
           className={`absolute inset-0 w-full h-full object-cover z-20`}
           preload="metadata"
           playsInline

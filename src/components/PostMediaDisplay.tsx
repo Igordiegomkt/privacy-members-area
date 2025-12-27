@@ -39,8 +39,11 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
   // Hook para autoplay
   useVideoAutoplay(videoRef, isVideo, showLockedOverlay);
 
-  // Prioriza thumbnail, depois a URL da mídia (se for imagem), senão o fallback genérico
-  const imageSrc = stripTrackingParams(media.thumbnail || (isVideo ? '/video-fallback.svg' : media.url));
+  // Prioriza thumbnail, depois a URL da mídia (se for imagem). Se for vídeo e não tiver thumbnail, usamos undefined.
+  const posterOrThumbnail = media.thumbnail || (isVideo ? undefined : media.url);
+  
+  // Se for vídeo e não tiver poster/thumbnail, não usamos o fallback genérico.
+  const imageSrc = stripTrackingParams(posterOrThumbnail || (isVideo ? undefined : '/video-fallback.svg'));
   const backgroundSrc = imageSrc;
   const videoUrl = stripTrackingParams(media.url); // Limpando a URL do vídeo
 
@@ -60,26 +63,30 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
   // --- Renderização da Capa (Thumbnail) ---
   const renderCover = () => (
     <div className="relative w-full h-full">
-      {/* Fundo espelhado/blur */}
-      <div
-        className={`absolute inset-0 bg-center bg-cover blur-lg scale-110 opacity-60 transition-opacity duration-500`}
-        style={{ backgroundImage: `url(${backgroundSrc})` }}
-      />
-      
-      {/* Imagem principal (centralizada e contida) */}
-      <div className="relative w-full h-full flex items-center justify-center">
-        <img
-          src={imageSrc}
-          alt={media.title || 'Conteúdo'}
-          // APLICANDO O EFEITO DE BLUR/ESCURECIMENTO DO MURAL AQUI
-          className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl ${
-            showBlurredImage ? 'blur-xl brightness-25 scale-105' : ''
-          }`}
-          loading="lazy"
-          draggable={false}
-          onContextMenu={(e) => e.preventDefault()}
+      {/* Fundo espelhado/blur - Renderiza apenas se houver backgroundSrc */}
+      {backgroundSrc && (
+        <div
+          className={`absolute inset-0 bg-center bg-cover blur-lg scale-110 opacity-60 transition-opacity duration-500`}
+          style={{ backgroundImage: `url(${backgroundSrc})` }}
         />
-      </div>
+      )}
+      
+      {/* Imagem principal (centralizada e contida) - Renderiza apenas se houver imageSrc */}
+      {imageSrc && (
+        <div className="relative w-full h-full flex items-center justify-center">
+          <img
+            src={imageSrc}
+            alt={media.title || 'Conteúdo'}
+            // APLICANDO O EFEITO DE BLUR/ESCURECIMENTO DO MURAL AQUI
+            className={`max-w-full max-h-full object-contain rounded-lg shadow-2xl ${
+              showBlurredImage ? 'blur-xl brightness-25 scale-105' : ''
+            }`}
+            loading="lazy"
+            draggable={false}
+            onContextMenu={(e) => e.preventDefault()}
+          />
+        </div>
+      )}
       
       {/* Ícone de tipo */}
       {!showLockedOverlay && (
@@ -110,7 +117,7 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
         key={media.id}
         ref={videoRef}
         src={videoUrl}
-        poster={imageSrc}
+        poster={imageSrc} // Usamos imageSrc como poster (pode ser undefined)
         // Usamos object-cover para garantir que o vídeo preencha o espaço, evitando bordas da imagem de fundo
         className={`absolute inset-0 w-full h-full object-cover transition-opacity duration-300 z-20`}
         preload="metadata"

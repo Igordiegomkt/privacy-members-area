@@ -39,13 +39,23 @@ export const PostMediaDisplay: React.FC<PostMediaDisplayProps> = ({
   // Hook para autoplay
   useVideoAutoplay(videoRef, isVideo, showLockedOverlay);
 
-  // Prioriza thumbnail, depois a URL da mídia (se for imagem). Se for vídeo e não tiver thumbnail, usamos undefined.
-  const posterOrThumbnail = media.thumbnail || (isVideo ? undefined : media.url);
+  // Lógica de poster/thumbnail:
+  // 1. Se for vídeo E não tiver thumbnail, imageSrc e backgroundSrc são null/undefined.
+  // 2. Se for imagem, usa a URL da mídia ou o fallback genérico.
+  // 3. Se for vídeo E tiver thumbnail, usa a thumbnail.
+  const posterOrThumbnail = media.thumbnail;
   
-  // Se for vídeo e não tiver poster/thumbnail, usamos undefined.
-  // Se for imagem e não tiver poster/thumbnail, usamos o fallback genérico.
-  const imageSrc = stripTrackingParams(posterOrThumbnail || (isVideo ? undefined : '/video-fallback.svg'));
-  const backgroundSrc = imageSrc;
+  let imageSrc: string | undefined = undefined;
+
+  if (isVideo) {
+    // Se for vídeo, só usa a thumbnail se ela existir
+    imageSrc = posterOrThumbnail ? stripTrackingParams(posterOrThumbnail) : undefined;
+  } else {
+    // Se for imagem, usa a URL da mídia ou o fallback genérico
+    imageSrc = stripTrackingParams(posterOrThumbnail || media.url || '/video-fallback.svg');
+  }
+  
+  const backgroundSrc = imageSrc; // backgroundSrc é o mesmo que imageSrc
   const videoUrl = stripTrackingParams(media.url); // Limpando a URL do vídeo
 
   const handleClick = (e: React.MouseEvent) => {

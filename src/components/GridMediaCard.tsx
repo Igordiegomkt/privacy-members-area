@@ -29,13 +29,21 @@ export const GridMediaCard: React.FC<GridMediaCardProps> = ({
   // Hook para autoplay
   useVideoAutoplay(videoRef, isVideo, showLockedOverlay);
 
-  // PosterSrc é usado como thumbnail da imagem ou poster do vídeo
-  // Se for vídeo e não tiver thumbnail, usamos undefined. Se for imagem, usamos a URL da mídia ou o fallback genérico.
-  const posterSrc = media.thumbnail || (isVideo ? undefined : media.url);
+  // Lógica de poster/thumbnail:
+  // 1. Se for vídeo E não tiver thumbnail, imageSrc é null/undefined.
+  // 2. Se for imagem, usa a URL da mídia ou o fallback genérico.
+  // 3. Se for vídeo E tiver thumbnail, usa a thumbnail.
+  const posterOrThumbnail = media.thumbnail;
   
-  // Se for vídeo e não tiver poster/thumbnail, usamos undefined.
-  // Se for imagem e não tiver poster/thumbnail, usamos o fallback genérico.
-  const imageSrc = stripTrackingParams(posterSrc || (isVideo ? undefined : '/video-fallback.svg'));
+  let imageSrc: string | undefined = undefined;
+
+  if (isVideo) {
+    // Se for vídeo, só usa a thumbnail se ela existir
+    imageSrc = posterOrThumbnail ? stripTrackingParams(posterOrThumbnail) : undefined;
+  } else {
+    // Se for imagem, usa a URL da mídia ou o fallback genérico
+    imageSrc = stripTrackingParams(posterOrThumbnail || media.url || '/video-fallback.svg');
+  }
   
   const videoUrl = stripTrackingParams(media.url); // Limpando a URL do vídeo
 
